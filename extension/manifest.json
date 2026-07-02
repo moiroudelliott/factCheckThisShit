@@ -1,0 +1,21 @@
+{
+  "manifest_version": 3,
+  "name": "FactCheckThis",
+  "version": "1.0",
+  "description": "Fact-checking en temps réel pour les débats politiques sur YouTube",
+  "permissions": ["tabCapture", "offscreen", "activeTab", "scripting", "storage"],
+  "host_permissions": ["*://*.youtube.com/*"],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["*://*.youtube.com/watch*"],
+      "js": ["content.js"],
+      "css": ["overlay.css"]
+    }
+  ],
+  "action": {
+    "default_popup": "popup.html"
+  }
+}

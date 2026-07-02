@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;1,6..72,400;1,6..72,500&family=Archivo:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      width: 300px;
+      padding: 18px 18px 16px;
+      background: #0d0f13;
+      color: rgba(255, 255, 255, 0.9);
+      font-family: 'Archivo', system-ui, sans-serif;
+      font-size: 13px;
+    }
+
+    /* ── Header ── */
+    .fct-header {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      margin-bottom: 16px;
+      padding-bottom: 13px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+    }
+
+    .fct-ping {
+      position: relative;
+      width: 8px;
+      height: 8px;
+      flex-shrink: 0;
+    }
+    .fct-ping-core {
+      position: absolute;
+      inset: 0;
+      border-radius: 50%;
+      background: oklch(0.74 0.13 145);
+      opacity: 0.35;
+      transition: opacity 0.3s;
+    }
+    .fct-ping-ring {
+      position: absolute;
+      inset: 0;
+      border-radius: 50%;
+      background: oklch(0.74 0.13 145);
+      animation: fct-ping 1.8s ease-out infinite;
+      display: none;
+    }
+    .active .fct-ping-core { opacity: 1; }
+    .active .fct-ping-ring { display: block; }
+
+    .fct-brand {
+      font-family: 'Newsreader', serif;
+      font-size: 15px;
+      font-weight: 500;
+      color: #fff;
+    }
+    .fct-brand-dot { color: oklch(0.74 0.13 145); }
+
+    .fct-status-pill {
+      margin-left: auto;
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      color: rgba(255, 255, 255, 0.28);
+      text-transform: uppercase;
+      transition: color 0.3s;
+    }
+    .fct-status-pill.active {
+      color: oklch(0.74 0.13 145);
+    }
+
+    /* ── Form ── */
+    .fct-section { margin-bottom: 9px; }
+    .fct-label {
+      font-size: 9.5px;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: rgba(255, 255, 255, 0.3);
+      margin-bottom: 5px;
+    }
+
+    input, textarea {
+      width: 100%;
+      background: rgba(255, 255, 255, 0.04);
+      color: rgba(255, 255, 255, 0.88);
+      border: 1px solid rgba(255, 255, 255, 0.09);
+      border-radius: 8px;
+      padding: 8px 11px;
+      font-size: 12px;
+      font-family: 'Archivo', system-ui, sans-serif;
+      transition: border-color 0.15s, background 0.15s;
+    }
+    input:focus, textarea:focus {
+      outline: none;
+      border-color: oklch(0.74 0.13 145 / 0.45);
+      background: rgba(255, 255, 255, 0.06);
+    }
+    input::placeholder, textarea::placeholder { color: rgba(255, 255, 255, 0.2); }
+    textarea { resize: none; height: 62px; }
+
+    /* ── Buttons ── */
+    .fct-btn {
+      width: 100%;
+      padding: 10px;
+      border-radius: 8px;
+      border: none;
+      font-size: 12.5px;
+      font-weight: 600;
+      font-family: 'Archivo', system-ui, sans-serif;
+      cursor: pointer;
+      transition: background 0.15s, color 0.15s;
+      margin-top: 6px;
+    }
+
+    #btn-start {
+      background: oklch(0.74 0.13 145);
+      color: #0a0c0f;
+    }
+    #btn-start:hover { background: oklch(0.70 0.14 145); }
+
+    #btn-stop {
+      background: rgba(239, 68, 68, 0.1);
+      color: rgba(239, 68, 68, 0.85);
+      border: 1px solid rgba(239, 68, 68, 0.22);
+      display: none;
+    }
+    #btn-stop:hover {
+      background: rgba(239, 68, 68, 0.2);
+      color: #fca5a5;
+    }
+
+    .fct-warn {
+      font-size: 10.5px;
+      color: oklch(0.78 0.15 75);
+      margin-top: 8px;
+      display: none;
+    }
+
+    @keyframes fct-ping {
+      0%   { transform: scale(0.6); opacity: 0.8; }
+      100% { transform: scale(2.4); opacity: 0; }
+    }
+  </style>
+</head>
+<body>
+  <div class="fct-header" id="fct-header">
+    <div class="fct-ping" id="fct-ping">
+      <div class="fct-ping-core"></div>
+      <div class="fct-ping-ring"></div>
+    </div>
+    <span class="fct-brand">vérif<span class="fct-brand-dot">.</span>live</span>
+    <span class="fct-status-pill" id="status-text">inactif</span>
+  </div>
+
+  <div id="briefing-section">
+    <div class="fct-section">
+      <div class="fct-label">Émission</div>
+      <input id="emission" type="text" placeholder="C à vous, BFM Politique…" />
+    </div>
+    <div class="fct-section">
+      <div class="fct-label">Intervenants</div>
+      <textarea id="guests" placeholder="Marine Le Pen&#10;Gabriel Attal&#10;…"></textarea>
+    </div>
+  </div>
+
+  <button class="fct-btn" id="btn-start">▶ Démarrer l'analyse</button>
+  <button class="fct-btn" id="btn-stop">■ Arrêter</button>
+  <p class="fct-warn" id="warn">⚠ Lance d'abord le backend Flask</p>
+
+  <script src="popup.js"></script>
+</body>
+</html>

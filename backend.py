@@ -131,7 +131,7 @@ def _key_words(text: str) -> set:
     tokens = re.findall(r'\b(?:[a-zàâçéèêëîïôùûü]{4,}|\d{3,})\b', text.lower())
     return {t for t in tokens if t not in _STOPWORDS}
 
-def _is_duplicate(new_text: str, existing: list, threshold: float = 0.55) -> bool:
+def _is_duplicate(new_text: str, existing: list, threshold: float = 0.45) -> bool:
     new_w = _key_words(new_text)
     if len(new_w) < 3:
         return False
@@ -290,6 +290,11 @@ session_buffers: dict[str, dict] = {}
 session_contexts: dict[str, dict] = {}   # { sid: {"emission": str, "guests": [str]} }
 session_points: dict[str, list] = {}     # { sid: talking points récents pour le contexte }
 session_flush_locks: dict[str, object] = {}  # { sid: Semaphore } évite la race condition sur session_points
+
+
+@app.route("/health")
+def health():
+    return {"status": "ok"}
 
 
 @socketio.on("connect")

@@ -1,40 +1,72 @@
-let capturing = false;
+// ══════════════════════════════════════════════════════════════════════════════
+// vérif.live — popup (v2)
+// À l'ouverture : lit l'état réel de capture (storage.session via le SW) puis
+// health-check le backend. Toute erreur est affichée, jamais silencieuse.
+// ══════════════════════════════════════════════════════════════════════════════
 
-// Synchroniser l'état au chargement de la popup (le SW peut avoir redémarré)
-chrome.storage.session.get(['isCapturing'], (result) => {
-  if (result.isCapturing) setCapturing(true);
-});
+const BACKEND_URL = 'http://localhost:5000';
 
-document.getElementById('btn-start').addEventListener('click', async () => {
+const $ = (id) => document.getElementById(id);
+
+init();
+
+async function init() {
+  const state = await chrome.runtime.sendMessage({ action: 'getStatus' }).catch(() => null);
+  setCapturing(Boolean(state?.capturing));
+  if (state?.capturing) return;
+
+  // Health-check : désactive le bouton Start si le backend est éteint
+  const ok = await fetch(`${BACKEND_URL}/health`, { signal: AbortSignal.timeout(2500) })
+    .then(r => r.ok)
+    .catch(() => false);
+  if (!ok) {
+    $('warn').style.display = 'block';
+    $('btn-start').disabled = true;
+    setStatus('backend éteint');
+  }
+}
+
+$('btn-start').addEventListener('click', async () => {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
 
   if (!tab?.url?.includes('youtube.com/watch')) {
-    setStatus('⚠ Ouvre une vidéo YouTube d\'abord', false);
+    setStatus('ouvre une vidéo YouTube');
     return;
   }
 
-  const emission = document.getElementById('emission').value.trim();
-  const guests   = document.getElementById('guests').value.trim();
+  $('btn-start').disabled = true;
+  setStatus('démarrage…');
 
-  chrome.runtime.sendMessage({ action: 'startCapture', tabId: tab.id, emission, guests });
-  setCapturing(true);
+  const res = await chrome.runtime.sendMessage({
+    action: 'startCapture',
+    tabId: tab.id,
+    emission: $('emission').value.trim(),
+    guests: $('guests').value.trim(),
+  }).catch(e => ({ ok: false, error: e.message }));
+
+  $('btn-start').disabled = false;
+  if (res?.ok) {
+    setCapturing(true);
+  } else {
+    setStatus('erreur au démarrage');
+    console.error('[FCT] startCapture:', res?.error);
+  }
 });
 
-document.getElementById('btn-stop').addEventListener('click', () => {
-  chrome.runtime.sendMessage({ action: 'stopCapture' });
+$('btn-stop').addEventListener('click', async () => {
+  await chrome.runtime.sendMessage({ action: 'stopCapture' }).catch(() => {});
   setCapturing(false);
 });
 
 function setCapturing(on) {
-  capturing = on;
-  document.getElementById('btn-start').style.display = on ? 'none' : 'block';
-  document.getElementById('btn-stop').style.display  = on ? 'block' : 'none';
-  document.getElementById('briefing-section').style.display = on ? 'none' : 'block';
-  document.getElementById('fct-ping').classList.toggle('active', on);
-  document.getElementById('status-text').classList.toggle('active', on);
+  $('btn-start').style.display = on ? 'none' : 'block';
+  $('btn-stop').style.display  = on ? 'block' : 'none';
+  $('briefing-section').style.display = on ? 'none' : 'block';
+  $('fct-ping').classList.toggle('active', on);
+  $('status-text').classList.toggle('active', on);
   setStatus(on ? 'en direct' : 'inactif');
 }
 
 function setStatus(text) {
-  document.getElementById('status-text').textContent = text;
+  $('status-text').textContent = text;
 }

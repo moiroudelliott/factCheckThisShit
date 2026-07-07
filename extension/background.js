@@ -1,48 +1,78 @@
-let activeTabId = null;
+// ══════════════════════════════════════════════════════════════════════════════
+// vérif.live — service worker (v2)
+// AUCUN état en mémoire : Chrome tue le worker après ~30 s d'inactivité, donc
+// tout vit dans chrome.storage.session. Chaque handler relit l'état.
+// ══════════════════════════════════════════════════════════════════════════════
 
-chrome.runtime.onMessage.addListener((msg, sender) => {
-  if (msg.action === 'startCapture') handleStart(msg);
-  if (msg.action === 'stopCapture')  handleStop();
-  // Relaye offscreen → content script
-  // Récupère activeTabId depuis le message si le SW a redémarré (activeTabId perdu)
-  if (msg.action === 'forwardToContent') {
-    const tid = activeTabId ?? msg.tabId;
-    if (tid) {
-      if (!activeTabId) activeTabId = tid;
-      chrome.tabs.sendMessage(tid, msg.payload).catch(() => {});
+function getState() {
+  return chrome.storage.session.get({ tabId: null, capturing: false });
+}
+
+chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+  (async () => {
+    try {
+      switch (msg.action) {
+        case 'startCapture':
+          await handleStart(msg);
+          sendResponse({ ok: true });
+          break;
+
+        case 'stopCapture':
+          await handleStop();
+          sendResponse({ ok: true });
+          break;
+
+        case 'getStatus':
+          sendResponse(await getState());
+          break;
+
+        case 'forwardToContent': {
+          // offscreen → content : le tabId voyage dans le message, avec le
+          // storage en secours (survit aux redémarrages du worker)
+          const tid = msg.tabId ?? (await getState()).tabId;
+          if (tid) chrome.tabs.sendMessage(tid, msg.payload).catch(() => {});
+          break;
+        }
+      }
+    } catch (e) {
+      console.error('[FCT] background error:', e);
+      try { sendResponse({ ok: false, error: e.message }); } catch (_) {}
     }
-  }
+  })();
+  return true; // sendResponse asynchrone
+});
+
+// Arrêt automatique si l'onglet capturé est fermé
+chrome.tabs.onRemoved.addListener(async (closedTabId) => {
+  const { tabId, capturing } = await getState();
+  if (capturing && closedTabId === tabId) handleStop();
 });
 
 async function handleStart({ tabId, emission, guests }) {
-  activeTabId = tabId;
-  chrome.storage.session.set({ activeTabId: tabId, isCapturing: true });
-
   try {
-    // 1. Vérifier si le content script est déjà actif (ping/pong)
-    const isAlive = await chrome.tabs.sendMessage(tabId, { action: 'ping' })
+    await chrome.storage.session.set({ tabId, capturing: true });
+
+    // Injecter le content script si absent (ping/pong)
+    const alive = await chrome.tabs.sendMessage(tabId, { action: 'ping' })
       .then(r => r?.pong === true)
       .catch(() => false);
 
-    if (!isAlive) {
-      // Réinitialiser le verrou avant réinjection (cas d'extension rechargée sans refresh page)
+    if (!alive) {
+      // Réinitialiser le verrou avant réinjection (extension rechargée sans refresh page)
       await chrome.scripting.executeScript({
         target: { tabId },
         func: () => { window.__fctInjected = false; },
       }).catch(() => {});
-      await chrome.scripting.executeScript({ target: { tabId }, files: ['content.js'] }).catch(() => {});
+      await chrome.scripting.executeScript({ target: { tabId }, files: ['content.js'] });
       await chrome.scripting.insertCSS({ target: { tabId }, files: ['overlay.css'] }).catch(() => {});
     }
 
-    // 2. Afficher l'overlay (catch: listener ne renvoie pas de réponse, ce qui est normal)
     await chrome.tabs.sendMessage(tabId, { action: 'showOverlay' }).catch(() => {});
 
-    // 3. Obtenir l'ID du flux audio de l'onglet
     const streamId = await chrome.tabCapture.getMediaStreamId({ targetTabId: tabId });
 
-    // 4. Créer le document offscreen si nécessaire (toujours vérifier, jamais de flag en mémoire)
-    const has = await chrome.offscreen.hasDocument();
-    if (!has) {
+    // Toujours interroger hasDocument() — jamais de flag en mémoire
+    if (!(await chrome.offscreen.hasDocument())) {
       await chrome.offscreen.createDocument({
         url: chrome.runtime.getURL('offscreen.html'),
         reasons: [chrome.offscreen.Reason.USER_MEDIA],
@@ -50,27 +80,21 @@ async function handleStart({ tabId, emission, guests }) {
       });
     }
 
-    // tabId inclus pour que offscreen.js puisse le propager dans forwardToContent
+    // tabId inclus pour que l'offscreen le propage dans chaque forwardToContent
     chrome.runtime.sendMessage({ action: 'doCapture', streamId, emission, guests, tabId });
-
   } catch (e) {
-    console.error('[FCT] handleStart error:', e.message, e);
-    activeTabId = null;
-    chrome.storage.session.set({ activeTabId: null, isCapturing: false });
+    await chrome.storage.session.set({ tabId: null, capturing: false });
+    throw e; // remonte au listener → réponse {ok:false} vers la popup
   }
 }
 
 async function handleStop() {
+  const { tabId } = await getState();
   chrome.runtime.sendMessage({ action: 'doStop' }).catch(() => {});
-  if (activeTabId) {
-    chrome.tabs.sendMessage(activeTabId, { action: 'hideOverlay' }).catch(() => {});
-  }
-  activeTabId = null;
-  chrome.storage.session.set({ activeTabId: null, isCapturing: false });
+  if (tabId) chrome.tabs.sendMessage(tabId, { action: 'hideOverlay' }).catch(() => {});
+  await chrome.storage.session.set({ tabId: null, capturing: false });
 
-  // Fermer le document offscreen pour éviter un double AudioContext au prochain démarrage
+  // Fermer le document offscreen : évite un double AudioContext au prochain démarrage
   const has = await chrome.offscreen.hasDocument().catch(() => false);
-  if (has) {
-    await chrome.offscreen.closeDocument().catch(() => {});
-  }
+  if (has) await chrome.offscreen.closeDocument().catch(() => {});
 }

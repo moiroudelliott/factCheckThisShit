@@ -5,6 +5,8 @@
 faster-whisper==1.1.1
 python-dotenv==1.0.1
 requests==2.32.3
+ddgs==9.0.0
+speechbrain>=1.0.0
 Flask==3.1.0
 Flask-Cors==5.0.0
 flask-socketio==5.5.1

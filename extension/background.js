@@ -48,7 +48,7 @@ chrome.tabs.onRemoved.addListener(async (closedTabId) => {
   if (capturing && closedTabId === tabId) handleStop();
 });
 
-async function handleStart({ tabId, emission, guests }) {
+async function handleStart({ tabId, emission, guests, description, videoDate }) {
   try {
     await chrome.storage.session.set({ tabId, capturing: true });
 
@@ -81,7 +81,7 @@ async function handleStart({ tabId, emission, guests }) {
     }
 
     // tabId inclus pour que l'offscreen le propage dans chaque forwardToContent
-    chrome.runtime.sendMessage({ action: 'doCapture', streamId, emission, guests, tabId });
+    chrome.runtime.sendMessage({ action: 'doCapture', streamId, emission, guests, description, videoDate, tabId });
   } catch (e) {
     await chrome.storage.session.set({ tabId: null, capturing: false });
     throw e; // remonte au listener → réponse {ok:false} vers la popup

@@ -1,0 +1,29 @@
+# Personnalités politiques françaises — banque de voix
+# Usage: python harvest_voices.py --liste politiciens.txt
+# (une ligne = un nom, # = commentaire)
+
+Emmanuel Macron
+Gabriel Attal
+Jordan Bardella
+Marine Le Pen
+Jean-Luc Mélenchon
+Manuel Bompard
+Mathilde Panot
+François Ruffin
+Éric Zemmour
+Marion Maréchal
+Raphaël Glucksmann
+Olivier Faure
+Édouard Philippe
+Bruno Le Maire
+Gérald Darmanin
+Élisabeth Borne
+François Bayrou
+Bruno Retailleau
+Laurent Wauquiez
+Éric Ciotti
+Fabien Roussel
+Sandrine Rousseau
+Marine Tondelier
+Valérie Pécresse
+Sébastien Chenu

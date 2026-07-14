@@ -64,6 +64,7 @@ const S = {
   cardTimer: null,   // LE timer de carte (un seul actif à la fois)
   shownWords: [],    // sets de mots-clés des dernières cartes affichées (anti-doublon)
   speakerMap: {},    // "Intervenant A" → nom réel confirmé par le backend
+  badgeTimer: null,  // auto-masquage du badge "qui parle" pendant les silences
   recapOpen: false,
   showAll: true,     // filtre récap : true = tout voir (défaut)
 };
@@ -133,6 +134,8 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     if (msg.type === 'fact_check_result') onFactCheck(msg);
     if (msg.type === 'connection_status') onStatus(msg);
     if (msg.type === 'speaker_map')       onSpeakerMap(msg.map || {});
+    if (msg.type === 'transcript_segment') onSegment(msg);
+    if (msg.type === 'speaker_live')      onSegment(msg);
   } catch (e) {
     // Un message malformé ne doit jamais tuer le pipeline d'affichage
     console.error('[FCT] message handler error:', e);
@@ -144,9 +147,10 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
 function initUI() {
   if (S.active) return;
   S.active = true;
-  ['fct-chip', 'fct-card-slot', 'fct-recap'].forEach(id => document.getElementById(id)?.remove());
+  ['fct-chip', 'fct-card-slot', 'fct-recap', 'fct-speaker-badge'].forEach(id => document.getElementById(id)?.remove());
   injectChip();
   injectSlot();
+  injectBadge();
 }
 
 function teardown() {
@@ -159,9 +163,10 @@ function teardown() {
   S.current = null;
   S.shownWords = [];
   S.speakerMap = {};
+  S.badgeTimer = null;
   S.recapOpen = false;
   S.showAll = true;
-  ['fct-chip', 'fct-card-slot', 'fct-recap'].forEach(id => document.getElementById(id)?.remove());
+  ['fct-chip', 'fct-card-slot', 'fct-recap', 'fct-speaker-badge'].forEach(id => document.getElementById(id)?.remove());
 }
 
 // ── Chip + statut de connexion ─────────────────────────────────────────────────
@@ -216,6 +221,40 @@ function updateCount() {
   }
 }
 
+// ── Badge "qui parle" (haut gauche) ────────────────────────────────────────────
+
+function injectBadge() {
+  const badge = document.createElement('div');
+  badge.id = 'fct-speaker-badge';
+  badge.innerHTML = `
+    <span class="fct-eq"><span></span><span></span><span></span></span>
+    <span class="fct-badge-name"></span>
+  `;
+  document.body.appendChild(badge);
+  return badge;
+}
+
+function onSegment({ speaker }) {
+  if (!S.active || !speaker) return;
+  const badge = document.getElementById('fct-speaker-badge') || injectBadge();
+  const nameEl = badge.querySelector('.fct-badge-name');
+  const name = S.speakerMap[speaker] || speaker;
+
+  badge.dataset.label = speaker; // label brut, pour le renommage via speaker_map
+  if (nameEl.textContent !== name) {
+    nameEl.textContent = name;
+    nameEl.classList.remove('fct-risein');
+    void nameEl.offsetWidth; // relance l'animation
+    nameEl.classList.add('fct-risein');
+  }
+  badge.classList.add('fct-badge--on');
+
+  // Auto-masquage si plus aucune détection n'arrive (silence, pub, fin) —
+  // les sondes arrivent toutes les ~2,5 s quand quelqu'un parle
+  clearTimeout(S.badgeTimer);
+  S.badgeTimer = later(() => badge.classList.remove('fct-badge--on'), 7000);
+}
+
 // ── Card slot ──────────────────────────────────────────────────────────────────
 
 function injectSlot() {
@@ -263,6 +302,11 @@ function onSpeakerMap(map) {
     const p = S.points.get(S.current.id)?.point;
     const el = S.current.el.querySelector('.fct-speaker');
     if (p?.qui && el) el.textContent = p.qui;
+  }
+  // Badge "qui parle" : renommer immédiatement si son label vient d'être identifié
+  const badge = document.getElementById('fct-speaker-badge');
+  if (badge?.dataset.label && map[badge.dataset.label]) {
+    badge.querySelector('.fct-badge-name').textContent = map[badge.dataset.label];
   }
   if (changed && S.recapOpen) renderRecap();
 }

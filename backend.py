@@ -77,6 +77,7 @@ import numpy as np
 DIARIZATION_THRESHOLD = 0.34  # similarité cosinus min pour rattacher un segment à un locuteur connu
 MIN_NEW_SPEAKER_SEC = 2.0     # un segment plus court ne peut PAS créer un nouveau locuteur
 MAX_SPEAKERS = 12             # au-delà, toujours rattacher au plus proche
+PROBE_MATCH_T = 0.28          # seuil (plus tolérant) des sondes temps réel "qui parle"
 DIARIZATION_DEVICE = os.environ.get("DIARIZATION_DEVICE", "cpu")
 
 try:
@@ -108,8 +109,11 @@ class SpeakerTracker:
         self.counts = []
         self.last = ""      # dernier label (repli pour les segments trop courts)
 
-    def assign(self, emb, dur: float) -> str:
-        emb = emb / (np.linalg.norm(emb) + 1e-8)
+    @staticmethod
+    def label_for(idx: int) -> str:
+        return f"Intervenant {chr(65 + idx)}" if idx < 26 else f"Intervenant {idx + 1}"
+
+    def _best(self, emb):
         best, best_sim = -1, -1.0
         for i, (s, c) in enumerate(zip(self.sums, self.counts)):
             centroid = s / c
@@ -117,6 +121,18 @@ class SpeakerTracker:
             sim = float(np.dot(emb, centroid))
             if sim > best_sim:
                 best, best_sim = i, sim
+        return best, best_sim
+
+    def match(self, emb):
+        """Lecture seule : (label, similarité) du locuteur le plus proche,
+        sans modifier les clusters. Utilisé par les sondes temps réel."""
+        emb = emb / (np.linalg.norm(emb) + 1e-8)
+        best, sim = self._best(emb)
+        return (self.label_for(best), sim) if best >= 0 else ("", -1.0)
+
+    def assign(self, emb, dur: float) -> str:
+        emb = emb / (np.linalg.norm(emb) + 1e-8)
+        best, best_sim = self._best(emb)
         if best >= 0 and best_sim >= self.threshold:
             # Même voix : rejoint le locuteur et affine son empreinte
             self.sums[best] += emb
@@ -131,7 +147,7 @@ class SpeakerTracker:
             self.sums.append(emb.copy())
             self.counts.append(1)
             idx = len(self.sums) - 1
-        self.last = f"Intervenant {chr(65 + idx)}" if idx < 26 else f"Intervenant {idx + 1}"
+        self.last = self.label_for(idx)
         return self.last
 
 
@@ -172,7 +188,7 @@ def _voice_slug(name: str) -> str:
     return re.sub(r"[^a-z0-9]+", "-", ascii_name).strip("-") or "voix"
 
 
-def load_voice_bank():
+def load_voice_bank(verbose: bool = True):
     _voice_bank.clear()
     idx_path = os.path.join(VOICES_DIR, "index.json")
     if not os.path.exists(idx_path):
@@ -185,7 +201,7 @@ def load_voice_bank():
             if os.path.exists(p):
                 v = np.load(p)
                 _voice_bank[name] = v / (np.linalg.norm(v) + 1e-8)
-        if _voice_bank:
+        if _voice_bank and verbose:
             print(f"[Voix] {len(_voice_bank)} empreinte(s) en banque: {', '.join(_voice_bank)}")
     except Exception as e:
         print(f"[Voix] erreur chargement banque: {type(e).__name__}: {e}")
@@ -621,8 +637,7 @@ def fact_check_affirmation(sid: str, claim_id: str, claim_text: str):
 def speaker_labels_list(tracker) -> list:
     if not tracker:
         return []
-    return [f"Intervenant {chr(65 + i)}" if i < 26 else f"Intervenant {i + 1}"
-            for i in range(len(tracker.sums))]
+    return [SpeakerTracker.label_for(i) for i in range(len(tracker.sums))]
 
 
 def apply_speaker_map(sid: str, transcript: str) -> str:
@@ -907,7 +922,10 @@ def on_connect():
     session_map_votes[sid] = {}
     session_map_state[sid] = {"flushes": 0, "inflight": False}
     session_voice_locked[sid] = set()
-    print(f"Client connecté: {sid}")
+    # Recharger la banque : des voix ont pu être ajoutées (harvest_voices.py,
+    # enroll.py, auto-enrôlement) depuis le démarrage du serveur
+    load_voice_bank(verbose=False)
+    print(f"Client connecté: {sid} — {len(_voice_bank)} voix en banque")
     emit("ready", {"status": "connected"})
 
 
@@ -954,6 +972,46 @@ def on_set_context(data):
 def on_start():
     session_starts[request.sid] = time.time()
     emit("ready", {"status": "listening"})
+
+
+@socketio.on("speaker_probe")
+def handle_speaker_probe(data):
+    """Sonde temps réel "qui parle" : ~2,5 s d'audio → empreinte vocale →
+    locuteur le plus proche (~100 ms, sans transcription). Lecture seule :
+    ne modifie jamais les clusters — seuls les segments Whisper apprennent."""
+    if not DIARIZATION or not data:
+        return
+    sid = request.sid
+    tracker = session_speakers.get(sid)
+    if not tracker or not tracker.sums:
+        return  # pas encore de clusters (premier chunk Whisper pas passé)
+    tmp_path = None
+    try:
+        with tempfile.NamedTemporaryFile(suffix=".webm", delete=False) as tmp:
+            tmp.write(bytes(data) if not isinstance(data, bytes) else data)
+            tmp_path = tmp.name
+        wav = decode_audio(tmp_path)
+        if len(wav) < 16000:
+            return  # moins d'une seconde utile
+        if float(np.sqrt((wav ** 2).mean())) < 0.005:
+            return  # silence — le badge s'effacera tout seul
+        with torch.no_grad():
+            t = torch.from_numpy(wav).float().unsqueeze(0)
+            emb = speaker_encoder.encode_batch(t).squeeze().cpu().numpy()
+        label, sim = tracker.match(emb)
+        if not label or sim < PROBE_MATCH_T:
+            return
+        # Le "locuteur courant" sert aussi d'héritage aux segments trop courts
+        tracker.last = label
+        emit("speaker_live", {"speaker": label})
+    except Exception as e:
+        print(f"[Probe error] {type(e).__name__}: {e}")
+    finally:
+        if tmp_path and os.path.exists(tmp_path):
+            try:
+                os.unlink(tmp_path)
+            except OSError:
+                pass
 
 
 @socketio.on("audio_chunk")

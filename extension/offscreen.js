@@ -7,6 +7,7 @@
 const BACKEND_URL = 'http://localhost:5000';
 const CHUNK_MS   = 10000; // plus long = plus de contexte pour Whisper, moins de phrases coupées
 const OVERLAP_MS = 1500;  // chevauchement entre chunks : ne perd pas les mots coupés à la frontière
+const PROBE_MS   = 2500;  // sondes "qui parle" : courtes = badge réactif (~3 s de latence)
 
 let socket = null;
 let mediaStream = null;
@@ -14,6 +15,7 @@ let audioCtx = null;
 let isCapturing = false;
 let tabId = null;
 let nextTimer = null;
+let probeTimer = null;
 const activeRecorders = new Set();
 
 chrome.runtime.onMessage.addListener((msg) => {
@@ -72,7 +74,12 @@ async function start({ streamId, emission, guests, description, videoDate }) {
     if (!isCapturing) {
       isCapturing = true;
       startRecorder();
+      startProbe();
     }
+  });
+
+  socket.on('speaker_live', (d) => {
+    forward({ type: 'speaker_live', speaker: d.speaker });
   });
 
   socket.on('connect_error', () => report('backend_down'));
@@ -80,6 +87,11 @@ async function start({ streamId, emission, guests, description, videoDate }) {
 
   socket.on('talking_points', (d) => {
     forward({ type: 'talking_points', points: d.points });
+  });
+
+  // Badge "qui parle" : seul le locuteur nous intéresse ici
+  socket.on('transcript_segment', (d) => {
+    if (d.speaker) forward({ type: 'transcript_segment', speaker: d.speaker });
   });
 
   socket.on('speaker_map', (d) => {
@@ -142,9 +154,46 @@ function startRecorder() {
   setTimeout(() => { if (rec.state === 'recording') rec.stop(); }, CHUNK_MS);
 }
 
+// Flux parallèle léger : petits blobs de 2,5 s classifiés par empreinte vocale
+// seule (pas de transcription) → le badge "qui parle" réagit en ~3 s
+function startProbe() {
+  if (!isCapturing || !mediaStream) return;
+
+  const mimeType = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : '';
+  const chunks = [];
+  let rec;
+  try {
+    rec = new MediaRecorder(mediaStream, {
+      ...(mimeType ? { mimeType } : {}),
+      audioBitsPerSecond: 64000,
+    });
+  } catch (e) {
+    probeTimer = setTimeout(startProbe, PROBE_MS);
+    return;
+  }
+  activeRecorders.add(rec);
+
+  rec.ondataavailable = (e) => { if (e.data?.size > 0) chunks.push(e.data); };
+  rec.onstop = async () => {
+    activeRecorders.delete(rec);
+    try {
+      if (chunks.length && socket?.connected) {
+        const blob = new Blob(chunks, { type: mimeType || 'audio/webm' });
+        socket.emit('speaker_probe', await blob.arrayBuffer());
+      }
+    } catch (_) {}
+  };
+  rec.onerror = () => {};
+
+  rec.start();
+  probeTimer = setTimeout(startProbe, PROBE_MS);
+  setTimeout(() => { if (rec.state === 'recording') rec.stop(); }, PROBE_MS);
+}
+
 function stop() {
   isCapturing = false;
   clearTimeout(nextTimer);
+  clearTimeout(probeTimer);
   activeRecorders.forEach(r => { if (r.state === 'recording') r.stop(); });
   activeRecorders.clear();
   mediaStream?.getTracks().forEach(t => t.stop());

@@ -300,6 +300,7 @@ Verdicts disponibles:
 
 RÈGLES DE RIGUEUR:
 - Un verdict tranché ("vrai", "faux", "trompeur") exige AU MOINS deux sources indépendantes concordantes, OU une SOURCE OFFICIELLE (INSEE, Eurostat, Légifrance, parlement…). Sinon: "partiellement_vrai" ou "non_verifiable".
+- Pour une affirmation CAUSALE ou sociologique ("X provoque Y", "X n'a pas d'effet sur Y"), les SOURCES ACADÉMIQUES (études évaluées par les pairs) pèsent plus lourd que la presse et que tes intuitions. Ne les utilise que si elles portent réellement sur le sujet de l'affirmation.
 - "confiance" (0-100) = ta certitude dans le verdict: ~90+ = sources officielles concordantes; ~70 = bien sourcé; ~50 = plausible mais mal sourcé; en dessous de 40, utilise plutôt "non_verifiable".
 - Quand les sources donnent un chiffre exact, cite-le dans "explication".
 - "url" doit être COPIÉE depuis un des résultats de recherche fournis — jamais inventée. Si aucun résultat n'appuie ton verdict, url vide.
@@ -556,6 +557,63 @@ _TIER_PRESS = (
 )
 
 
+def _scholar_query(claim: str) -> str:
+    """Les moteurs académiques (Solr) marchent aux mots-clés, pas aux phrases:
+    on garde les mots significatifs du claim, dans l'ordre."""
+    tokens = re.findall(r"[a-zàâçéèêëîïôùûü]{4,}|\d{2,}", claim.lower())
+    words = [t for t in tokens if t not in _STOPWORDS]
+    return " ".join(words[:6])
+
+
+def scholar_search(claim: str, max_results: int = 4) -> list:
+    """Études académiques pour ancrer les claims sociologiques/causaux.
+    HAL (archive ouverte française, fort en sciences sociales FR) + OpenAlex
+    (index scientifique mondial). APIs publiques, gratuites, sans clé."""
+    query = _scholar_query(claim)
+    if len(query.split()) < 2:
+        return []
+    out = []
+    try:
+        r = requests.get(
+            "https://api.archives-ouvertes.fr/search/",
+            params={"q": query, "rows": 2, "fl": "title_s,abstract_s,uri_s,producedDateY_i"},
+            timeout=6,
+        )
+        for doc in r.json().get("response", {}).get("docs", []):
+            title = (doc.get("title_s") or [""])[0]
+            abstract = (doc.get("abstract_s") or [""])[0]
+            uri = doc.get("uri_s", "")
+            year = doc.get("producedDateY_i", "")
+            if title and uri:
+                out.append({"title": f"{title} ({year}, HAL)", "body": abstract[:300], "href": uri})
+    except Exception as e:
+        print(f"[Scholar HAL] {type(e).__name__}: {e}")
+    try:
+        r = requests.get(
+            "https://api.openalex.org/works",
+            params={"search": query, "per-page": 2},
+            timeout=6,
+        )
+        for w in r.json().get("results", []):
+            title = w.get("display_name") or ""
+            year = w.get("publication_year", "")
+            url = (w.get("primary_location") or {}).get("landing_page_url") or w.get("id", "")
+            # OpenAlex stocke les résumés en index inversé — reconstruction
+            abstract = ""
+            inv = w.get("abstract_inverted_index")
+            if inv:
+                pos = {}
+                for word, idxs in inv.items():
+                    for i in idxs:
+                        pos[i] = word
+                abstract = " ".join(pos[i] for i in sorted(pos))[:300]
+            if title and url:
+                out.append({"title": f"{title} ({year}, OpenAlex)", "body": abstract, "href": url})
+    except Exception as e:
+        print(f"[Scholar OpenAlex] {type(e).__name__}: {e}")
+    return out[:max_results]
+
+
 def _source_tier(url: str) -> str:
     u = (url or "").lower()
     if any(d in u for d in _TIER_OFFICIAL):
@@ -565,11 +623,17 @@ def _source_tier(url: str) -> str:
     return "FIABILITÉ INCONNUE"
 
 
-def build_evidence_block(results: list) -> str:
-    if not results:
+def build_evidence_block(results: list, academic: list = None) -> str:
+    if not results and not academic:
         return "Aucun résultat de recherche disponible — base-toi sur tes connaissances uniquement."
-    lines = ["Résultats de recherche web (fiabilité annotée):"]
-    for i, r in enumerate(results, 1):
+    lines = ["Résultats de recherche (fiabilité annotée):"]
+    i = 0
+    for r in (academic or []):
+        i += 1
+        lines.append(f"[{i}] [SOURCE ACADÉMIQUE] {(r.get('title') or '').strip()} — "
+                     f"{(r.get('body') or '').strip()[:300]}\n    URL: {(r.get('href') or '').strip()}")
+    for r in (results or []):
+        i += 1
         title = (r.get("title") or "").strip()
         body = (r.get("body") or "").strip()[:300]
         href = (r.get("href") or "").strip()
@@ -579,12 +643,13 @@ def build_evidence_block(results: list) -> str:
 
 def call_mistral_factcheck(claim: str, context: dict = None) -> dict:
     results = web_search(claim)
-    print(f"[Search] {len(results)} résultat(s) pour «{claim[:50]}»")
+    academic = scholar_search(claim)
+    print(f"[Search] {len(results)} web + {len(academic)} académique(s) pour «{claim[:50]}»")
     prompt = FACTCHECK_PROMPT_TEMPLATE.format(
         today=time.strftime("%d/%m/%Y"),
         context_block=build_context_block(context or {}),
         claim=claim,
-        evidence_block=build_evidence_block(results),
+        evidence_block=build_evidence_block(results, academic),
     )
     content = _call_mistral_api(prompt)
     print(f"[FactCheck résultat] {content[:150]}")
@@ -597,7 +662,7 @@ def call_mistral_factcheck(claim: str, context: dict = None) -> dict:
                 # L'URL doit venir des résultats de recherche : jamais d'URL inventée,
                 # et uniquement http(s) (une URL javascript: serait un vecteur XSS)
                 url = data.get("url", "")
-                valid_hrefs = {r.get("href") for r in results}
+                valid_hrefs = {r.get("href") for r in results} | {r.get("href") for r in academic}
                 if not (isinstance(url, str) and url.startswith(("http://", "https://")) and url in valid_hrefs):
                     data["url"] = ""
                 conf = data.get("confiance")

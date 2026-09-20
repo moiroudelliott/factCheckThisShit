@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SOURCÉ — vérification factuelle des débats politiques</title>
+  <meta name="description" content="Prototype étudiant de vérification factuelle en temps réel pour les débats politiques : transcription en direct, identification des intervenants, verdict sourcé.">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400;1,6..72,500&family=Archivo:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500&display=swap">
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; background: #0d0f13; color: #f2f1ee; font-family: 'Archivo', system-ui, sans-serif; line-height: 1.6; }
+    a { color: #e0324f; text-decoration: none; }
+    .navlink { color: #f2f1ee !important; }
+    .navlink:hover { color: #e0324f !important; }
+    .video-frame { border: 1px solid rgba(242,241,238,0.14); background: #000; box-shadow: 0 32px 70px -28px rgba(224,50,79,0.28), 0 12px 40px -16px rgba(0,0,0,0.55); }
+    .video-frame video { width: 100%; display: block; }
+    @media (max-width: 720px) {
+      .nav-links { display: none !important; }
+      .hero-eyebrow, .hero-lede { padding-left: 8px; padding-right: 8px; }
+    }
+  </style>
+</head>
+<body>
+
+  <header style="border-bottom: 1px solid rgba(242,241,238,0.12); position: sticky; top: 0; background: rgba(13,15,19,0.92); backdrop-filter: blur(8px); z-index: 10;">
+    <div style="max-width:920px; margin:0 auto; padding:20px 28px; display:flex; align-items:center; justify-content:space-between; gap:20px; flex-wrap:wrap;">
+      <div style="display:flex; align-items:center; gap:10px;">
+        <span style="width:9px; height:9px; border-radius:50%; background:#e0324f; display:inline-block;"></span>
+        <span style="font-family:'Newsreader', serif; font-style:italic; font-weight:500; font-size:20px;">SOURC<span style="color:#e0324f;">É</span></span>
+      </div>
+      <nav class="nav-links" style="display:flex; align-items:center; gap:28px;">
+        <a class="navlink" href="#methode" style="font-family:'IBM Plex Mono', monospace; font-size:12px; letter-spacing:0.04em; text-transform:uppercase;">Méthode</a>
+        <a class="navlink" href="#projet" style="font-family:'IBM Plex Mono', monospace; font-size:12px; letter-spacing:0.04em; text-transform:uppercase;">Le projet</a>
+        <a href="#contact" style="font-family:'Archivo', sans-serif; font-weight:700; font-size:13px; color:#0d0f13; background:#e0324f; padding:9px 20px;">Nous contacter</a>
+      </nav>
+    </div>
+  </header>
+
+  <section style="max-width:1160px; margin:0 auto; padding:56px 28px 64px;">
+    <div style="max-width:640px; margin:0 auto; text-align:center;">
+      <p class="hero-eyebrow" style="font-family:'IBM Plex Mono', monospace; font-size:11px; letter-spacing:0.08em; text-transform:uppercase; color:#e0324f; margin:0 0 16px;">Démonstration — débat réel</p>
+      <h1 style="font-family:'Archivo',sans-serif; font-weight:800; font-size:40px; line-height:1.14; letter-spacing:-0.01em; margin:0 0 18px;">Vérifier ce qui est dit,<br>pendant qu'il est dit.</h1>
+      <p class="hero-lede" style="font-size:16px; color:rgba(242,241,238,0.7); margin:0 auto 32px; max-width:52ch;">
+        Transcription en direct, identification des intervenants et vérification automatique
+        des affirmations chiffrées, avec un verdict et sa source en quelques dizaines de secondes.
+      </p>
+    </div>
+
+    <div class="video-frame">
+      <video controls preload="metadata" poster="videos/poster.jpg">
+        <source src="videos/demo-2.mp4" type="video/mp4">
+      </video>
+    </div>
+    <p style="font-family:'IBM Plex Mono', monospace; font-size:11.5px; color:rgba(242,241,238,0.4); text-align:center; margin:14px 0 0;">Capture d'écran réelle — débat des législatives, France 2, 27 juin 2024. Aucun montage du contenu des vérifications.</p>
+
+    <div style="display:flex; gap:14px; flex-wrap:wrap; justify-content:center; margin-top:32px;">
+      <a href="#contact" style="font-family:'Archivo',sans-serif; font-weight:700; font-size:14px; color:#0d0f13; background:#e0324f; padding:13px 26px;">Nous contacter</a>
+      <a href="#methode" style="font-family:'Archivo',sans-serif; font-weight:700; font-size:14px; color:#f2f1ee; padding:13px 26px; border:1.5px solid rgba(242,241,238,0.25);">Voir la méthode</a>
+    </div>
+  </section>
+
+  <section id="methode" style="max-width:920px; margin:0 auto; padding:56px 28px;">
+    <p style="font-family:'IBM Plex Mono', monospace; font-size:11px; letter-spacing:0.08em; text-transform:uppercase; color:#e0324f; margin:0 0 16px;">Méthode</p>
+    <h2 style="font-family:'Archivo',sans-serif; font-weight:800; font-size:26px; margin:0 0 14px;">Quatre étapes, une seule question posée à chaque phrase</h2>
+    <p style="font-size:14.5px; color:rgba(242,241,238,0.65); max-width:62ch; margin:0 0 8px;">Seules les affirmations vérifiables donnent lieu à un verdict. Le reste (opinions, joutes, questions) reste consultable, sans jamais encombrer l'écran.</p>
+
+    <div style="margin-top:12px;">
+      <div style="display:flex; gap:24px; padding:26px 0; border-bottom:1px solid rgba(242,241,238,0.12); align-items:baseline;">
+        <span style="font-family:'Newsreader',serif; font-style:italic; font-size:34px; color:#e0324f; width:56px; flex-shrink:0;">01</span>
+        <div><h3 style="font-family:'Archivo',sans-serif; font-size:16px; font-weight:700; margin:0 0 6px;">Transcription en direct</h3><p style="font-size:13.5px; color:rgba(242,241,238,0.65); margin:0;">Le son du débat est transcrit en continu, avec quelques secondes de latence.</p></div>
+      </div>
+      <div style="display:flex; gap:24px; padding:26px 0; border-bottom:1px solid rgba(242,241,238,0.12); align-items:baseline;">
+        <span style="font-family:'Newsreader',serif; font-style:italic; font-size:34px; color:#e0324f; width:56px; flex-shrink:0;">02</span>
+        <div><h3 style="font-family:'Archivo',sans-serif; font-size:16px; font-weight:700; margin:0 0 6px;">Identification des intervenants</h3><p style="font-size:13.5px; color:rgba(242,241,238,0.65); margin:0;">Les voix sont distinguées automatiquement et, quand c'est possible, associées à un nom.</p></div>
+      </div>
+      <div style="display:flex; gap:24px; padding:26px 0; border-bottom:1px solid rgba(242,241,238,0.12); align-items:baseline;">
+        <span style="font-family:'Newsreader',serif; font-style:italic; font-size:34px; color:#e0324f; width:56px; flex-shrink:0;">03</span>
+        <div><h3 style="font-family:'Archivo',sans-serif; font-size:16px; font-weight:700; margin:0 0 6px;">Vérification sourcée</h3><p style="font-size:13.5px; color:rgba(242,241,238,0.65); margin:0;">Chaque affirmation chiffrée est confrontée à la presse, aux sources officielles et à la recherche académique.</p></div>
+      </div>
+      <div style="display:flex; gap:24px; padding:26px 0; align-items:baseline;">
+        <span style="font-family:'Newsreader',serif; font-style:italic; font-size:34px; color:#e0324f; width:56px; flex-shrink:0;">04</span>
+        <div><h3 style="font-family:'Archivo',sans-serif; font-size:16px; font-weight:700; margin:0 0 6px;">Registre consultable</h3><p style="font-size:13.5px; color:rgba(242,241,238,0.65); margin:0;">Tout ce qui a été dit et vérifié reste consultable et exportable à la fin de la session.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="projet" style="max-width:920px; margin:0 auto; padding:56px 28px;">
+    <p style="font-family:'IBM Plex Mono', monospace; font-size:11px; letter-spacing:0.08em; text-transform:uppercase; color:#e0324f; margin:0 0 16px;">Le projet</p>
+    <h2 style="font-family:'Archivo',sans-serif; font-weight:800; font-size:26px; margin:0 0 24px;">Ce que c'est, et ce que ce n'est pas encore</h2>
+    <div style="background:#17191f; padding:32px 36px;">
+      <p style="font-family:'Newsreader',serif; font-style:italic; font-size:19px; line-height:1.5; color:#f2f1ee; margin:0 0 18px;">« Ce projet est mené par Elliott Moiroud, étudiant à l'Université Savoie Mont Blanc. Ce n'est pas un produit commercial, et il n'est pas présenté comme tel. »</p>
+      <p style="font-family:'Archivo',sans-serif; font-size:14px; color:rgba(242,241,238,0.65); margin:0;">Il fonctionne aujourd'hui sous forme d'extension de navigateur, testée sur des débats politiques diffusés sur YouTube. Rien n'est figé dans son architecture : selon les besoins identifiés, il pourrait aussi bien devenir une application autonome que s'intégrer à un outil existant.</p>
+    </div>
+  </section>
+
+  <section id="contact" style="max-width:920px; margin:0 auto; padding:0 28px 64px;">
+    <div style="background:#e0324f; padding:48px 44px;">
+      <p style="font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:0.08em; text-transform:uppercase; color:rgba(13,15,19,0.6); margin:0 0 16px;">Contact</p>
+      <h2 style="font-family:'Archivo',sans-serif; font-weight:800; font-size:26px; color:#0d0f13; margin:0 0 12px;">Une question, une remarque, une idée de collaboration ?</h2>
+      <p style="font-family:'Archivo',sans-serif; font-size:14.5px; color:rgba(13,15,19,0.72); max-width:56ch; margin:0 0 26px;">Le projet continue d'évoluer. Vos retours nous aident à savoir dans quelle direction le faire avancer.</p>
+      <a href="mailto:contact@source.codeminds.fr?subject=Sourc%C3%A9%20contact" style="display:inline-block; font-family:'Archivo',sans-serif; font-weight:700; font-size:14px; color:#e0324f; background:#0d0f13; padding:13px 26px;">Nous écrire</a>
+    </div>
+  </section>
+
+  <footer style="max-width:920px; margin:0 auto; padding:0 28px 40px;">
+    <p style="font-family:'IBM Plex Mono',monospace; font-size:11px; color:rgba(242,241,238,0.4); margin:0;">SOURCÉ, un projet mené par Elliott Moiroud, étudiant à l'Université Savoie Mont Blanc. Aucune donnée n'est collectée par cette page.</p>
+  </footer>
+
+</body>
+</html>

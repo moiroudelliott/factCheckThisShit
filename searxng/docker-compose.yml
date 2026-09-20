@@ -1,0 +1,13 @@
+services:
+  searxng:
+    image: searxng/searxng:latest
+    container_name: source-searxng
+    # 127.0.0.1 uniquement : jamais exposé au réseau. C'est le backend Flask
+    # (aussi sur 127.0.0.1) qui interroge cette instance, pas l'extension.
+    ports:
+      - "127.0.0.1:8080:8080"
+    volumes:
+      - ./config:/etc/searxng
+    environment:
+      - SEARXNG_BASE_URL=http://127.0.0.1:8080/
+    restart: unless-stopped

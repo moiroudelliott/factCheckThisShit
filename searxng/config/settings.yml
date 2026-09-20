@@ -1,0 +1,26 @@
+# Read the documentation before extending the defaults:
+# https://docs.searxng.org/admin/settings/
+
+# Moteurs volontairement limités : ni Google ni Bing/Yahoo (ni aucun moteur qui
+# leur sous-traite son index). Brave (index propre) et Mojeek (UK, index
+# indépendant, pas Big Tech) — cf. ARCHITECTURE.md.
+# Qwant testé et retiré : bloque systématiquement le scraping SearxNG par
+# CAPTCHA (limitation connue et documentée du projet SearxNG, pas un choix de
+# config — inutile de le lister, chaque requête attendrait son timeout pour rien).
+use_default_settings:
+  engines:
+    keep_only:
+      - brave
+      - mojeek
+
+server:
+  secret_key: "u9nTuXtVVDrpzrbgt8BHm0HomEgCjno"
+  image_proxy: true
+  # Instance strictement locale (127.0.0.1, jamais exposée) : pas besoin du
+  # rate-limiter anti-bot (qui exigerait Redis) pour autoriser l'API JSON.
+  limiter: false
+
+search:
+  formats:
+    - html
+    - json

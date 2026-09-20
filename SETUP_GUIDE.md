@@ -1,8 +1,12 @@
-# Setup Guide — FactCheckThis MVP
+# Setup Guide — vérif.live
+
+Ce guide installe le **backend** (Whisper + diarisation + Mistral). Le
+produit lui-même est l'extension Chrome dans [`extension/`](extension/),
+chargée à l'étape 5 — voir aussi [`README.md`](README.md).
 
 ## Prérequis
 - Python 3.10+
-- Node.js 18+
+- Google Chrome
 - NVIDIA GPU (RTX 4070 Super recommandé)
 - CUDA 12.x installé
 
@@ -27,7 +31,7 @@ python -c "import torch; print('CUDA disponible:', torch.cuda.is_available())"
 
 ## Étape 2 — Installer FFmpeg
 
-faster-whisper utilise FFmpeg pour décoder les fichiers audio WebM.
+faster-whisper utilise FFmpeg pour décoder les chunks audio WebM.
 
 1. Télécharger: https://ffmpeg.org/download.html → Windows builds → ffmpeg-release-full.7z
 2. Extraire et copier le dossier dans `C:\ffmpeg\`
@@ -45,6 +49,8 @@ ffprobe -version
 ```bash
 cd factCheckThisShit
 pip install -r requirements.txt
+cp .env.example .env
+# éditer .env et renseigner MISTRAL_API_KEY (https://console.mistral.ai/)
 ```
 
 ---
@@ -61,58 +67,58 @@ Cache: `%USERPROFILE%\.cache\huggingface\hub\`
 
 ---
 
-## Étape 5 — Dépendances Node
+## Étape 5 — Lancer SearxNG (recherche web du fact-checker)
+
+Le fact-checker s'appuie sur une instance **SearxNG auto-hébergée** (Brave +
+Mojeek uniquement — ni Google ni Bing, voir [`ARCHITECTURE.md`](ARCHITECTURE.md))
+plutôt que d'interroger un moteur tiers directement. Nécessite Docker Desktop.
 
 ```bash
-npm install
+cd searxng
+docker compose up -d
 ```
+
+Vérifier: `curl http://127.0.0.1:8080/healthz` doit répondre `200`. Sans
+instance joignable, le backend le signale au démarrage et le fact-check tourne
+en dégradé (verdicts basés sur les connaissances du modèle, sans preuve web) —
+ça ne bloque rien, mais dégrade la qualité des verdicts.
 
 ---
 
-## Étape 6 — Lancer l'application
+## Étape 6 — Charger l'extension Chrome
 
-**Terminal 1 — Backend:**
+1. `chrome://extensions`
+2. Activer *Mode développeur* (coin supérieur droit)
+3. *Charger l'extension non empaquetée* → sélectionner le dossier `extension/`
+
+---
+
+## Étape 7 — Lancer l'application
+
+**Terminal — Backend:**
 ```bash
 python backend.py
 ```
-Attendre: `Modèle prêt.` puis `Running on http://0.0.0.0:5000`
+Attendre: `Modèle prêt.` puis `Running on http://127.0.0.1:5000`
 
-**Terminal 2 — Frontend:**
-```bash
-npm start
-```
-Ouvre automatiquement http://localhost:3000
-
----
-
-## Étape 7 — Vérification
-
-1. Ouvrir http://localhost:3000
-2. Cliquer "Démarrer la transcription"
-3. Autoriser la caméra et le micro dans le navigateur
-4. La webcam s'affiche à gauche — parler normalement
-5. Après ~5 secondes, les premiers mots apparaissent à droite
-6. Vérifier que le GPU travaille: `nvidia-smi` (utilisation GPU doit monter)
+**Extension:**
+1. Ouvrir une vidéo de débat sur YouTube
+2. Cliquer l'icône vérif.live dans la barre d'extensions
+3. Vérifier que l'émission/les intervenants sont bien détectés (ou les
+   compléter à la main), puis *Démarrer l'analyse*
+4. Autoriser le partage d'onglet si Chrome le demande
 
 ---
 
-## Setup OBS pour transcription de débats
+## Étape 8 — Vérification
 
-Une fois le MVP fonctionnel avec webcam/micro réels:
-
-### Installer VB-Cable (audio virtuel)
-1. Télécharger: https://vb-audio.com/Cable/
-2. Installer et redémarrer Windows
-
-### Configurer OBS
-1. OBS → Settings → Audio → "Desktop Audio" → CABLE Input (VB-Audio)
-2. Ajouter la source vidéo (capture fenêtre, capture jeu, etc.)
-3. Tools → "Start Virtual Camera"
-
-### Dans le navigateur
-Quand l'appli demande les permissions:
-- **Caméra** → sélectionner "OBS Virtual Camera"
-- **Micro** → sélectionner "CABLE Output (VB-Audio Virtual Cable)"
+1. Après quelques secondes de parole, un badge "qui parle" apparaît en haut
+   à gauche de la vidéo
+2. Après ~20-30s de propos substantiel, les premières cartes de vérification
+   apparaissent en haut à droite
+3. Le bouton *Récap* (chip en haut à droite) liste tous les points extraits
+4. Vérifier que le GPU travaille pendant la transcription: `nvidia-smi`
+   (utilisation GPU doit monter)
 
 ---
 
@@ -122,7 +128,9 @@ Quand l'appli demande les permissions:
 |---|---|
 | `torch.cuda.is_available()` retourne False | Refaire l'étape 1 (PyTorch CUDA) |
 | `ffprobe: command not found` | Ajouter FFmpeg au PATH (étape 2) |
-| "Accès refusé caméra/micro" | Autoriser dans chrome://settings/content/camera |
-| Pas de transcription mais pas d'erreur | Parler plus fort ou réduire CHUNK_DURATION_MS à 3000 dans WhisperMVP.jsx |
-| Latence > 10s | Vérifier que CUDA est bien actif (`nvidia-smi` pendant la transcription) |
-| Port 5000 déjà utilisé | Changer le port dans backend.py et dans WhisperMVP.jsx (SOCKET_URL) |
+| Popup affiche "backend éteint" | Le backend n'écoute que sur `127.0.0.1:5000` — vérifier qu'il tourne (`python backend.py`) et qu'aucun autre process n'occupe le port |
+| Chip affiche "jeton invalide" | `BACKEND_TOKEN` est défini dans `.env` mais ne correspond pas au champ "Jeton d'accès" (section Avancé de la popup) — ou vice-versa |
+| Pas de transcription mais pas d'erreur | Vérifier que l'onglet capturé joue bien du son (icône haut-parleur dans l'onglet Chrome) |
+| Latence de transcription élevée | Vérifier que CUDA est bien actif (`nvidia-smi` pendant l'analyse) |
+| Console backend affiche "SearxNG injoignable" | Docker Desktop n'est pas lancé, ou `cd searxng && docker compose up -d` n'a pas été fait (étape 5) — le fact-check continue de fonctionner mais sans preuve web |
+| Port 5000 déjà utilisé | Changer le port dans `backend.py` (`socketio.run(...)`) et dans `BACKEND_URL` (`extension/offscreen.js` et `extension/popup.js`) |

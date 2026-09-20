@@ -4,9 +4,11 @@ import eventlet
 # la réception des chunks audio. Source majeure de latence cumulée.
 eventlet.monkey_patch(socket=True, select=True)
 import eventlet.semaphore
+import eventlet.tpool
 
 import os
 import re
+import sys
 import json
 import time
 import sqlite3
@@ -14,22 +16,26 @@ import tempfile
 import threading
 import unicodedata
 
+# Certains terminaux Windows (codepage cp1252, pas de chcp 65001) plantent sur
+# le moindre é/⚠️ dans un print() — jamais vu sur un terminal déjà en UTF-8,
+# mais un crash au démarrage pour un caractère accentué est absurde à laisser.
+if sys.stdout.encoding and sys.stdout.encoding.lower() != "utf-8":
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+
 import requests
 from dotenv import load_dotenv
 load_dotenv()
 
-# Recherche web pour fonder les verdicts (pip install ddgs)
-try:
-    from ddgs import DDGS
-except ImportError:
-    try:
-        from duckduckgo_search import DDGS  # ancien nom du package
-    except ImportError:
-        DDGS = None
+# Recherche web pour fonder les verdicts — instance SearxNG auto-hébergée
+# (docker-compose dans searxng/), pas d'appel direct à un moteur US : voir
+# ARCHITECTURE.md. SEARXNG_URL doit rester un hôte local (127.0.0.1) — c'est le
+# backend qui interroge SearxNG, jamais un tiers qui voit passer les claims.
+SEARXNG_URL = os.environ.get("SEARXNG_URL", "http://127.0.0.1:8080").rstrip("/")
 
 from flask import Flask, request
 from flask_cors import CORS
-from flask_socketio import SocketIO, emit
+from flask_socketio import SocketIO, emit, ConnectionRefusedError
 
 from faster_whisper import WhisperModel
 
@@ -38,6 +44,15 @@ MISTRAL_MODEL = os.environ.get("MISTRAL_MODEL", "mistral-medium-latest")  # medi
 FLUSH_INTERVAL = 22    # secondes max entre deux analyses Mistral
 MIN_WORDS = 30         # ne pas appeler Mistral avec moins de 30 mots (trop peu pour un talking point)
 MAX_BUFFER_WORDS = 55  # flush anticipé dès que le buffer est assez dense (échange rapide = analyse plus tôt)
+
+# Jeton partagé optionnel : sans lui, quiconque atteint ce port (même onglet tiers
+# ouvert dans le même navigateur, cf. bind ci-dessous) peut piloter le backend et
+# consommer la clé Mistral. Si non défini, le serveur reste ouvert (comportement
+# historique) mais le signale au démarrage.
+BACKEND_TOKEN = os.environ.get("BACKEND_TOKEN", "").strip()
+
+MISTRAL_MAX_RETRIES = 3     # tentatives supplémentaires sur 429 (rate limit)
+MISTRAL_RETRY_BASE_S = 2.0  # backoff exponentiel: 2s, 4s, 8s (sauf Retry-After fourni par l'API)
 
 app = Flask(__name__)
 CORS(app, origins="*")
@@ -55,11 +70,19 @@ except Exception as e:
     model = WhisperModel("medium", device="cuda", compute_type="float16")
 print("Modèle prêt.")
 
-if DDGS is None:
-    print("⚠️  Package 'ddgs' absent (pip install ddgs) — fact-checking sans recherche web.")
+try:
+    requests.get(f"{SEARXNG_URL}/healthz", timeout=2)
+    print(f"SearxNG local détecté sur {SEARXNG_URL}.")
+except Exception:
+    print(f"⚠️  SearxNG injoignable sur {SEARXNG_URL} — fact-checking sans recherche web "
+          f"(cf. searxng/docker-compose.yml : `docker compose up -d`).")
 
 if not MISTRAL_API_KEY:
     print("⚠️  MISTRAL_API_KEY non définie — les talking points seront désactivés.")
+
+if not BACKEND_TOKEN:
+    print("⚠️  BACKEND_TOKEN non défini — le backend accepte toute connexion locale sans "
+          "authentification (voir .env.example). Recommandé si d'autres apps tournent dans le même navigateur.")
 
 model_lock = threading.Lock()
 
@@ -394,12 +417,24 @@ def _key_words(text: str) -> set:
     tokens = re.findall(r'\b(?:[a-zàâçéèêëîïôùûü]{4,}|\d{3,})\b', text.lower())
     return {t for t in tokens if t not in _STOPWORDS}
 
-def _is_duplicate(new_text: str, existing: list, threshold: float = 0.45) -> bool:
+def _dupe_index_add(index: dict, words: set, idx: int) -> None:
+    for w in words:
+        index.setdefault(w, []).append(idx)
+
+
+def _is_duplicate_indexed(new_text: str, points: list, index: dict, threshold: float = 0.45) -> bool:
+    """Équivalent de _is_duplicate, mais ne compare qu'aux points partageant au
+    moins un mot-clé (index inversé) au lieu de scanner tout l'historique. La
+    dédup reste volontairement globale sur toute la session (cf.
+    flush_to_mistral) — seul le coût du scan est réduit."""
     new_w = _key_words(new_text)
     if len(new_w) < 3:
         return False
-    for p in existing:
-        ex_w = _key_words(p['texte'])
+    candidates = set()
+    for w in new_w:
+        candidates.update(index.get(w, ()))
+    for idx in candidates:
+        ex_w = _key_words(points[idx]['texte'])
         if len(ex_w) < 3:
             continue
         overlap = len(new_w & ex_w)
@@ -479,15 +514,41 @@ def cache_store(claim: str, result: dict):
 _cache_load()
 
 
-def _call_mistral_api(prompt: str) -> str:
-    resp = requests.post(
-        "https://api.mistral.ai/v1/chat/completions",
-        headers={"Authorization": f"Bearer {MISTRAL_API_KEY}", "Content-Type": "application/json"},
-        json={"model": MISTRAL_MODEL, "messages": [{"role": "user", "content": prompt}], "temperature": 0.1},
-        timeout=20,
-    )
-    resp.raise_for_status()
-    return resp.json()["choices"][0]["message"]["content"]
+def _retry_delay(resp, attempt: int) -> float:
+    """Respecte l'en-tête Retry-After de l'API si fourni, sinon backoff
+    exponentiel (2s, 4s, 8s…)."""
+    retry_after = resp.headers.get("Retry-After")
+    if retry_after:
+        try:
+            return max(1.0, float(retry_after))
+        except ValueError:
+            pass
+    return MISTRAL_RETRY_BASE_S * (2 ** attempt)
+
+
+def _call_mistral_api(prompt: str, sid: str = None) -> str:
+    """sid (optionnel) : si fourni, un événement mistral_rate_limited est
+    émis à cette session à chaque nouvelle tentative sur 429, pour que
+    l'extension affiche l'attente au lieu de laisser l'utilisateur sans
+    retour pendant le backoff."""
+    for attempt in range(MISTRAL_MAX_RETRIES + 1):
+        resp = requests.post(
+            "https://api.mistral.ai/v1/chat/completions",
+            headers={"Authorization": f"Bearer {MISTRAL_API_KEY}", "Content-Type": "application/json"},
+            json={"model": MISTRAL_MODEL, "messages": [{"role": "user", "content": prompt}], "temperature": 0.1},
+            timeout=20,
+        )
+        if resp.status_code == 429 and attempt < MISTRAL_MAX_RETRIES:
+            wait = _retry_delay(resp, attempt)
+            print(f"[Mistral] 429 (rate limit) — nouvelle tentative {attempt + 1}/{MISTRAL_MAX_RETRIES} dans {wait:.0f}s")
+            if sid:
+                socketio.emit("mistral_rate_limited", {
+                    "attempt": attempt + 1, "max": MISTRAL_MAX_RETRIES, "wait": round(wait),
+                }, to=sid)
+            eventlet.sleep(wait)  # eventlet.sleep (coopératif), jamais time.sleep : ne bloque pas la boucle
+            continue
+        resp.raise_for_status()
+        return resp.json()["choices"][0]["message"]["content"]
 
 
 ATTRIBUTION_RULE_DIAR = (
@@ -503,14 +564,14 @@ ATTRIBUTION_RULE_NODIAR = (
 )
 
 
-def call_mistral(text: str, context: dict = None, recent_points: list = None) -> list:
+def call_mistral(text: str, context: dict = None, recent_points: list = None, sid: str = None) -> list:
     prompt = MISTRAL_PROMPT_TEMPLATE.format(
         context_block=build_context_block(context or {}),
         text=text,
         history_block=build_history_block(recent_points or []),
         attribution_rule=ATTRIBUTION_RULE_DIAR if DIARIZATION else ATTRIBUTION_RULE_NODIAR,
     )
-    content = _call_mistral_api(prompt)
+    content = _call_mistral_api(prompt, sid=sid)
     print(f"[Mistral talking points] {content[:200]}")
     try:
         start = content.find('[')
@@ -531,12 +592,19 @@ def call_mistral(text: str, context: dict = None, recent_points: list = None) ->
 
 
 def web_search(query: str, max_results: int = 6) -> list:
-    """Recherche web (DuckDuckGo, sans clé API). Retourne [] en cas d'échec."""
-    if DDGS is None:
-        return []
+    """Recherche web via l'instance SearxNG auto-hébergée (searxng/docker-compose.yml) —
+    Brave + Mojeek uniquement (ni Google ni Bing, cf. searxng/config/settings.yml).
+    Retourne [] si l'instance est injoignable, jamais d'appel direct à un moteur tiers."""
     try:
-        with DDGS() as ddgs:
-            return list(ddgs.text(query, region="fr-fr", max_results=max_results))
+        r = requests.get(
+            f"{SEARXNG_URL}/search",
+            params={"q": query, "format": "json", "language": "fr"},
+            timeout=8,
+        )
+        r.raise_for_status()
+        results = r.json().get("results", [])[:max_results]
+        return [{"title": res.get("title", ""), "body": res.get("content", ""), "href": res.get("url", "")}
+                for res in results]
     except Exception as e:
         print(f"[Search error] {type(e).__name__}: {e}")
         return []
@@ -614,6 +682,34 @@ def scholar_search(claim: str, max_results: int = 4) -> list:
     return out[:max_results]
 
 
+def datagouv_search(claim: str, max_results: int = 3) -> list:
+    """Jeux de données officiels français (catalogue data.gouv.fr, API publique
+    sans clé) pertinents pour l'affirmation. Contrairement à web_search (qui
+    passe par un agrégateur de moteurs tiers), c'est une source française
+    interrogée directement : aucun intermédiaire, aucune ambiguïté de
+    souveraineté."""
+    query = _scholar_query(claim)
+    if len(query.split()) < 2:
+        return []
+    try:
+        r = requests.get(
+            "https://www.data.gouv.fr/api/1/datasets/",
+            params={"q": query, "page_size": max_results},
+            timeout=6,
+        )
+        out = []
+        for d in r.json().get("data", []):
+            title = d.get("title") or ""
+            page = d.get("page") or ""
+            desc = (d.get("description") or "").replace("\n", " ")[:300]
+            if title and page:
+                out.append({"title": f"{title} (data.gouv.fr)", "body": desc, "href": page})
+        return out
+    except Exception as e:
+        print(f"[data.gouv.fr] {type(e).__name__}: {e}")
+        return []
+
+
 def _source_tier(url: str) -> str:
     u = (url or "").lower()
     if any(d in u for d in _TIER_OFFICIAL):
@@ -623,11 +719,15 @@ def _source_tier(url: str) -> str:
     return "FIABILITÉ INCONNUE"
 
 
-def build_evidence_block(results: list, academic: list = None) -> str:
-    if not results and not academic:
+def build_evidence_block(results: list, academic: list = None, official: list = None) -> str:
+    if not results and not academic and not official:
         return "Aucun résultat de recherche disponible — base-toi sur tes connaissances uniquement."
     lines = ["Résultats de recherche (fiabilité annotée):"]
     i = 0
+    for r in (official or []):
+        i += 1
+        lines.append(f"[{i}] [SOURCE OFFICIELLE — DATA.GOUV.FR] {(r.get('title') or '').strip()} — "
+                     f"{(r.get('body') or '').strip()[:300]}\n    URL: {(r.get('href') or '').strip()}")
     for r in (academic or []):
         i += 1
         lines.append(f"[{i}] [SOURCE ACADÉMIQUE] {(r.get('title') or '').strip()} — "
@@ -641,17 +741,18 @@ def build_evidence_block(results: list, academic: list = None) -> str:
     return "\n".join(lines)
 
 
-def call_mistral_factcheck(claim: str, context: dict = None) -> dict:
+def call_mistral_factcheck(claim: str, context: dict = None, sid: str = None) -> dict:
     results = web_search(claim)
     academic = scholar_search(claim)
-    print(f"[Search] {len(results)} web + {len(academic)} académique(s) pour «{claim[:50]}»")
+    official = datagouv_search(claim)
+    print(f"[Search] {len(results)} web + {len(academic)} académique(s) + {len(official)} data.gouv.fr pour «{claim[:50]}»")
     prompt = FACTCHECK_PROMPT_TEMPLATE.format(
         today=time.strftime("%d/%m/%Y"),
         context_block=build_context_block(context or {}),
         claim=claim,
-        evidence_block=build_evidence_block(results, academic),
+        evidence_block=build_evidence_block(results, academic, official),
     )
-    content = _call_mistral_api(prompt)
+    content = _call_mistral_api(prompt, sid=sid)
     print(f"[FactCheck résultat] {content[:150]}")
     try:
         start = content.find('{')
@@ -662,7 +763,8 @@ def call_mistral_factcheck(claim: str, context: dict = None) -> dict:
                 # L'URL doit venir des résultats de recherche : jamais d'URL inventée,
                 # et uniquement http(s) (une URL javascript: serait un vecteur XSS)
                 url = data.get("url", "")
-                valid_hrefs = {r.get("href") for r in results} | {r.get("href") for r in academic}
+                valid_hrefs = ({r.get("href") for r in results} | {r.get("href") for r in academic}
+                               | {r.get("href") for r in official})
                 if not (isinstance(url, str) and url.startswith(("http://", "https://")) and url in valid_hrefs):
                     data["url"] = ""
                 conf = data.get("confiance")
@@ -683,7 +785,7 @@ def fact_check_affirmation(sid: str, claim_id: str, claim_text: str):
         return
     context = session_contexts.get(sid, {})
     try:
-        result = call_mistral_factcheck(claim_text, context=context)
+        result = call_mistral_factcheck(claim_text, context=context, sid=sid)
         cache_store(claim_text, result)
         socketio.emit("fact_check_result", {"id": claim_id, **result}, to=sid)
     except Exception as e:
@@ -790,7 +892,7 @@ def identify_speakers(sid: str):
             guests_line=", ".join(guests) if guests else "(liste non fournie)",
             excerpts="\n---\n".join(excerpts),
         )
-        content = _call_mistral_api(prompt)
+        content = _call_mistral_api(prompt, sid=sid)
         print(f"[SpeakerMap] {content[:150]}")
         start = content.find('{')
         if start == -1:
@@ -845,7 +947,7 @@ def flush_to_mistral(sid: str, text: str, ts: float = None):
         text = apply_speaker_map(sid, text)
         context = session_contexts.get(sid, {})
         all_points = session_points.get(sid, [])
-        raw_points = call_mistral(text, context=context, recent_points=all_points)
+        raw_points = call_mistral(text, context=context, recent_points=all_points, sid=sid)
         print(f"[Mistral] {len(raw_points)} talking point(s) reçus")
 
         # Toutes les 2 analyses : tenter d'identifier les locuteurs encore anonymes
@@ -868,20 +970,25 @@ def flush_to_mistral(sid: str, text: str, ts: float = None):
             if p.get("qui") in smap:
                 p["qui"] = smap[p["qui"]]
         import uuid
+        index = session_dupe_index.setdefault(sid, {})
+        combined = list(all_points)
         unique: list = []
         for p in raw_points:
-            if _is_duplicate(p['texte'], all_points + unique):
+            if _is_duplicate_indexed(p['texte'], combined, index):
                 print(f"[Dedup] ignoré: {p['texte'][:70]}")
             else:
                 # ts = horodatage (unix) approximatif du moment où le propos a été
                 # tenu → permet le "sauter à ce moment de la vidéo" côté extension
-                unique.append({"id": uuid.uuid4().hex[:8], "ts": ts, **p})
+                entry = {"id": uuid.uuid4().hex[:8], "ts": ts, **p}
+                _dupe_index_add(index, _key_words(entry['texte']), len(combined))
+                combined.append(entry)
+                unique.append(entry)
         if not unique:
             print("[Dedup] tous les points étaient des doublons — rien émis")
             return
         socketio.emit("talking_points", {"points": unique}, to=sid)
         # Garder TOUS les points de la session (pas de cap) pour déduplication globale
-        session_points[sid] = all_points + unique
+        session_points[sid] = combined
         # Fact-check uniquement les affirmations
         for p in unique:
             if p["type"] == "affirmation":
@@ -930,7 +1037,9 @@ session_starts: dict[str, float] = {}
 session_buffers: dict[str, dict] = {}
 session_contexts: dict[str, dict] = {}   # { sid: {"emission": str, "guests": [str]} }
 session_points: dict[str, list] = {}     # { sid: talking points récents pour le contexte }
+session_dupe_index: dict[str, dict] = {}  # { sid: {mot_clé: [indices dans session_points[sid]]} } — évite un scan O(n) à chaque dédup
 session_flush_locks: dict[str, object] = {}  # { sid: Semaphore } évite la race condition sur session_points
+session_chunk_locks: dict[str, object] = {}  # { sid: Semaphore } sérialise les chunks d'UNE session (le tracker n'est pas thread-safe), sans bloquer les autres sessions
 session_speakers: dict[str, "SpeakerTracker"] = {}  # { sid: tracker de locuteurs (diarisation) }
 session_excerpts: dict[str, list] = {}       # { sid: derniers transcripts annotés (preuves pour l'identification) }
 session_speaker_map: dict[str, dict] = {}    # { sid: {"Intervenant A": "Éric Zemmour", …} — mappings confirmés }
@@ -948,6 +1057,8 @@ def health():
 def analyze_video():
     """Extrait la liste des intervenants depuis les métadonnées de la vidéo
     (appelé par la popup à l'ouverture, pour préremplir le champ)."""
+    if BACKEND_TOKEN and request.headers.get("X-Backend-Token") != BACKEND_TOKEN:
+        return {"guests": []}, 401
     data = request.get_json(silent=True) or {}
     title = str(data.get("title", ""))[:300]
     channel = str(data.get("channel", ""))[:100]
@@ -974,13 +1085,18 @@ def analyze_video():
 
 
 @socketio.on("connect")
-def on_connect():
+def on_connect(auth=None):
+    if BACKEND_TOKEN and (not isinstance(auth, dict) or auth.get("token") != BACKEND_TOKEN):
+        print(f"[Auth] connexion refusée (jeton manquant ou invalide): {request.sid}")
+        raise ConnectionRefusedError("unauthorized")
     sid = request.sid
     session_history[sid] = []
     session_buffers[sid] = {"entries": [], "last_flush": time.time(), "start_abs": None}
     session_contexts[sid] = {}
     session_points[sid] = []
+    session_dupe_index[sid] = {}
     session_flush_locks[sid] = eventlet.semaphore.Semaphore(1)
+    session_chunk_locks[sid] = eventlet.semaphore.Semaphore(1)
     session_speakers[sid] = SpeakerTracker() if DIARIZATION else None
     session_excerpts[sid] = []
     session_speaker_map[sid] = {}
@@ -1006,7 +1122,9 @@ def on_disconnect():
     session_buffers.pop(sid, None)
     session_contexts.pop(sid, None)
     session_points.pop(sid, None)
+    session_dupe_index.pop(sid, None)
     session_flush_locks.pop(sid, None)
+    session_chunk_locks.pop(sid, None)
     session_speakers.pop(sid, None)
     session_excerpts.pop(sid, None)
     session_speaker_map.pop(sid, None)
@@ -1039,6 +1157,21 @@ def on_start():
     emit("ready", {"status": "listening"})
 
 
+def _probe_speaker(path: str, tracker) -> tuple:
+    """Calcul bloquant (décodage + ECAPA) d'une sonde — exécuté en thread natif
+    (tpool) pour ne pas geler la boucle eventlet. Lecture seule sur le tracker :
+    ne modifie jamais les clusters, donc pas besoin du verrou de session."""
+    wav = decode_audio(path)
+    if len(wav) < 16000:  # moins d'une seconde utile
+        return "", -1.0
+    if float(np.sqrt((wav ** 2).mean())) < 0.005:  # silence — le badge s'effacera tout seul
+        return "", -1.0
+    with torch.no_grad():
+        t = torch.from_numpy(wav).float().unsqueeze(0)
+        emb = speaker_encoder.encode_batch(t).squeeze().cpu().numpy()
+    return tracker.match(emb)
+
+
 @socketio.on("speaker_probe")
 def handle_speaker_probe(data):
     """Sonde temps réel "qui parle" : ~2,5 s d'audio → empreinte vocale →
@@ -1055,15 +1188,7 @@ def handle_speaker_probe(data):
         with tempfile.NamedTemporaryFile(suffix=".webm", delete=False) as tmp:
             tmp.write(bytes(data) if not isinstance(data, bytes) else data)
             tmp_path = tmp.name
-        wav = decode_audio(tmp_path)
-        if len(wav) < 16000:
-            return  # moins d'une seconde utile
-        if float(np.sqrt((wav ** 2).mean())) < 0.005:
-            return  # silence — le badge s'effacera tout seul
-        with torch.no_grad():
-            t = torch.from_numpy(wav).float().unsqueeze(0)
-            emb = speaker_encoder.encode_batch(t).squeeze().cpu().numpy()
-        label, sim = tracker.match(emb)
+        label, sim = eventlet.tpool.execute(_probe_speaker, tmp_path, tracker)
         if not label or sim < PROBE_MATCH_T:
             return
         # Le "locuteur courant" sert aussi d'héritage aux segments trop courts
@@ -1079,6 +1204,64 @@ def handle_speaker_probe(data):
                 pass
 
 
+def _transcribe_and_diarize(path: str, sid: str, chunk_offset: float, chunk_abs_time: float) -> list:
+    """Tout le travail bloquant d'un chunk (Whisper GPU, décodage, ECAPA CPU,
+    filtrage) — exécuté en thread natif (tpool) pour ne pas geler la boucle
+    eventlet pendant l'inférence (cf. commentaire sur eventlet.monkey_patch en
+    tête de fichier : celui-ci ne couvre que le réseau, pas le calcul). Aucun
+    appel socket ici : on retourne les segments prêts à émettre, l'émission et
+    les effets de bord socket.io restent sur le greenlet appelant. Appelé sous
+    le verrou de session (session_chunk_locks) : sûr de muter tracker/history
+    ici, un seul chunk de CETTE session est traité à la fois."""
+    with model_lock:
+        segments_gen, _ = model.transcribe(
+            path,
+            language="fr",
+            beam_size=5,
+            temperature=0,
+            vad_filter=True,
+            vad_parameters={"threshold": 0.3, "min_silence_duration_ms": 300},
+            no_speech_threshold=0.45,
+            compression_ratio_threshold=2.4,
+        )
+        segments = list(segments_gen)
+
+    wav = None
+    if DIARIZATION and segments:
+        try:
+            wav = decode_audio(path)
+        except Exception as e:
+            print(f"[Diar] decode_audio: {type(e).__name__}: {e}")
+
+    tracker = session_speakers.get(sid)
+    history = session_history.get(sid, [])
+    out = []
+    for seg in segments:
+        text = seg.text.strip()
+        if not text:
+            continue
+        if is_hallucination(text):
+            print(f"  → filtré (hallucination): {text[:50]}")
+            continue
+        if text in history:
+            print(f"  → filtré (doublon): {text[:50]}")
+            continue
+        history.append(text)
+        if len(history) > 5:
+            history.pop(0)
+        label = speaker_label(tracker, wav, seg)
+        print(f"  → émis{f' [{label}]' if label else ''}: {text[:80]}")
+        out.append({
+            "text": text,
+            "speaker": label,
+            "start": round(chunk_offset + seg.start, 3),
+            "end": round(chunk_offset + seg.end, 3),
+            "abs_time": chunk_abs_time,
+        })
+    session_history[sid] = history
+    return out
+
+
 @socketio.on("audio_chunk")
 def handle_audio_chunk(data):
     if not data:
@@ -1086,6 +1269,9 @@ def handle_audio_chunk(data):
 
     sid = request.sid
     tmp_path = None
+    lock = session_chunk_locks.get(sid)
+    if lock:
+        lock.acquire()
     try:
         print(f"[Chunk] reçu ({len(data)} bytes)")
         with tempfile.NamedTemporaryFile(suffix=".webm", delete=False) as tmp:
@@ -1096,65 +1282,21 @@ def handle_audio_chunk(data):
         session_start = session_starts.get(sid, chunk_abs_time)
         chunk_offset = chunk_abs_time - session_start
 
-        with model_lock:
-            segments_gen, _ = model.transcribe(
-                tmp_path,
-                language="fr",
-                beam_size=5,
-                temperature=0,
-                vad_filter=True,
-                vad_parameters={"threshold": 0.3, "min_silence_duration_ms": 300},
-                no_speech_threshold=0.45,
-                compression_ratio_threshold=2.4,
-            )
-            segments = list(segments_gen)
+        results = eventlet.tpool.execute(_transcribe_and_diarize, tmp_path, sid, chunk_offset, chunk_abs_time)
+        print(f"[Whisper] {len(results)} segment(s) émis")
 
-        print(f"[Whisper] {len(segments)} segment(s) produit(s)")
-
-        history = session_history.get(sid, [])
-        buf = session_buffers.get(sid) or {"entries": [], "last_flush": time.time(), "start_abs": None}
-        tracker = session_speakers.get(sid)
         emitted = []  # [(label_locuteur, texte)]
+        for r in results:
+            emitted.append((r["speaker"], r["text"]))
+            emit("transcript_segment", r)
 
-        # Waveform 16 kHz pour les empreintes vocales (même fichier que Whisper)
-        wav = None
-        if DIARIZATION and segments:
-            try:
-                wav = decode_audio(tmp_path)
-            except Exception as e:
-                print(f"[Diar] decode_audio: {type(e).__name__}: {e}")
-
-        for seg in segments:
-            text = seg.text.strip()
-            if not text:
-                continue
-            if is_hallucination(text):
-                print(f"  → filtré (hallucination): {text[:50]}")
-                continue
-            if text in history:
-                print(f"  → filtré (doublon): {text[:50]}")
-                continue
-            history.append(text)
-            if len(history) > 5:
-                history.pop(0)
-            label = speaker_label(tracker, wav, seg)
-            emitted.append((label, text))
-            print(f"  → émis{f' [{label}]' if label else ''}: {text[:80]}")
-            emit("transcript_segment", {
-                "text": text,
-                "speaker": label,
-                "start": round(chunk_offset + seg.start, 3),
-                "end": round(chunk_offset + seg.end, 3),
-                "abs_time": chunk_abs_time,
-            })
-
-        session_history[sid] = history
         if emitted:
             match_clusters_to_bank(sid)
 
         if not MISTRAL_API_KEY:
             print("[Buffer] MISTRAL_API_KEY manquante — flush désactivé")
         elif emitted:
+            buf = session_buffers.get(sid) or {"entries": [], "last_flush": time.time(), "start_abs": None}
             if not buf["entries"]:
                 # Début (approximatif) du texte accumulé — sert d'horodatage aux points
                 buf["start_abs"] = chunk_abs_time
@@ -1180,6 +1322,8 @@ def handle_audio_chunk(data):
         print(f"[ERREUR] {type(e).__name__}: {e}")
 
     finally:
+        if lock:
+            lock.release()
         if tmp_path and os.path.exists(tmp_path):
             try:
                 os.unlink(tmp_path)
@@ -1188,4 +1332,6 @@ def handle_audio_chunk(data):
 
 
 if __name__ == "__main__":
-    socketio.run(app, host="0.0.0.0", port=5000, debug=False)
+    # 127.0.0.1 et non 0.0.0.0 : ce backend relaie vers l'API Mistral avec ta
+    # clé et n'a pas vocation à être joignable depuis le réseau local.
+    socketio.run(app, host="127.0.0.1", port=5000, debug=False)

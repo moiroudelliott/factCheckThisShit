@@ -39,6 +39,13 @@ const DUPE_MEMORY   = 6;     // nb de dernières cartes mémorisées pour l'anti
 // technique ("Intervenant A") ou une attente indéfinie.
 const IDENT_TIMEOUT_MS = 150000;
 
+// Une fois le NOM connu (vote LLM), l'empreinte vocale n'est pas forcément
+// encore en banque (il faut VOICE_ENROLL_MIN_SEGMENTS segments côté backend).
+// On affiche "capture en cours" jusqu'à voice_enrolled, ou on abandonne
+// l'indicateur après ce délai plutôt que de le laisser tourner pour un
+// intervenant qui n'a pas assez parlé pour être enrôlé.
+const ENROLL_INDICATOR_TIMEOUT_MS = 60000;
+
 const PENDING_ACCENT = 'oklch(0.72 0.025 255)';
 
 const VERDICT_CFG = {
@@ -72,6 +79,8 @@ const S = {
   shownWords: [],    // sets de mots-clés des dernières cartes affichées (anti-doublon)
   speakerMap: {},    // "Intervenant A" → nom réel confirmé par le backend
   speakerFirstSeen: {}, // "Intervenant A" → Date.now() du premier segment vu avec ce label (pour "identification en cours" → "échec")
+  enrolledNames: new Set(), // noms dont l'empreinte vocale est déjà en banque (backend) — sinon "capture en cours" dans le badge
+  nameFirstSeen: {}, // nom réel → Date.now() du premier affichage (abandonne l'indicateur de capture après ENROLL_INDICATOR_TIMEOUT_MS)
   badgeTimer: null,  // auto-masquage du badge "qui parle" pendant les silences
   recapOpen: false,
   showAll: true,     // filtre récap : true = tout voir (défaut)
@@ -125,6 +134,41 @@ function displayNameHtml(rawLabelOrName) {
   if (st.kind === 'name') return esc(st.text);
   const iconCls = st.kind === 'progress' ? 'fct-ident-icon--progress' : 'fct-ident-icon--unknown';
   return `<span class="fct-ident fct-ident--${st.kind}"><span class="fct-ident-icon ${iconCls}"></span>${esc(st.text)}</span>`;
+}
+
+// Une fois le nom connu, son empreinte vocale n'est pas forcément encore en
+// banque (voir ENROLL_INDICATOR_TIMEOUT_MS) — seul le badge "qui parle" a la
+// place de le montrer ; la carte/le récap n'affichent que le nom.
+function needsEnrollIndicator(name) {
+  if (S.enrolledNames.has(name)) return false;
+  if (!S.nameFirstSeen[name]) S.nameFirstSeen[name] = Date.now();
+  return Date.now() - S.nameFirstSeen[name] < ENROLL_INDICATOR_TIMEOUT_MS;
+}
+
+// Construit et applique le contenu du badge pour un label/nom donné — point
+// d'entrée unique partagé par onSegment (nouveau segment) et onSpeakerMap /
+// onVoiceEnrolled (mise à jour d'un badge déjà affiché), pour ne jamais
+// dupliquer la logique état → contenu à deux endroits.
+function applyBadgeContent(badge, rawLabelOrName) {
+  const nameEl = badge.querySelector('.fct-badge-name');
+  const st = identState(rawLabelOrName);
+  const enrolling = st.kind === 'name' && needsEnrollIndicator(st.text);
+  const html = enrolling
+    ? `${esc(st.text)}<span class="fct-ident fct-ident--progress fct-badge-enroll"><span class="fct-ident-icon fct-ident-icon--progress"></span>empreinte vocale…</span>`
+    : esc(st.text);
+
+  // Le badge est trop petit pour une 2e icône animée à côté de l'équaliseur
+  // quand on ne fait QUE chercher qui parle : seule sa couleur porte cet état
+  // (rouge = voix identifiée, gris = en recherche). Une fois le nom connu, la
+  // capture d'empreinte a sa propre icône — le badge s'élargit pour l'accueillir.
+  badge.classList.toggle('fct-badge--pending-id', st.kind !== 'name');
+  badge.classList.toggle('fct-badge--enrolling', enrolling);
+  if (nameEl.innerHTML !== html) {
+    nameEl.innerHTML = html;
+    nameEl.classList.remove('fct-risein');
+    void nameEl.offsetWidth; // relance l'animation
+    nameEl.classList.add('fct-risein');
+  }
 }
 
 function esc(s) {
@@ -198,10 +242,11 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     if (msg.type === 'talking_points')    (msg.points || []).forEach(addPoint);
     if (msg.type === 'fact_check_result') onFactCheck(msg);
     if (msg.type === 'connection_status') onStatus(msg);
-    if (msg.type === 'speaker_map')       onSpeakerMap(msg.map || {});
+    if (msg.type === 'speaker_map')       onSpeakerMap(msg.map || {}, msg.enrolled || []);
     if (msg.type === 'transcript_segment') onSegment(msg);
     if (msg.type === 'speaker_live')      onSegment(msg);
     if (msg.type === 'mistral_rate_limited') onRateLimited(msg);
+    if (msg.type === 'voice_enrolled')    onVoiceEnrolled(msg);
   } catch (e) {
     // Un message malformé ne doit jamais tuer le pipeline d'affichage
     console.error('[FCT] message handler error:', e);
@@ -231,6 +276,8 @@ function teardown() {
   S.shownWords = [];
   S.speakerMap = {};
   S.speakerFirstSeen = {};
+  S.enrolledNames = new Set();
+  S.nameFirstSeen = {};
   S.badgeTimer = null;
   S.recapOpen = false;
   S.showAll = true;
@@ -325,19 +372,9 @@ function injectBadge() {
 function onSegment({ speaker }) {
   if (!S.active || !speaker) return;
   const badge = document.getElementById('fct-speaker-badge') || injectBadge();
-  const nameEl = badge.querySelector('.fct-badge-name');
-  const st = identState(speaker);
 
-  badge.dataset.label = speaker; // label brut, pour le renommage via speaker_map
-  // Le badge est trop petit pour une 2e icône animée à côté de l'équaliseur :
-  // seule sa couleur porte l'état (rouge = voix identifiée, gris = en recherche).
-  badge.classList.toggle('fct-badge--pending-id', st.kind !== 'name');
-  if (nameEl.textContent !== st.text) {
-    nameEl.textContent = st.text;
-    nameEl.classList.remove('fct-risein');
-    void nameEl.offsetWidth; // relance l'animation
-    nameEl.classList.add('fct-risein');
-  }
+  badge.dataset.label = speaker; // label brut, pour le renommage via speaker_map/voice_enrolled
+  applyBadgeContent(badge, speaker);
   badge.classList.add('fct-badge--on');
 
   // Auto-masquage si plus aucune détection n'arrive (silence, pub, fin) —
@@ -383,10 +420,11 @@ function addPoint(point) {
   pump();
 }
 
-function onSpeakerMap(map) {
+function onSpeakerMap(map, enrolled) {
   // Le backend a identifié (ou corrigé) un locuteur : renommer rétroactivement
   // tous les points déjà reçus via leur label d'origine (quiLabel)
   S.speakerMap = { ...S.speakerMap, ...map };
+  for (const name of (enrolled || [])) S.enrolledNames.add(name);
   let changed = false;
   for (const { point } of S.points.values()) {
     const name = point.quiLabel && map[point.quiLabel];
@@ -403,10 +441,21 @@ function onSpeakerMap(map) {
   // Badge "qui parle" : renommer immédiatement si son label vient d'être identifié
   const badge = document.getElementById('fct-speaker-badge');
   if (badge?.dataset.label && map[badge.dataset.label]) {
-    badge.querySelector('.fct-badge-name').textContent = map[badge.dataset.label];
-    badge.classList.remove('fct-badge--pending-id');
+    applyBadgeContent(badge, badge.dataset.label);
   }
   if (changed && S.recapOpen) renderRecap();
+}
+
+// L'empreinte vocale de ce nom vient d'être sauvegardée en banque — si le
+// badge affiché correspond, retirer l'indicateur "capture en cours" tout de
+// suite plutôt que d'attendre le prochain segment/sonde de ce locuteur.
+function onVoiceEnrolled({ name }) {
+  if (!name) return;
+  S.enrolledNames.add(name);
+  const badge = document.getElementById('fct-speaker-badge');
+  if (badge?.dataset.label && S.speakerMap[badge.dataset.label] === name) {
+    applyBadgeContent(badge, badge.dataset.label);
+  }
 }
 
 function onFactCheck(data) {

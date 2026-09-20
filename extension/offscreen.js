@@ -103,7 +103,13 @@ async function start({ streamId, emission, guests, description, videoDate, token
   });
 
   socket.on('speaker_map', (d) => {
-    forward({ type: 'speaker_map', map: d.map || {} });
+    forward({ type: 'speaker_map', map: d.map || {}, enrolled: d.enrolled || [] });
+  });
+
+  // Empreinte vocale sauvegardée en banque pour ce nom — l'extension peut
+  // retirer son indicateur "capture de l'empreinte…" (voir content.js)
+  socket.on('voice_enrolled', (d) => {
+    if (d.name) forward({ type: 'voice_enrolled', name: d.name });
   });
 
   socket.on('fact_check_result', (d) => {

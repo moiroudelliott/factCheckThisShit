@@ -823,6 +823,15 @@ def apply_speaker_map(sid: str, transcript: str) -> str:
     return transcript
 
 
+def _emit_speaker_map(sid: str, confirmed: dict):
+    """Émission commune à match_clusters_to_bank et identify_speakers : inclut
+    quels noms sont déjà en banque, pour que l'extension sache si elle doit
+    afficher une capture d'empreinte en cours ou juste le nom (déjà enrôlé,
+    via un match acoustique ou un enrôlement précédent)."""
+    enrolled = [n for n in confirmed.values() if n in _voice_bank]
+    socketio.emit("speaker_map", {"map": confirmed, "enrolled": enrolled}, to=sid)
+
+
 def match_clusters_to_bank(sid: str):
     """Attribution ACOUSTIQUE : compare les centroïdes de la session aux
     empreintes de la banque. Une correspondance nette (seuil + marge sur la
@@ -865,19 +874,24 @@ def match_clusters_to_bank(sid: str):
                 print(f"[Voix] {label} = {best_name} (cos {best:.2f})")
     if changed:
         session_speaker_map[sid] = confirmed
-        socketio.emit("speaker_map", {"map": confirmed}, to=sid)
+        _emit_speaker_map(sid, confirmed)
 
 
 def auto_enroll_voices(sid: str):
     """Sauvegarde en banque les voix identifiées de façon fiable par les votes
-    LLM (invité connu, assez de matière, pas déjà en banque). Appelée à chaque
-    nouvelle confirmation (identify_speakers) ET à la déconnexion — idempotente
-    par construction (name in _voice_bank), donc sans risque à rappeler : dès
-    qu'un nom passe VOICE_ENROLL_MIN_SEGMENTS, il est enregistré immédiatement,
-    plutôt que perdu si le backend plante avant la fin propre du débat (le seul
-    cas que l'enregistrement à la seule déconnexion ne couvrait pas). La banque
-    s'enrichit toute seule — au prochain débat, la reconnaissance est
-    acoustique et immédiate."""
+    LLM (invité connu, assez de matière, pas déjà en banque). Idempotente par
+    construction (name in _voice_bank bloque un doublon), donc sans risque à
+    rappeler souvent : appelée après chaque chunk transcrit (juste après
+    match_clusters_to_bank), à chaque nouvelle confirmation dans
+    identify_speakers, ET à la déconnexion. L'appel fréquent compte : un nom
+    confirmé avant d'avoir assez de segments (VOICE_ENROLL_MIN_SEGMENTS) doit
+    être retenté au fur et à mesure que `tracker.counts` grandit, pas
+    seulement au moment de la confirmation — sinon il n'était plus jamais
+    réessayé. Émet voice_enrolled dès qu'un nom passe le seuil, pour que
+    l'extension retire son indicateur "capture de l'empreinte…" (voir
+    content.js) — plutôt que perdu si le backend plante avant la fin propre
+    du débat. La banque s'enrichit toute seule : au prochain débat, la
+    reconnaissance est acoustique et immédiate."""
     if not DIARIZATION:
         return
     tracker = session_speakers.get(sid)
@@ -894,6 +908,7 @@ def auto_enroll_voices(sid: str):
             continue
         centroid = tracker.sums[i] / tracker.counts[i]
         save_voice(name, centroid, auto=True)
+        socketio.emit("voice_enrolled", {"name": name}, to=sid)
 
 
 def identify_speakers(sid: str):
@@ -955,7 +970,7 @@ def identify_speakers(sid: str):
             session_speaker_map[sid] = confirmed
             print(f"[SpeakerMap] confirmé: {confirmed}")
             # L'extension renomme rétroactivement tous les points déjà affichés
-            socketio.emit("speaker_map", {"map": confirmed}, to=sid)
+            _emit_speaker_map(sid, confirmed)
             # Empreinte vocale sauvegardée dès que possible, pas seulement à la
             # fin du débat — voir auto_enroll_voices.
             auto_enroll_voices(sid)
@@ -1321,6 +1336,10 @@ def handle_audio_chunk(data):
 
         if emitted:
             match_clusters_to_bank(sid)
+            # Retenté à chaque chunk (pas seulement à chaque nouvelle
+            # confirmation LLM) : un nom confirmé avant VOICE_ENROLL_MIN_SEGMENTS
+            # doit être réessayé au fur et à mesure que tracker.counts grandit.
+            auto_enroll_voices(sid)
 
         if not MISTRAL_API_KEY:
             print("[Buffer] MISTRAL_API_KEY manquante — flush désactivé")

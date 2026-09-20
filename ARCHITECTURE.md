@@ -188,7 +188,8 @@ Le cache (`factcheck_cache.db`, SQLite) est à **deux niveaux** : la table SQL p
 | `speaker_live` | S→C | `{speaker}` | idem (sonde) |
 | `talking_points` | S→C | `{points: [...]}` | `addPoint()` par point |
 | `fact_check_result` | S→C | `{id, verdict, confiance, explication, source, url}` | `onFactCheck()` → résout la carte si affichée |
-| `speaker_map` | S→C | `{map: {label: nom}}` | renomme rétroactivement |
+| `speaker_map` | S→C | `{map: {label: nom}, enrolled: [nom, ...]}` | renomme rétroactivement ; `enrolled` évite d'afficher "capture en cours" pour un nom déjà en banque |
+| `voice_enrolled` | S→C | `{name}` | retire l'indicateur "capture de l'empreinte…" du badge pour ce nom |
 | `mistral_rate_limited` | S→C | `{attempt, max, wait}` | message temporaire sur la chip |
 
 ---

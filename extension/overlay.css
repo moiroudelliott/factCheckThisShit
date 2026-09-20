@@ -124,6 +124,9 @@
 }
 
 .fct-badge-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
   font-size: 12.5px;
   font-weight: 600;
   color: rgba(255, 255, 255, 0.92);
@@ -131,6 +134,17 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  transition: max-width 0.35s ease;
+}
+/* Nom + capture d'empreinte vocale en cours : la pastille s'élargit pour
+   accueillir l'indicateur au lieu de le tronquer. */
+#fct-speaker-badge.fct-badge--enrolling .fct-badge-name {
+  max-width: 420px;
+}
+.fct-badge-enroll {
+  font-size: 11px;
+  font-weight: 500;
+  white-space: nowrap;
 }
 
 .fct-eq {
@@ -157,9 +171,12 @@
 /* Locuteur en cours d'identification ou jamais identifié — même petit
    vocabulaire visuel que le spinner/point de verdict des cartes (spinner =
    recherche en cours, point statique = verdict tombé), appliqué ici à la
-   voix plutôt qu'au fait. Réservé à la carte et au récap : dans le badge
-   (petit, déjà occupé par l'équaliseur), une 2e icône animée faisait surcharge
-   — le badge se contente de faire passer l'équaliseur du rouge au gris. */
+   voix plutôt qu'au fait.
+   Dans le badge, tant que le NOM lui-même n'est pas connu, une 2e icône
+   animée à côté de l'équaliseur ferait surcharge pour rien : seule sa
+   couleur porte cet état (rouge/gris, cf. fct-badge--pending-id). Une fois
+   le nom connu, la capture d'empreinte vocale (fct-badge-enroll ci-dessous)
+   réutilise ce même .fct-ident — le badge a alors la place pour elle. */
 .fct-ident {
   display: inline-flex;
   align-items: center;

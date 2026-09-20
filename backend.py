@@ -160,17 +160,26 @@ class SpeakerTracker:
             # Même voix : rejoint le locuteur et affine son empreinte
             self.sums[best] += emb
             self.counts[best] += 1
-            idx = best
-        elif best >= 0 and (dur < MIN_NEW_SPEAKER_SEC or len(self.sums) >= MAX_SPEAKERS):
-            # Segment court (interjection, brouhaha) : rattaché au plus proche
-            # SANS polluer son centroïde — les interjections créaient des
-            # locuteurs fantômes (11 labels pour 6 voix réelles)
-            idx = best
+            self.last = self.label_for(best)
+        elif dur < MIN_NEW_SPEAKER_SEC or len(self.sums) >= MAX_SPEAKERS:
+            # Segment court (interjection, brouhaha) ou banque de locuteurs
+            # pleine : jamais assez fiable pour créer un nouveau cluster (ça
+            # fragmentait en locuteurs fantômes — 11 labels pour 6 voix
+            # réelles). MAIS on ne force plus non plus le rattachement au
+            # cluster "le moins pire" quand il ne ressemble en fait à rien
+            # (best_sim < PROBE_MATCH_T) : la première réplique courte d'un
+            # nouveau venu ne doit jamais être happée par un cluster
+            # simplement parce qu'il est, de peu, le moins dissemblable des
+            # existants (cas vécu : le "oui" de François Copé absorbé par le
+            # cluster de Sébastien Chenu, qui n'a ensuite plus jamais son
+            # propre cluster). Dans ce cas on hérite du dernier locuteur actif
+            # (self.last inchangé) plutôt que de coller un nom au hasard.
+            if best >= 0 and best_sim >= PROBE_MATCH_T:
+                self.last = self.label_for(best)
         else:
             self.sums.append(emb.copy())
             self.counts.append(1)
-            idx = len(self.sums) - 1
-        self.last = self.label_for(idx)
+            self.last = self.label_for(len(self.sums) - 1)
         return self.last
 
 
@@ -817,11 +826,23 @@ def apply_speaker_map(sid: str, transcript: str) -> str:
 def match_clusters_to_bank(sid: str):
     """Attribution ACOUSTIQUE : compare les centroïdes de la session aux
     empreintes de la banque. Une correspondance nette (seuil + marge sur la
-    2e meilleure) est définitive et prioritaire sur l'identification LLM."""
+    2e meilleure) est définitive et prioritaire sur l'identification LLM.
+
+    La banque accumule des voix sur TOUS les débats passés — sans filtrage,
+    un présentateur (ou un invité non listé) peut hériter du nom de
+    quelqu'un d'un tout autre débat simplement parce que c'est, de peu,
+    l'empreinte la moins dissemblable de toute la banque (cas vécu : un
+    présentateur identifié comme "François Ruffin", absent de l'émission).
+    Si des intervenants ont été déclarés pour cette session, on restreint
+    donc les candidats à cette liste."""
     if not DIARIZATION or not _voice_bank:
         return
     tracker = session_speakers.get(sid)
     if not tracker or not tracker.sums:
+        return
+    guests = session_contexts.get(sid, {}).get("guests") or []
+    candidates = {n: e for n, e in _voice_bank.items() if not guests or n in guests}
+    if not candidates:
         return
     confirmed = session_speaker_map.setdefault(sid, {})
     locked = session_voice_locked.setdefault(sid, set())
@@ -833,7 +854,7 @@ def match_clusters_to_bank(sid: str):
         centroid = tracker.sums[i] / tracker.counts[i]
         centroid = centroid / (np.linalg.norm(centroid) + 1e-8)
         sims = sorted(((float(np.dot(centroid, ref)), name)
-                       for name, ref in _voice_bank.items()), reverse=True)
+                       for name, ref in candidates.items()), reverse=True)
         best, best_name = sims[0]
         second = sims[1][0] if len(sims) > 1 else -1.0
         if best >= VOICE_MATCH_THRESHOLD and (best - second) >= VOICE_MATCH_MARGIN:

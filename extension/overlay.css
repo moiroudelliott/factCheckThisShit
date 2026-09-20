@@ -154,6 +154,32 @@
   50%      { height: 12px; }
 }
 
+/* Locuteur en cours d'identification ou jamais identifié — même petit
+   vocabulaire visuel que le spinner/point de verdict des cartes (spinner =
+   recherche en cours, point statique = verdict tombé), appliqué ici à la
+   voix plutôt qu'au fait. */
+.fct-ident-icon {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.fct-ident-icon--progress {
+  border: 1.4px solid rgba(255, 255, 255, 0.22);
+  border-top-color: oklch(0.72 0.14 240); /* même bleu que le tag AFFIRMATION */
+  animation: fct-spin 0.7s linear infinite;
+}
+.fct-ident-icon--unknown {
+  background: rgba(255, 255, 255, 0.32);
+}
+.fct-ident--progress { color: oklch(0.72 0.14 240); }
+.fct-ident--unknown { color: rgba(255, 255, 255, 0.4); font-style: italic; }
+
+#fct-speaker-badge.fct-badge--pending-id .fct-eq span {
+  background: rgba(255, 255, 255, 0.35); /* équaliseur rouge = voix identifiée ; gris = en recherche */
+}
+
 /* ── Card slot ─────────────────────────────────────────────────────────────── */
 
 #fct-card-slot {

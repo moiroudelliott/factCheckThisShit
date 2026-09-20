@@ -99,13 +99,32 @@ function setCardTimer(fn, ms) {
 // ne pas casser le renommage rétroactif de onSpeakerMap.
 const RAW_LABEL_RE = /^Intervenant ([A-Z]|\d+)$/;
 
-function displayName(rawLabelOrName) {
-  if (!rawLabelOrName) return '';
+// { kind: 'name' | 'progress' | 'unknown', text }
+function identState(rawLabelOrName) {
+  if (!rawLabelOrName) return null;
   const resolved = S.speakerMap[rawLabelOrName] || rawLabelOrName;
-  if (!RAW_LABEL_RE.test(resolved)) return resolved; // déjà un vrai nom
+  if (!RAW_LABEL_RE.test(resolved)) return { kind: 'name', text: resolved };
   if (!S.speakerFirstSeen[resolved]) S.speakerFirstSeen[resolved] = Date.now();
   const elapsed = Date.now() - S.speakerFirstSeen[resolved];
-  return elapsed < IDENT_TIMEOUT_MS ? 'Identification du locuteur…' : 'Locuteur non identifié';
+  return elapsed < IDENT_TIMEOUT_MS
+    ? { kind: 'progress', text: 'Identification du locuteur…' }
+    : { kind: 'unknown', text: 'Locuteur non identifié' };
+}
+
+// Texte brut (markdown export, textContent) : jamais de balisage.
+function displayName(rawLabelOrName) {
+  return identState(rawLabelOrName)?.text || '';
+}
+
+// HTML (carte, récap, badge) : petite icône cohérente avec le spinner/point de
+// verdict des cartes — spinner tant que la recherche tourne, point statique
+// une fois qu'on a renoncé.
+function displayNameHtml(rawLabelOrName) {
+  const st = identState(rawLabelOrName);
+  if (!st) return '';
+  if (st.kind === 'name') return esc(st.text);
+  const iconCls = st.kind === 'progress' ? 'fct-ident-icon--progress' : 'fct-ident-icon--unknown';
+  return `<span class="fct-ident fct-ident--${st.kind}"><span class="fct-ident-icon ${iconCls}"></span>${esc(st.text)}</span>`;
 }
 
 function esc(s) {
@@ -307,11 +326,15 @@ function onSegment({ speaker }) {
   if (!S.active || !speaker) return;
   const badge = document.getElementById('fct-speaker-badge') || injectBadge();
   const nameEl = badge.querySelector('.fct-badge-name');
-  const name = displayName(speaker);
+  const st = identState(speaker);
+  const html = st.kind === 'name' ? esc(st.text)
+    : `<span class="fct-ident fct-ident--${st.kind}"><span class="fct-ident-icon fct-ident-icon--${st.kind}"></span>${esc(st.text)}</span>`;
 
   badge.dataset.label = speaker; // label brut, pour le renommage via speaker_map
-  if (nameEl.textContent !== name) {
-    nameEl.textContent = name;
+  // Équaliseur rouge = voix identifiée en train de parler ; gris = en recherche.
+  badge.classList.toggle('fct-badge--pending-id', st.kind !== 'name');
+  if (nameEl.innerHTML !== html) {
+    nameEl.innerHTML = html;
     nameEl.classList.remove('fct-risein');
     void nameEl.offsetWidth; // relance l'animation
     nameEl.classList.add('fct-risein');
@@ -382,6 +405,7 @@ function onSpeakerMap(map) {
   const badge = document.getElementById('fct-speaker-badge');
   if (badge?.dataset.label && map[badge.dataset.label]) {
     badge.querySelector('.fct-badge-name').textContent = map[badge.dataset.label];
+    badge.classList.remove('fct-badge--pending-id');
   }
   if (changed && S.recapOpen) renderRecap();
 }
@@ -442,7 +466,7 @@ function showCard(id, entry) {
           <span class="fct-tag-text">VÉRIFICATION</span>
         </span>
       </div>
-      ${point.qui ? `<div class="fct-speaker">${esc(displayName(point.qui))}</div>` : ''}
+      ${point.qui ? `<div class="fct-speaker">${displayNameHtml(point.qui)}</div>` : ''}
       <p class="fct-claim">« ${esc(point.texte)} »</p>
       <div class="fct-checking">
         <span class="fct-spinner"></span>
@@ -719,7 +743,7 @@ function renderRecap() {
         <div class="fct-recap-card-inner">
           <div class="fct-recap-row">
             <span class="fct-recap-badge">${esc(p.type === 'affirmation' && vcfg ? vcfg.tag : tcfg.tag)}</span>
-            ${p.qui ? `<span class="fct-recap-speaker">${esc(displayName(p.qui))}</span>` : ''}
+            ${p.qui ? `<span class="fct-recap-speaker">${displayNameHtml(p.qui)}</span>` : ''}
             ${p.type === 'affirmation' && !vcfg ? '<span class="fct-recap-pending">⏳ vérification…</span>' : ''}
             ${tsChip}
           </div>

@@ -869,10 +869,15 @@ def match_clusters_to_bank(sid: str):
 
 
 def auto_enroll_voices(sid: str):
-    """Fin de session : sauvegarde en banque les voix identifiées de façon
-    fiable par les votes LLM (invité connu, cluster fourni, pas déjà en banque).
-    La banque s'enrichit toute seule — au prochain débat, la reconnaissance
-    est acoustique et immédiate."""
+    """Sauvegarde en banque les voix identifiées de façon fiable par les votes
+    LLM (invité connu, assez de matière, pas déjà en banque). Appelée à chaque
+    nouvelle confirmation (identify_speakers) ET à la déconnexion — idempotente
+    par construction (name in _voice_bank), donc sans risque à rappeler : dès
+    qu'un nom passe VOICE_ENROLL_MIN_SEGMENTS, il est enregistré immédiatement,
+    plutôt que perdu si le backend plante avant la fin propre du débat (le seul
+    cas que l'enregistrement à la seule déconnexion ne couvrait pas). La banque
+    s'enrichit toute seule — au prochain débat, la reconnaissance est
+    acoustique et immédiate."""
     if not DIARIZATION:
         return
     tracker = session_speakers.get(sid)
@@ -951,6 +956,9 @@ def identify_speakers(sid: str):
             print(f"[SpeakerMap] confirmé: {confirmed}")
             # L'extension renomme rétroactivement tous les points déjà affichés
             socketio.emit("speaker_map", {"map": confirmed}, to=sid)
+            # Empreinte vocale sauvegardée dès que possible, pas seulement à la
+            # fin du débat — voir auto_enroll_voices.
+            auto_enroll_voices(sid)
     except Exception as e:
         print(f"[SpeakerMap error] {type(e).__name__}: {e}")
     finally:

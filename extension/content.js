@@ -1,5 +1,5 @@
 // ══════════════════════════════════════════════════════════════════════════════
-// vérif.live — content script (v2.1)
+// SOURCÉ — content script (v2.1)
 //
 // Workflow : seules les AFFIRMATIONS vérifiables apparaissent en carte
 // (spinner → verdict). Tout le reste (questions, opinions, remarques…) va
@@ -19,7 +19,7 @@ window.__fctInjected = true;
   if (document.getElementById('fct-fonts')) return;
   const l = document.createElement('link');
   l.id = 'fct-fonts'; l.rel = 'stylesheet';
-  l.href = 'https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;1,6..72,400;1,6..72,500&family=Archivo:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500&display=swap';
+  l.href = 'https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400;1,6..72,500&family=Archivo:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500&display=swap';
   document.head.appendChild(l);
 })();
 
@@ -62,11 +62,14 @@ const S = {
   queue: [],         // ids d'affirmations en attente d'affichage
   current: null,     // { id, el } — carte actuellement affichée
   cardTimer: null,   // LE timer de carte (un seul actif à la fois)
+  cardPending: null, // { fn, ms } — dernière phase programmée par setCardTimer, pour pause/reprise (récap ouvert)
   shownWords: [],    // sets de mots-clés des dernières cartes affichées (anti-doublon)
   speakerMap: {},    // "Intervenant A" → nom réel confirmé par le backend
   badgeTimer: null,  // auto-masquage du badge "qui parle" pendant les silences
   recapOpen: false,
   showAll: true,     // filtre récap : true = tout voir (défaut)
+  lastStatus: 'connected', // dernier statut de connexion connu, pour revenir dessus après un message transitoire
+  rateLimitTimer: null,
 };
 
 // Timer lié à la génération courante : ne fait rien si un teardown est passé entre-temps
@@ -77,6 +80,7 @@ function later(fn, ms) {
 
 function setCardTimer(fn, ms) {
   clearTimeout(S.cardTimer);
+  S.cardPending = { fn, ms }; // pour pause/reprise si le récap s'ouvre pendant ce délai
   S.cardTimer = later(fn, ms);
 }
 
@@ -103,6 +107,24 @@ const STOPWORDS = new Set([
 function keyWords(text) {
   const tokens = String(text).toLowerCase().match(/[a-zàâçéèêëîïôùûü]{4,}|\d{3,}/g) || [];
   return new Set(tokens.filter(t => !STOPWORDS.has(t)));
+}
+
+// Filet contre la résurgence de doublons après un redémarrage backend : la
+// dédup serveur (session_points) repart de zéro sur une nouvelle session/sid,
+// mais S.points survit côté extension tant que la capture reste active — on
+// compare donc tout nouveau point à TOUT l'historique déjà reçu, pas
+// seulement aux dernières cartes affichées (cf. isNearDupeOfShown).
+function isDuplicateOfAny(text) {
+  const words = keyWords(text);
+  if (words.size < 3) return false;
+  for (const { point } of S.points.values()) {
+    const w = keyWords(point.texte);
+    if (w.size < 3) continue;
+    let overlap = 0;
+    for (const x of words) if (w.has(x)) overlap++;
+    if (overlap / Math.min(words.size, w.size) >= 0.6) return true;
+  }
+  return false;
 }
 
 function isNearDupeOfShown(text) {
@@ -136,6 +158,7 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     if (msg.type === 'speaker_map')       onSpeakerMap(msg.map || {});
     if (msg.type === 'transcript_segment') onSegment(msg);
     if (msg.type === 'speaker_live')      onSegment(msg);
+    if (msg.type === 'mistral_rate_limited') onRateLimited(msg);
   } catch (e) {
     // Un message malformé ne doit jamais tuer le pipeline d'affichage
     console.error('[FCT] message handler error:', e);
@@ -157,6 +180,7 @@ function teardown() {
   S.gen++; // tous les timers en vol deviennent des no-ops
   clearTimeout(S.cardTimer);
   S.cardTimer = null;
+  S.cardPending = null;
   S.active = false;
   S.points.clear();
   S.queue = [];
@@ -166,6 +190,9 @@ function teardown() {
   S.badgeTimer = null;
   S.recapOpen = false;
   S.showAll = true;
+  S.lastStatus = 'connected';
+  clearTimeout(S.rateLimitTimer);
+  S.rateLimitTimer = null;
   ['fct-chip', 'fct-card-slot', 'fct-recap', 'fct-speaker-badge'].forEach(id => document.getElementById(id)?.remove());
 }
 
@@ -179,10 +206,10 @@ function injectChip() {
       <span class="fct-ping-core"></span>
       <span class="fct-ping-ring"></span>
     </span>
-    <span class="fct-chip-brand">vérif<span class="fct-chip-dot">.</span>live</span>
+    <span class="fct-chip-brand">SOURC<span class="fct-chip-dot">É</span></span>
     <span class="fct-chip-sub" id="fct-chip-sub">connexion…</span>
-    <button class="fct-chip-recap" id="fct-recap-btn">Récap <span id="fct-count"></span></button>
-    <button class="fct-chip-stop" id="fct-stop-btn" title="Arrêter la transcription">■</button>
+    <button class="fct-chip-recap" id="fct-recap-btn" aria-expanded="false" aria-controls="fct-recap">Récap <span id="fct-count"></span></button>
+    <button class="fct-chip-stop" id="fct-stop-btn" title="Arrêter la transcription" aria-label="Arrêter la transcription">■</button>
   `;
   chip.querySelector('#fct-recap-btn').addEventListener('click', toggleRecap);
   chip.querySelector('#fct-stop-btn').addEventListener('click', () => {
@@ -197,9 +224,11 @@ const STATUS_CFG = {
   reconnecting:  { cls: 'fct-chip--warn',   label: 'reconnexion…' },
   backend_down:  { cls: 'fct-chip--error',  label: 'backend injoignable' },
   capture_error: { cls: 'fct-chip--error',  label: 'erreur de capture' },
+  unauthorized:  { cls: 'fct-chip--error',  label: 'jeton invalide — vérifie la popup' },
 };
 
 function onStatus({ status }) {
+  S.lastStatus = status;
   const chip = document.getElementById('fct-chip');
   const sub  = document.getElementById('fct-chip-sub');
   if (!chip || !sub) return;
@@ -207,6 +236,21 @@ function onStatus({ status }) {
   chip.classList.remove('fct-chip--warn', 'fct-chip--error');
   if (cfg.cls) chip.classList.add(cfg.cls);
   sub.textContent = cfg.label;
+}
+
+// Mistral saturé (429) : le backend retente automatiquement avec un backoff —
+// on l'affiche plutôt que de laisser l'utilisateur croire que l'app est figée.
+function onRateLimited({ attempt, max, wait }) {
+  const chip = document.getElementById('fct-chip');
+  const sub  = document.getElementById('fct-chip-sub');
+  if (!chip || !sub) return;
+  chip.classList.add('fct-chip--warn');
+  sub.textContent = `Mistral saturé — tentative ${attempt}/${max} dans ${wait}s`;
+  clearTimeout(S.rateLimitTimer);
+  S.rateLimitTimer = later(() => {
+    chip.classList.remove('fct-chip--warn');
+    onStatus({ status: S.lastStatus });
+  }, wait * 1000 + 1200);
 }
 
 function updateCount() {
@@ -261,6 +305,11 @@ function injectSlot() {
   document.getElementById('fct-card-slot')?.remove();
   const slot = document.createElement('div');
   slot.id = 'fct-card-slot';
+  // Une nouvelle carte de vérification est un contenu qui mérite d'être
+  // annoncé par un lecteur d'écran, sans lui faire perdre le focus courant.
+  slot.setAttribute('role', 'status');
+  slot.setAttribute('aria-live', 'polite');
+  slot.setAttribute('aria-atomic', 'true');
   document.body.appendChild(slot);
   return slot;
 }
@@ -269,6 +318,7 @@ function injectSlot() {
 
 function addPoint(point) {
   if (!point?.id || typeof point.texte !== 'string' || S.points.has(point.id)) return;
+  if (isDuplicateOfAny(point.texte)) return;
   // quiLabel = label diarisation d'origine, conservé pour pouvoir renommer
   // (ou corriger) rétroactivement quand le mapping évolue
   point.quiLabel = point.qui_label || point.qui || '';
@@ -329,7 +379,10 @@ function onFactCheck(data) {
 // ── Affichage — une seule carte à la fois ──────────────────────────────────────
 
 function pump() {
-  if (!S.active) return;
+  // Le récap se superpose visuellement au slot de carte (mêmes coordonnées) :
+  // avancer la file pendant qu'elle est masquée ferait défiler des cartes que
+  // personne ne voit. On gèle l'affichage tant que le récap est ouvert.
+  if (!S.active || S.recapOpen) return;
   // Carte détruite par le DOM de YouTube (navigation SPA) → libérer le slot
   if (S.current && !S.current.el.isConnected) {
     clearTimeout(S.cardTimer);
@@ -357,7 +410,7 @@ function showCard(id, entry) {
     <div class="fct-card-inner">
       <div class="fct-card-head">
         <span class="fct-brand">
-          <span class="fct-brand-diamond">◆</span>vérif<span class="fct-brand-dot">.</span>live
+          <span class="fct-brand-diamond">◆</span>SOURC<span class="fct-brand-dot">É</span>
         </span>
         <span class="fct-tag">
           <span class="fct-tag-icon fct-spinner-icon"></span>
@@ -482,7 +535,7 @@ function exportRecap() {
     return (t != null && vid) ? `https://www.youtube.com/watch?v=${vid}&t=${Math.floor(t)}s` : null;
   };
 
-  const lines = [`# vérif.live — Récapitulatif (${new Date().toLocaleDateString('fr-FR')})`, ''];
+  const lines = [`# SOURCÉ — Récapitulatif (${new Date().toLocaleDateString('fr-FR')})`, ''];
   const affs = [], others = [];
   for (const entry of S.points.values()) {
     (entry.point.type === 'affirmation' ? affs : others).push(entry);
@@ -526,17 +579,26 @@ function toggleRecap() { S.recapOpen ? closeRecap() : openRecap(); }
 
 function openRecap() {
   S.recapOpen = true;
+  // Mettre en pause la carte en cours : le récap la recouvre entièrement, la
+  // laisser tourner (minuteur + file) ferait sauter des cartes jamais vues.
+  if (S.cardTimer) {
+    clearTimeout(S.cardTimer);
+    S.cardTimer = null;
+  }
   document.getElementById('fct-recap-btn')?.classList.add('fct-chip-recap--active');
+  document.getElementById('fct-recap-btn')?.setAttribute('aria-expanded', 'true');
 
   const panel = document.createElement('div');
   panel.id = 'fct-recap';
+  panel.setAttribute('role', 'region');
+  panel.setAttribute('aria-label', 'Récapitulatif SOURCÉ');
   panel.innerHTML = `
     <div class="fct-recap-header">
-      <span class="fct-recap-title">◆ vérif<span style="color:oklch(0.74 0.13 145)">.</span>live — Récapitulatif</span>
+      <span class="fct-recap-title">◆ SOURC<span style="color:#e0324f">É</span> — Récapitulatif</span>
       <div style="display:flex;gap:6px">
-        <button class="fct-recap-filter" id="fct-recap-export" title="Exporter en Markdown">⬇</button>
+        <button class="fct-recap-filter" id="fct-recap-export" title="Exporter en Markdown" aria-label="Exporter en Markdown">⬇</button>
         <button class="fct-recap-filter" id="fct-recap-filter"></button>
-        <button class="fct-recap-close" id="fct-recap-close">✕</button>
+        <button class="fct-recap-close" id="fct-recap-close" aria-label="Fermer le récapitulatif">✕</button>
       </div>
     </div>
     <div class="fct-recap-stats" id="fct-recap-stats"></div>
@@ -569,10 +631,19 @@ function openRecap() {
 function closeRecap() {
   S.recapOpen = false;
   document.getElementById('fct-recap-btn')?.classList.remove('fct-chip-recap--active');
+  document.getElementById('fct-recap-btn')?.setAttribute('aria-expanded', 'false');
   const panel = document.getElementById('fct-recap');
-  if (!panel) return;
-  panel.classList.remove('fct-recap--in');
-  later(() => panel.remove(), 380);
+  if (panel) {
+    panel.classList.remove('fct-recap--in');
+    later(() => panel.remove(), 380);
+  }
+  // Reprendre la carte interrompue (phase complète, par simplicité) ou, si
+  // aucune carte n'était affichée, laisser la file avancer normalement.
+  if (S.current && S.cardPending) {
+    setCardTimer(S.cardPending.fn, S.cardPending.ms);
+  } else {
+    pump();
+  }
 }
 
 function renderStats() {

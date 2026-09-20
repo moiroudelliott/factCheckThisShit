@@ -1,5 +1,5 @@
 // ══════════════════════════════════════════════════════════════════════════════
-// vérif.live — document offscreen (v2)
+// SOURCÉ — document offscreen (v2)
 // Capture l'audio de l'onglet, le découpe en chunks WebM, streame au backend
 // via socket.io, et remonte résultats + état de connexion au content script.
 // ══════════════════════════════════════════════════════════════════════════════
@@ -34,7 +34,7 @@ function report(status, detail = '') {
   forward({ type: 'connection_status', status, detail });
 }
 
-async function start({ streamId, emission, guests, description, videoDate }) {
+async function start({ streamId, emission, guests, description, videoDate, token }) {
   try {
     mediaStream = await navigator.mediaDevices.getUserMedia({
       audio: {
@@ -56,7 +56,9 @@ async function start({ streamId, emission, guests, description, videoDate }) {
   if (audioCtx.state === 'suspended') await audioCtx.resume().catch(() => {});
   audioCtx.createMediaStreamSource(mediaStream).connect(audioCtx.destination);
 
-  socket = io(BACKEND_URL, { transports: ['websocket'] });
+  // auth.token : ignoré par le backend si BACKEND_TOKEN n'est pas défini côté
+  // serveur ; sinon la connexion est refusée sans jeton valide (voir backend.py)
+  socket = io(BACKEND_URL, { transports: ['websocket'], auth: { token: token || '' } });
 
   // 'connect' se déclenche aussi à chaque reconnexion : on renvoie le contexte
   // car le backend a créé une nouvelle session (nouveau sid)
@@ -82,8 +84,14 @@ async function start({ streamId, emission, guests, description, videoDate }) {
     forward({ type: 'speaker_live', speaker: d.speaker });
   });
 
-  socket.on('connect_error', () => report('backend_down'));
+  socket.on('connect_error', (err) => {
+    report(err?.message === 'unauthorized' ? 'unauthorized' : 'backend_down');
+  });
   socket.on('disconnect', () => { if (isCapturing) report('reconnecting'); });
+
+  socket.on('mistral_rate_limited', (d) => {
+    forward({ type: 'mistral_rate_limited', attempt: d.attempt, max: d.max, wait: d.wait });
+  });
 
   socket.on('talking_points', (d) => {
     forward({ type: 'talking_points', points: d.points });

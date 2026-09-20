@@ -1,5 +1,5 @@
 // ══════════════════════════════════════════════════════════════════════════════
-// vérif.live — service worker (v2)
+// SOURCÉ — service worker (v2)
 // AUCUN état en mémoire : Chrome tue le worker après ~30 s d'inactivité, donc
 // tout vit dans chrome.storage.session. Chaque handler relit l'état.
 // ══════════════════════════════════════════════════════════════════════════════
@@ -48,7 +48,7 @@ chrome.tabs.onRemoved.addListener(async (closedTabId) => {
   if (capturing && closedTabId === tabId) handleStop();
 });
 
-async function handleStart({ tabId, emission, guests, description, videoDate }) {
+async function handleStart({ tabId, emission, guests, description, videoDate, token }) {
   try {
     await chrome.storage.session.set({ tabId, capturing: true });
 
@@ -81,7 +81,7 @@ async function handleStart({ tabId, emission, guests, description, videoDate }) 
     }
 
     // tabId inclus pour que l'offscreen le propage dans chaque forwardToContent
-    chrome.runtime.sendMessage({ action: 'doCapture', streamId, emission, guests, description, videoDate, tabId });
+    chrome.runtime.sendMessage({ action: 'doCapture', streamId, emission, guests, description, videoDate, token, tabId });
   } catch (e) {
     await chrome.storage.session.set({ tabId: null, capturing: false });
     throw e; // remonte au listener → réponse {ok:false} vers la popup

@@ -48,21 +48,22 @@
 
 .fct-chip-brand {
   font-family: 'Newsreader', serif;
+  font-style: italic;
   font-size: 14px;
   font-weight: 500;
   color: #fff;
 }
-.fct-chip-dot { color: oklch(0.74 0.13 145); }
+.fct-chip-dot { color: #e0324f; }
 .fct-chip-sub {
   font-size: 11px;
   color: rgba(255, 255, 255, 0.45);
 }
 
 .fct-chip-stop {
-  background: rgba(239, 68, 68, 0.12);
-  border: 1px solid rgba(239, 68, 68, 0.3);
+  background: rgba(224, 50, 79, 0.12);
+  border: 1px solid rgba(224, 50, 79, 0.3);
   border-radius: 999px;
-  color: rgba(239, 68, 68, 0.8);
+  color: rgba(224, 50, 79, 0.85);
   font-size: 10px;
   padding: 3px 9px;
   cursor: pointer;
@@ -70,8 +71,8 @@
   font-family: 'Archivo', system-ui, sans-serif;
 }
 .fct-chip-stop:hover {
-  background: rgba(239, 68, 68, 0.25);
-  color: #fca5a5;
+  background: rgba(224, 50, 79, 0.25);
+  color: #f28a9c;
 }
 
 .fct-chip-recap {
@@ -142,7 +143,7 @@
 .fct-eq span {
   width: 3px;
   border-radius: 2px;
-  background: oklch(0.74 0.13 145);
+  background: #e0324f;
   animation: fct-eq 1s ease-in-out infinite;
 }
 .fct-eq span:nth-child(2) { animation-delay: 0.2s; }
@@ -250,16 +251,15 @@
 
 .fct-brand {
   font-family: 'Newsreader', serif;
+  font-style: italic;
   font-size: 13.5px;
   font-weight: 500;
   color: rgba(255, 255, 255, 0.8);
-  display: flex;
-  align-items: center;
-  gap: 5px;
 }
 .fct-brand-diamond {
   color: var(--accent);
   font-size: 9px;
+  margin-right: 5px;
   transition: color 0.55s ease;
 }
 .fct-brand-dot {

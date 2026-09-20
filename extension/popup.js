@@ -1,5 +1,5 @@
 // ══════════════════════════════════════════════════════════════════════════════
-// vérif.live — popup (v2)
+// SOURCÉ — popup (v2)
 // À l'ouverture : lit l'état réel de capture (storage.session via le SW) puis
 // health-check le backend. Toute erreur est affichée, jamais silencieuse.
 // ══════════════════════════════════════════════════════════════════════════════
@@ -13,6 +13,21 @@ let videoMeta = null; // { title, channel, desc } — détecté sur la vidéo en
 init();
 
 async function init() {
+  const { fctToken } = await chrome.storage.local.get('fctToken').catch(() => ({}));
+  if (fctToken) {
+    $('token').value = fctToken;
+    $('advanced-panel').style.display = 'block';
+    $('advanced-toggle').textContent = 'Avancé ▴';
+  }
+  $('advanced-toggle').addEventListener('click', () => {
+    const open = $('advanced-panel').style.display !== 'none';
+    $('advanced-panel').style.display = open ? 'none' : 'block';
+    $('advanced-toggle').textContent = open ? 'Avancé ▾' : 'Avancé ▴';
+  });
+  $('token').addEventListener('change', () => {
+    chrome.storage.local.set({ fctToken: $('token').value.trim() });
+  });
+
   const state = await chrome.runtime.sendMessage({ action: 'getStatus' }).catch(() => null);
   setCapturing(Boolean(state?.capturing));
   if (state?.capturing) return;
@@ -44,9 +59,13 @@ async function init() {
   if (videoMeta?.title && !$('guests').value.trim()) {
     setStatus('détection des intervenants…');
     try {
+      const token = $('token').value.trim();
       const r = await fetch(`${BACKEND_URL}/analyze_video`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'X-Backend-Token': token } : {}),
+        },
         body: JSON.stringify({
           title: videoMeta.title,
           channel: videoMeta.channel,
@@ -139,6 +158,7 @@ $('btn-start').addEventListener('click', async () => {
     guests: $('guests').value.trim(),
     description: videoMeta?.desc || '',
     videoDate: videoMeta?.publishDate || '',
+    token: $('token').value.trim(),
   }).catch(e => ({ ok: false, error: e.message }));
 
   $('btn-start').disabled = false;

@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
-  "name": "FactCheckThis",
-  "version": "1.0",
+  "name": "SOURCÉ",
+  "version": "3.2",
   "description": "Fact-checking en temps réel pour les débats politiques sur YouTube",
   "permissions": ["tabCapture", "offscreen", "activeTab", "scripting", "storage"],
   "host_permissions": ["*://*.youtube.com/*"],

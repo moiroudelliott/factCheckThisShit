@@ -7,3 +7,5 @@ build/
 pretrained_models/
 *.db
 voices/
+.claude/
+brag-output/

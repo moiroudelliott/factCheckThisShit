@@ -327,14 +327,13 @@ function onSegment({ speaker }) {
   const badge = document.getElementById('fct-speaker-badge') || injectBadge();
   const nameEl = badge.querySelector('.fct-badge-name');
   const st = identState(speaker);
-  const html = st.kind === 'name' ? esc(st.text)
-    : `<span class="fct-ident fct-ident--${st.kind}"><span class="fct-ident-icon fct-ident-icon--${st.kind}"></span>${esc(st.text)}</span>`;
 
   badge.dataset.label = speaker; // label brut, pour le renommage via speaker_map
-  // Équaliseur rouge = voix identifiée en train de parler ; gris = en recherche.
+  // Le badge est trop petit pour une 2e icône animée à côté de l'équaliseur :
+  // seule sa couleur porte l'état (rouge = voix identifiée, gris = en recherche).
   badge.classList.toggle('fct-badge--pending-id', st.kind !== 'name');
-  if (nameEl.innerHTML !== html) {
-    nameEl.innerHTML = html;
+  if (nameEl.textContent !== st.text) {
+    nameEl.textContent = st.text;
     nameEl.classList.remove('fct-risein');
     void nameEl.offsetWidth; // relance l'animation
     nameEl.classList.add('fct-risein');

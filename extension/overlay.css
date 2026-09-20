@@ -157,7 +157,14 @@
 /* Locuteur en cours d'identification ou jamais identifié — même petit
    vocabulaire visuel que le spinner/point de verdict des cartes (spinner =
    recherche en cours, point statique = verdict tombé), appliqué ici à la
-   voix plutôt qu'au fait. */
+   voix plutôt qu'au fait. Réservé à la carte et au récap : dans le badge
+   (petit, déjà occupé par l'équaliseur), une 2e icône animée faisait surcharge
+   — le badge se contente de faire passer l'équaliseur du rouge au gris. */
+.fct-ident {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
 .fct-ident-icon {
   display: inline-block;
   width: 8px;

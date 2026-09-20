@@ -33,6 +33,12 @@ const GAP_MS        = 220;   // pause entre deux cartes
 const MAX_QUEUE     = 8;     // file d'affichage max (les plus anciennes sautent, restent au récap)
 const DUPE_MEMORY   = 6;     // nb de dernières cartes mémorisées pour l'anti-doublon d'affichage
 
+// L'identification (vote LLM à 2 confirmations concordantes, ou match banque
+// de voix) peut prendre plusieurs cycles d'analyse — 150s laisse le temps à
+// 2-3 tentatives réalistes avant d'afficher un échec plutôt qu'un label
+// technique ("Intervenant A") ou une attente indéfinie.
+const IDENT_TIMEOUT_MS = 150000;
+
 const PENDING_ACCENT = 'oklch(0.72 0.025 255)';
 
 const VERDICT_CFG = {
@@ -65,6 +71,7 @@ const S = {
   cardPending: null, // { fn, ms } — dernière phase programmée par setCardTimer, pour pause/reprise (récap ouvert)
   shownWords: [],    // sets de mots-clés des dernières cartes affichées (anti-doublon)
   speakerMap: {},    // "Intervenant A" → nom réel confirmé par le backend
+  speakerFirstSeen: {}, // "Intervenant A" → Date.now() du premier segment vu avec ce label (pour "identification en cours" → "échec")
   badgeTimer: null,  // auto-masquage du badge "qui parle" pendant les silences
   recapOpen: false,
   showAll: true,     // filtre récap : true = tout voir (défaut)
@@ -82,6 +89,23 @@ function setCardTimer(fn, ms) {
   clearTimeout(S.cardTimer);
   S.cardPending = { fn, ms }; // pour pause/reprise si le récap s'ouvre pendant ce délai
   S.cardTimer = later(fn, ms);
+}
+
+// ── Nom affiché d'un locuteur ──────────────────────────────────────────────────
+// Un label brut ("Intervenant A"…) ne doit jamais atteindre l'utilisateur : tant
+// qu'aucun nom n'est confirmé (vote LLM ou banque de voix), on affiche l'état de
+// la recherche plutôt qu'un identifiant technique. Ne modifie jamais les données
+// stockées (point.qui reste le label/nom brut) — uniquement la présentation, pour
+// ne pas casser le renommage rétroactif de onSpeakerMap.
+const RAW_LABEL_RE = /^Intervenant ([A-Z]|\d+)$/;
+
+function displayName(rawLabelOrName) {
+  if (!rawLabelOrName) return '';
+  const resolved = S.speakerMap[rawLabelOrName] || rawLabelOrName;
+  if (!RAW_LABEL_RE.test(resolved)) return resolved; // déjà un vrai nom
+  if (!S.speakerFirstSeen[resolved]) S.speakerFirstSeen[resolved] = Date.now();
+  const elapsed = Date.now() - S.speakerFirstSeen[resolved];
+  return elapsed < IDENT_TIMEOUT_MS ? 'Identification du locuteur…' : 'Locuteur non identifié';
 }
 
 function esc(s) {
@@ -187,6 +211,7 @@ function teardown() {
   S.current = null;
   S.shownWords = [];
   S.speakerMap = {};
+  S.speakerFirstSeen = {};
   S.badgeTimer = null;
   S.recapOpen = false;
   S.showAll = true;
@@ -282,7 +307,7 @@ function onSegment({ speaker }) {
   if (!S.active || !speaker) return;
   const badge = document.getElementById('fct-speaker-badge') || injectBadge();
   const nameEl = badge.querySelector('.fct-badge-name');
-  const name = S.speakerMap[speaker] || speaker;
+  const name = displayName(speaker);
 
   badge.dataset.label = speaker; // label brut, pour le renommage via speaker_map
   if (nameEl.textContent !== name) {
@@ -417,7 +442,7 @@ function showCard(id, entry) {
           <span class="fct-tag-text">VÉRIFICATION</span>
         </span>
       </div>
-      ${point.qui ? `<div class="fct-speaker">${esc(point.qui)}</div>` : ''}
+      ${point.qui ? `<div class="fct-speaker">${esc(displayName(point.qui))}</div>` : ''}
       <p class="fct-claim">« ${esc(point.texte)} »</p>
       <div class="fct-checking">
         <span class="fct-spinner"></span>
@@ -547,7 +572,7 @@ function exportRecap() {
       const verdict = fc
         ? (VERDICT_CFG[fc.verdict]?.tag || fc.verdict) + (fc.confiance != null ? ` ${fc.confiance}%` : '')
         : 'EN ATTENTE';
-      let line = `- **[${verdict}]**${p.qui ? ` ${p.qui} —` : ''} « ${p.texte} »`;
+      let line = `- **[${verdict}]**${p.qui ? ` ${displayName(p.qui)} —` : ''} « ${p.texte} »`;
       if (fc?.explication) line += ` — ${fc.explication}`;
       if (fc?.source) line += fc.url ? ` *(source : [${fc.source}](${fc.url}))*` : ` *(source : ${fc.source})*`;
       const l = link(p.ts);
@@ -561,7 +586,7 @@ function exportRecap() {
     for (const { point: p } of others) {
       const tag = TYPE_CFG[p.type]?.tag || String(p.type || '?').toUpperCase();
       const l = link(p.ts);
-      lines.push(`- **[${tag}]**${p.qui ? ` ${p.qui} —` : ''} « ${p.texte} »${l ? ` — [▶ voir](${l})` : ''}`);
+      lines.push(`- **[${tag}]**${p.qui ? ` ${displayName(p.qui)} —` : ''} « ${p.texte} »${l ? ` — [▶ voir](${l})` : ''}`);
     }
   }
 
@@ -694,7 +719,7 @@ function renderRecap() {
         <div class="fct-recap-card-inner">
           <div class="fct-recap-row">
             <span class="fct-recap-badge">${esc(p.type === 'affirmation' && vcfg ? vcfg.tag : tcfg.tag)}</span>
-            ${p.qui ? `<span class="fct-recap-speaker">${esc(p.qui)}</span>` : ''}
+            ${p.qui ? `<span class="fct-recap-speaker">${esc(displayName(p.qui))}</span>` : ''}
             ${p.type === 'affirmation' && !vcfg ? '<span class="fct-recap-pending">⏳ vérification…</span>' : ''}
             ${tsChip}
           </div>

@@ -39,10 +39,11 @@ le même navigateur — voir [`.env.example`](.env.example).
 | Dossier / fichier | Rôle |
 |---|---|
 | `extension/` | Extension Chrome (MV3) — le produit réel |
-| `backend.py` | Serveur Flask/Socket.IO : Whisper, diarisation, Mistral, cache |
+| `backend.py` | Point d'entrée du serveur (monkey-patch eventlet + lancement) |
+| `server/` | Logique du serveur : Whisper, diarisation, Mistral, cache — voir [ARCHITECTURE.md](ARCHITECTURE.md) |
 | `searxng/` | Instance SearxNG auto-hébergée (recherche web sans dépendance à un moteur tiers) |
 | `site/` | Page vitrine statique du projet |
-| `enroll.py`, `harvest_voices.py` | Outils CLI pour peupler `voices/` (banque d'empreintes vocales) |
+| `enroll.py`, `harvest_voices.py`, `remove_voice.py` | Outils CLI pour peupler/retirer des voix dans `voices/` (banque d'empreintes vocales) |
 | `voices/` | Empreintes vocales enregistrées (gitignored, générées localement) |
 | `ARCHITECTURE.md` | Fonctionnement technique détaillé du pipeline |
 | `SETUP_GUIDE.md` | Installation détaillée du backend (CUDA, FFmpeg, SearxNG…) |

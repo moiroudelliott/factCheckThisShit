@@ -1,0 +1,69 @@
+"""Constantes et variables d'environnement — aucun effet de bord (pas de
+print, pas de chargement de modèle) : les diagnostics de démarrage vivent
+dans app.py, qui sait dans quel ordre les afficher."""
+
+import os
+
+from dotenv import load_dotenv
+load_dotenv()
+
+# ── Mistral ────────────────────────────────────────────────────────────────
+MISTRAL_API_KEY = os.environ.get("MISTRAL_API_KEY", "")
+MISTRAL_MODEL = os.environ.get("MISTRAL_MODEL", "mistral-medium-latest")  # medium: suit bien le prompt d'extraction; small le sur-applique
+MISTRAL_MAX_RETRIES = 3     # tentatives supplémentaires sur 429 (rate limit)
+MISTRAL_RETRY_BASE_S = 2.0  # backoff exponentiel: 2s, 4s, 8s (sauf Retry-After fourni par l'API)
+
+# ── Recherche web ──────────────────────────────────────────────────────────
+# Instance SearxNG auto-hébergée (docker-compose dans searxng/), pas d'appel
+# direct à un moteur US : voir ARCHITECTURE.md. SEARXNG_URL doit rester un
+# hôte local (127.0.0.1) — c'est le backend qui interroge SearxNG, jamais un
+# tiers qui voit passer les claims.
+SEARXNG_URL = os.environ.get("SEARXNG_URL", "http://127.0.0.1:8080").rstrip("/")
+
+# ── Buffer de transcription → analyse Mistral ─────────────────────────────
+FLUSH_INTERVAL = 22    # secondes max entre deux analyses Mistral
+MIN_WORDS = 30         # ne pas appeler Mistral avec moins de 30 mots (trop peu pour un talking point)
+MAX_BUFFER_WORDS = 55  # flush anticipé dès que le buffer est assez dense (échange rapide = analyse plus tôt)
+
+# Jeton partagé optionnel : sans lui, quiconque atteint ce port (même onglet
+# tiers ouvert dans le même navigateur) peut piloter le backend et consommer
+# la clé Mistral. Si non défini, le serveur reste ouvert (comportement
+# historique) mais le signale au démarrage.
+BACKEND_TOKEN = os.environ.get("BACKEND_TOKEN", "").strip()
+
+# ── Whisper ────────────────────────────────────────────────────────────────
+# large-v3-turbo : nettement meilleur que medium sur les chiffres et noms
+# propres (ce qu'on fact-checke), ~6 Go VRAM. Repli sur medium si le
+# chargement échoue (voir app.py).
+WHISPER_MODEL = os.environ.get("WHISPER_MODEL", "large-v3-turbo")
+
+# ── Diarisation (SpeechBrain ECAPA-TDNN) ──────────────────────────────────
+# IMPORTANT: ECAPA tourne sur CPU. Sur GPU, le cuDNN de torch entre en
+# conflit avec celui de CTranslate2 (faster-whisper) dans le même processus
+# Windows ("Could not load symbol cudnnGetLibConfig") et crash le backend.
+# Le modèle est minuscule, le CPU suffit largement (~100 ms/segment).
+DIARIZATION_THRESHOLD = 0.34  # similarité cosinus min pour rattacher un segment à un locuteur connu
+MIN_NEW_SPEAKER_SEC = 2.0     # un segment plus court ne peut PAS créer un nouveau locuteur
+MAX_SPEAKERS = 12             # au-delà, toujours rattacher au plus proche
+PROBE_MATCH_T = 0.28          # seuil (plus tolérant) des sondes temps réel "qui parle"
+DIARIZATION_DEVICE = os.environ.get("DIARIZATION_DEVICE", "cpu")
+
+# ── Banque d'empreintes vocales ────────────────────────────────────────────
+# Il n'existe aucune API publique d'empreintes de personnalités (un embedding
+# n'est comparable qu'au sein d'un même modèle + terrain miné RGPD). On
+# construit donc la nôtre : empreintes ECAPA locales dans voices/, alimentées
+# manuellement (enroll.py) ou automatiquement quand un locuteur a été
+# identifié de façon fiable (vote LLM ou match acoustique).
+VOICES_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "voices")
+VOICE_MATCH_THRESHOLD = 0.45   # cos min entre centroïde de session et empreinte en banque
+VOICE_MATCH_MARGIN = 0.08      # écart min avec la 2e meilleure empreinte (anti-confusion)
+VOICE_ENROLL_MIN_SEGMENTS = 8  # segments min pour auto-enrôler une voix en fin de session
+
+# ── Cache persistant des fact-checks ──────────────────────────────────────
+# Les politiques répètent les mêmes claims pendant des mois : un claim déjà
+# vérifié (cette session ou une précédente) obtient son verdict
+# instantanément, sans recherche web ni appel Mistral.
+CACHE_DB = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "factcheck_cache.db")
+CACHE_TTL_DAYS = 30      # les chiffres politiques/économiques périment
+CACHE_MIN_CONF = 60      # ne jamais mettre en cache un verdict peu sûr
+CACHE_SIM_THRESHOLD = 0.75  # similarité (mots-clés) pour considérer deux claims identiques

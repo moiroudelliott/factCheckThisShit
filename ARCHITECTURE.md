@@ -1,6 +1,6 @@
 # SOURCÉ — Architecture technique
 
-Ce document décrit le fonctionnement interne du pipeline SOURCÉ : capture audio, transcription, diarisation, extraction de talking points, fact-checking, et affichage. Il est basé sur une lecture ligne à ligne de `backend.py`, `extension/content.js`, `extension/offscreen.js` et `extension/background.js`.
+Ce document décrit le fonctionnement interne du pipeline SOURCÉ : capture audio, transcription, diarisation, extraction de talking points, fact-checking, et affichage. Il est basé sur une lecture ligne à ligne de `backend.py` (point d'entrée) + du package `server/` qui contient toute la logique, `extension/content.js`, `extension/offscreen.js` et `extension/background.js`.
 
 ## Sommaire
 
@@ -23,7 +23,7 @@ Ce document décrit le fonctionnement interne du pipeline SOURCÉ : capture audi
 Quatre composants, trois frontières réseau :
 
 ```
-[Onglet YouTube]  --tabCapture-->  [offscreen.js]  --socket.io-->  [backend.py]  --HTTP-->  [Mistral / DDG / HAL / OpenAlex]
+[Onglet YouTube]  --tabCapture-->  [offscreen.js]  --socket.io-->  [server/routes.py]  --HTTP-->  [Mistral / SearxNG / HAL / OpenAlex]
        ^                                                                 |
        |________________forwardToContent (via background.js)____________|
        |
@@ -32,7 +32,14 @@ Quatre composants, trois frontières réseau :
 
 - **`extension/background.js`** — service worker MV3, **sans état mémoire** (Chrome le tue après ~30 s d'inactivité) : tout vit dans `chrome.storage.session` ([background.js:7-9](extension/background.js#L7)). Il orchestre : injecter `content.js`, créer le document offscreen, relayer les messages.
 - **`extension/offscreen.js`** — le seul endroit où l'audio existe. Un document offscreen a accès à `MediaRecorder`/`AudioContext`, ce qu'un service worker n'a pas.
-- **`backend.py`** — Flask-SocketIO mono-processus, event-loop `eventlet`. Un `sid` (session socket.io) = un débat en cours = un jeu complet de structures `session_*`.
+- **`backend.py`** — point d'entrée : monkey-patch eventlet puis lance `server/routes.py`. Toute la logique vit dans le package `server/` :
+  - `server/app.py` — app Flask/SocketIO, chargement des modèles (Whisper, ECAPA), diagnostics de démarrage.
+  - `server/config.py` — constantes et variables d'environnement.
+  - `server/state.py` — dicts `session_*` (un `sid` socket.io = un débat en cours = un jeu complet de structures).
+  - `server/voices.py` — diarisation (`SpeakerTracker`), banque d'empreintes, identification des locuteurs (vote LLM + match acoustique).
+  - `server/factcheck.py` — appels Mistral, recherche web/académique/officielle, prompts.
+  - `server/cache.py` / `server/dedup.py` / `server/text_utils.py` — cache SQLite des fact-checks, déduplication sémantique, petits utilitaires texte.
+  - `server/routes.py` — routes Flask + handlers Socket.IO, la couche d'orchestration qui relie tout ça.
 - **`extension/content.js`** — state machine d'affichage, aucune logique métier (tout arrive déjà décidé du backend).
 
 ---
@@ -54,19 +61,19 @@ Chaque chunk est un blob WebM envoyé en binaire brut (`ArrayBuffer`) via `socke
 
 ## 3. Réception serveur : verrouillage par session, pas de blocage global
 
-`handle_audio_chunk` ([backend.py:1215](backend.py#L1215)) :
+`handle_audio_chunk` ([server/routes.py:302](server/routes.py#L302)) :
 
 1. Acquiert `session_chunk_locks[sid]` (un `eventlet.semaphore.Semaphore(1)` par session) — **sérialise les chunks d'UNE session** (le `SpeakerTracker` n'est pas thread-safe) **sans bloquer les autres sessions**.
 2. Écrit le blob sur disque (`tempfile`), calcule `chunk_offset = chunk_abs_time - session_start` (position dans le débat) et `chunk_abs_time = time.time()` (horodatage unix absolu).
-3. Délègue tout le calcul lourd à `_transcribe_and_diarize` via `eventlet.tpool.execute(...)` ([backend.py:1235](backend.py#L1235)) — **thread natif**, pas le greenlet eventlet.
+3. Délègue tout le calcul lourd à `_transcribe_and_diarize` via `eventlet.tpool.execute(...)` ([server/routes.py:321](server/routes.py#L321)) — **thread natif**, pas le greenlet eventlet.
 
-C'est le point le plus important de toute l'architecture : `eventlet.monkey_patch()` ([backend.py:5](backend.py#L5)) ne coopérativise que les I/O réseau, jamais le calcul CPU/GPU. Sans `tpool`, Whisper (GPU) et ECAPA (CPU) gèleraient tout le serveur, y compris la réception des chunks des autres sessions.
+C'est le point le plus important de toute l'architecture : `eventlet.monkey_patch()` ([backend.py:12](backend.py#L12)) ne coopérativise que les I/O réseau, jamais le calcul CPU/GPU. Sans `tpool`, Whisper (GPU) et ECAPA (CPU) gèleraient tout le serveur, y compris la réception des chunks des autres sessions.
 
 ---
 
 ## 4. Ce que produit un chunk : structure exacte
 
-`_transcribe_and_diarize` ([backend.py:1157](backend.py#L1157)) retourne une liste de dicts, un par segment Whisper :
+`_transcribe_and_diarize` ([server/routes.py:180](server/routes.py#L180)) retourne une liste de dicts, un par segment Whisper :
 
 ```python
 {"text": str, "speaker": "Intervenant A" | "", "start": float, "end": float, "abs_time": float}
@@ -75,9 +82,9 @@ C'est le point le plus important de toute l'architecture : `eventlet.monkey_patc
 Pipeline interne par segment :
 
 1. **Whisper** (`large-v3-turbo`, repli `medium` si VRAM insuffisante) — `vad_filter=True`, `no_speech_threshold=0.45`, `compression_ratio_threshold=2.4` (filtre les répétitions hallucinées).
-2. **Filtre hallucination** ([backend.py:971](backend.py#L971)) — liste noire (`amara.org`, `sous-titres réalisés`…) + heuristique ponctuation (`meaningful/len < 0.2` → rejeté).
+2. **Filtre hallucination** ([server/text_utils.py:71](server/text_utils.py#L71)) — liste noire (`amara.org`, `sous-titres réalisés`…) + heuristique ponctuation (`meaningful/len < 0.2` → rejeté).
 3. **Filtre doublon local** — comparaison texte brut à `session_history[sid]` (5 derniers segments, pas sémantique, juste exact-match — les recouvrements de chunk produisent souvent le texte identique mot pour mot).
-4. **Diarisation** ([backend.py:168](backend.py#L168)) — `speaker_label()` découpe l'échantillon audio du segment (`seg.start:seg.end` en samples 16 kHz), encode via ECAPA-TDNN → embedding 192-d → `SpeakerTracker.assign()`.
+4. **Diarisation** ([server/voices.py:96](server/voices.py#L96)) — `speaker_label()` découpe l'échantillon audio du segment (`seg.start:seg.end` en samples 16 kHz), encode via ECAPA-TDNN → embedding 192-d → `SpeakerTracker.assign()`.
 
 Chaque segment part immédiatement en `emit("transcript_segment", r)` — **avant** tout traitement Mistral. C'est ce flux qui alimente le badge "qui parle" côté extension (juste `speaker`, le texte est ignoré côté client à ce stade, cf. [content.js:281](extension/content.js#L281)).
 
@@ -85,7 +92,7 @@ Chaque segment part immédiatement en `emit("transcript_segment", r)` — **avan
 
 ## 5. Diarisation : le clustering incrémental et ses seuils
 
-`SpeakerTracker` ([backend.py:115](backend.py#L115)) ne fait aucun apprentissage préalable — c'est du clustering en ligne pur, par similarité cosinus à des centroïdes.
+`SpeakerTracker` ([server/voices.py:34](server/voices.py#L34)) ne fait aucun apprentissage préalable — c'est du clustering en ligne pur, par similarité cosinus à des centroïdes.
 
 | Paramètre | Valeur | Rôle |
 |---|---|---|
@@ -100,9 +107,9 @@ Mapping mental : **chaque locuteur = un vecteur `sums[i]` (somme des embeddings)
 
 Les labels (`Intervenant A`, `B`…) sont **anonymes par construction**. Deux mécanismes indépendants les associent à un vrai nom, avec des garanties différentes :
 
-**a) Vote LLM** (`identify_speakers`, [backend.py:823](backend.py#L823)) — toutes les 2 analyses Mistral (`state["flushes"] % 2 == 0`), le backend envoie les 6 derniers extraits annotés à Mistral avec la liste des invités connus. Un nom n'est **confirmé qu'à 2 votes concordants et strictement majoritaires** (`session_map_votes[sid][label][nom] += 1`) — une identification isolée ne peut pas verrouiller une erreur, mais peut être corrigée par les votes suivants.
+**a) Vote LLM** (`identify_speakers`, [server/voices.py:315](server/voices.py#L315)) — toutes les 2 analyses Mistral (`state["flushes"] % 2 == 0`), le backend envoie les 6 derniers extraits annotés à Mistral avec la liste des invités connus. Un nom n'est **confirmé qu'à 2 votes concordants et strictement majoritaires** (`session_map_votes[sid][label][nom] += 1`) — une identification isolée ne peut pas verrouiller une erreur, mais peut être corrigée par les votes suivants.
 
-**b) Empreinte acoustique** (`match_clusters_to_bank`, [backend.py:767](backend.py#L767)) — compare le centroïde de session à la banque de voix locale (`voices/index.json` + fichiers `.npy`). Seuils : `VOICE_MATCH_THRESHOLD=0.45` **et** marge `VOICE_MATCH_MARGIN=0.08` avec la 2e meilleure correspondance (anti-confusion). Une fois matché, le label est **verrouillé** (`session_voice_locked`) — les votes LLM ne peuvent plus le modifier. C'est prioritaire sur (a) : la voix prime toujours sur l'inférence textuelle.
+**b) Empreinte acoustique** (`match_clusters_to_bank`, [server/voices.py:202](server/voices.py#L202)) — compare le centroïde de session à la banque de voix locale (`voices/index.json` + fichiers `.npy`). Seuils : `VOICE_MATCH_THRESHOLD=0.45` **et** marge `VOICE_MATCH_MARGIN=0.08` avec la 2e meilleure correspondance (anti-confusion). Une fois matché, le label est **verrouillé** (`session_voice_locked`) — les votes LLM ne peuvent plus le modifier. C'est prioritaire sur (a) : la voix prime toujours sur l'inférence textuelle.
 
 **Bug corrigé — la banque n'est plus interrogée sans restriction.** La banque accumule des voix sur **tous les débats passés**, tous locuteurs confondus. Avant correction, `match_clusters_to_bank` comparait le centroïde de session à *toute* la banque : un présentateur (ou un invité non déclaré) pouvait hériter du nom de quelqu'un d'un tout autre débat, simplement parce que c'était, de peu, l'empreinte la moins dissemblable de toute la banque (cas réel observé : un présentateur identifié comme « François Ruffin », absent de l'émission). La fonction restreint désormais les candidats aux `guests` déclarés pour la session (`session_contexts[sid]["guests"]`) quand cette liste existe — sans elle, le comportement reste inchangé (tolérant, par compatibilité).
 
@@ -122,7 +129,7 @@ Chaque changement de mapping émet `speaker_map` → l'extension **renomme rétr
 word_count >= MIN_WORDS(30) and (elapsed_since_flush >= FLUSH_INTERVAL(22s) or word_count >= MAX_BUFFER_WORDS(55))
 ```
 
-— soit "assez de matière et 22 s se sont écoulées", soit "buffer déjà dense (55 mots), on n'attend pas les 22 s". Le texte accumulé passe par `build_transcript()` ([backend.py:246](backend.py#L246)) qui fusionne les tours de parole consécutifs du même locuteur en un bloc `"Intervenant A: ... \nIntervenant B: ..."` — c'est **ce texte annoté** qui devient le prompt Mistral, pas la transcription brute.
+— soit "assez de matière et 22 s se sont écoulées", soit "buffer déjà dense (55 mots), on n'attend pas les 22 s". Le texte accumulé passe par `build_transcript()` ([server/text_utils.py:22](server/text_utils.py#L22)) qui fusionne les tours de parole consécutifs du même locuteur en un bloc `"Intervenant A: ... \nIntervenant B: ..."` — c'est **ce texte annoté** qui devient le prompt Mistral, pas la transcription brute.
 
 `ts = buf.get("start_abs")` — le timestamp du **premier** mot du buffer, pas du flush. C'est ce nombre qui, des mois plus tard côté extension, permet `claimVideoTime()` ([content.js:510](extension/content.js#L510)) de recalculer la position vidéo :
 
@@ -136,7 +143,7 @@ video.currentTime - (Date.now()/1000 - ts) - 8   // 8s = marge latence chunk + b
 
 `call_mistral()` renvoie une liste de `{"type", "texte", "qui"}`. Deux couches de dédup, **jamais une seule** :
 
-1. **Dédup sémantique serveur** (`_is_duplicate_indexed`, [backend.py:416](backend.py#L416)) — index inversé mot-clé → indices (`session_dupe_index[sid]`), évite un scan O(n) de tout l'historique de session. Un point est doublon si `overlap / min(len_a, len_b) >= 0.45` sur les mots-clés (≥ 4 lettres ou ≥ 3 chiffres, hors stopwords).
+1. **Dédup sémantique serveur** (`is_duplicate_indexed`, [server/dedup.py:13](server/dedup.py#L13)) — index inversé mot-clé → indices (`session_dupe_index[sid]`), évite un scan O(n) de tout l'historique de session. Un point est doublon si `overlap / min(len_a, len_b) >= 0.45` sur les mots-clés (≥ 4 lettres ou ≥ 3 chiffres, hors stopwords).
 2. **Dédup d'affichage extension** (`isDuplicateOfAny` + `isNearDupeOfShown`, [content.js:117](extension/content.js#L117)) — même principe mais seuil **0.6**, sur deux périmètres différents : `isDuplicateOfAny` compare à **tout** `S.points` (survit à un redémarrage backend où `session_points` repartirait de zéro), `isNearDupeOfShown` compare seulement aux 6 dernières cartes **affichées** (`DUPE_MEMORY=6`) pour éviter qu'un point similaire mais pas identique n'interrompe une carte qu'on vient de montrer.
 
 Chaque point unique reçoit un `id = uuid4().hex[:8]` — **c'est cet id qui relie `talking_points` et `fact_check_result`** à travers tout le pipeline asynchrone. Seuls les points `type == "affirmation"` déclenchent `fact_check_affirmation` en tâche de fond ; les autres types (`argument`, `subjectif`, `remarque`, `question`, `accord`, `désaccord`) vont directement au récap sans jamais passer par le fact-check.
@@ -145,7 +152,7 @@ Chaque point unique reçoit un `id = uuid4().hex[:8]` — **c'est cet id qui rel
 
 ## 8. Fact-check : cache → recherche → verdict
 
-`fact_check_affirmation` ([backend.py:728](backend.py#L728)) :
+`fact_check_affirmation` ([server/factcheck.py:389](server/factcheck.py#L389)) :
 
 ```
 cache_lookup(claim)  →  hit ?  → emit verdict instantané (pas d'appel réseau)
@@ -168,11 +175,11 @@ validation : url doit être EXACTEMENT une des href retournées par la recherche
 cache_store (si confiance >= 60 et verdict != non_verifiable)
 ```
 
-**Souveraineté de la recherche web** — `web_search()` ([backend.py](backend.py)) n'appelle plus un moteur tiers directement : elle interroge une instance **SearxNG auto-hébergée** (`searxng/docker-compose.yml`, `127.0.0.1:8080`), configurée pour ne solliciter que Brave et Mojeek (`searxng/config/settings.yml`) — ni Google ni Bing, et aucun moteur qui leur sous-traite son index. Qwant a été testé et retiré : son scraping est bloqué par CAPTCHA côté SearxNG, une limitation connue du projet, pas un choix de config. `datagouv_search()` interroge en plus, en direct et sans intermédiaire, l'API publique du catalogue `data.gouv.fr` — c'est la seule source du pipeline qui ne dépend d'aucun agrégateur ni moteur de recherche. Si SearxNG est injoignable, `web_search()` retourne `[]` (dégradé, jamais bloquant) et le backend le signale au démarrage.
+**Souveraineté de la recherche web** — `web_search()` ([server/factcheck.py:205](server/factcheck.py#L205)) n'appelle plus un moteur tiers directement : elle interroge une instance **SearxNG auto-hébergée** (`searxng/docker-compose.yml`, `127.0.0.1:8080`), configurée pour ne solliciter que Brave et Mojeek (`searxng/config/settings.yml`) — ni Google ni Bing, et aucun moteur qui leur sous-traite son index. Qwant a été testé et retiré : son scraping est bloqué par CAPTCHA côté SearxNG, une limitation connue du projet, pas un choix de config. `datagouv_search()` interroge en plus, en direct et sans intermédiaire, l'API publique du catalogue `data.gouv.fr` — c'est la seule source du pipeline qui ne dépend d'aucun agrégateur ni moteur de recherche. Si SearxNG est injoignable, `web_search()` retourne `[]` (dégradé, jamais bloquant) et le backend le signale au démarrage.
 
 Le cache (`factcheck_cache.db`, SQLite) est à **deux niveaux** : la table SQL persiste entre redémarrages serveur, `_cache_mem` est une copie en RAM `[(set_mots_clés, résultat)]` rechargée au démarrage pour un matching flou rapide sans requête SQL par claim (`CACHE_SIM_THRESHOLD=0.75`, `CACHE_TTL_DAYS=30`).
 
-**Retry sur 429** (`_call_mistral_api`, [backend.py:520](backend.py#L520)) — jusqu'à `MISTRAL_MAX_RETRIES=3` tentatives, délai = `Retry-After` du header si fourni, sinon backoff exponentiel `2s, 4s, 8s`. Chaque tentative émet `mistral_rate_limited` au client (`{attempt, max, wait}`) — c'est ce qui alimente le message "Mistral saturé — tentative 2/3 dans 4s" dans la chip ([content.js:243](extension/content.js#L243)), plutôt que de laisser l'UI figée en silence.
+**Retry sur 429** (`call_mistral_api`, [server/factcheck.py:151](server/factcheck.py#L151)) — jusqu'à `MISTRAL_MAX_RETRIES=3` tentatives, délai = `Retry-After` du header si fourni, sinon backoff exponentiel `2s, 4s, 8s`. Chaque tentative émet `mistral_rate_limited` au client (`{attempt, max, wait}`) — c'est ce qui alimente le message "Mistral saturé — tentative 2/3 dans 4s" dans la chip ([content.js:243](extension/content.js#L243)), plutôt que de laisser l'UI figée en silence.
 
 ---
 
@@ -190,6 +197,7 @@ Le cache (`factcheck_cache.db`, SQLite) est à **deux niveaux** : la table SQL p
 | `fact_check_result` | S→C | `{id, verdict, confiance, explication, source, url}` | `onFactCheck()` → résout la carte si affichée |
 | `speaker_map` | S→C | `{map: {label: nom}, enrolled: [nom, ...]}` | renomme rétroactivement ; `enrolled` évite d'afficher "capture en cours" pour un nom déjà en banque |
 | `voice_enrolled` | S→C | `{name}` | retire l'indicateur "capture de l'empreinte…" du badge pour ce nom |
+| `voice_not_in_bank` | S→C | `{labels: [label, ...]}` | affiche "Locuteur non identifié" tout de suite, sans attendre IDENT_TIMEOUT_MS |
 | `mistral_rate_limited` | S→C | `{attempt, max, wait}` | message temporaire sur la chip |
 
 ---
@@ -221,12 +229,12 @@ showCard (spinner)
 |---|---|---|
 | `CHUNK_MS` / `OVERLAP_MS` | 10000 / 1500 | offscreen.js |
 | `PROBE_MS` | 2500 | offscreen.js |
-| `FLUSH_INTERVAL` / `MIN_WORDS` / `MAX_BUFFER_WORDS` | 22s / 30 / 55 | backend.py |
-| `DIARIZATION_THRESHOLD` / `MIN_NEW_SPEAKER_SEC` / `MAX_SPEAKERS` | 0.34 / 2.0s / 12 | backend.py |
-| `PROBE_MATCH_T` | 0.28 | backend.py |
-| `VOICE_MATCH_THRESHOLD` / `VOICE_MATCH_MARGIN` / `VOICE_ENROLL_MIN_SEGMENTS` | 0.45 / 0.08 / 8 | backend.py |
-| dédup serveur (mots-clés) | seuil 0.45 | backend.py |
+| `FLUSH_INTERVAL` / `MIN_WORDS` / `MAX_BUFFER_WORDS` | 22s / 30 / 55 | server/config.py |
+| `DIARIZATION_THRESHOLD` / `MIN_NEW_SPEAKER_SEC` / `MAX_SPEAKERS` | 0.34 / 2.0s / 12 | server/config.py |
+| `PROBE_MATCH_T` | 0.28 | server/config.py |
+| `VOICE_MATCH_THRESHOLD` / `VOICE_MATCH_MARGIN` / `VOICE_ENROLL_MIN_SEGMENTS` | 0.45 / 0.08 / 8 | server/config.py |
+| dédup serveur (mots-clés) | seuil 0.45 | server/dedup.py |
 | dédup extension (affichage) | seuil 0.6 | content.js |
-| `CACHE_TTL_DAYS` / `CACHE_MIN_CONF` / `CACHE_SIM_THRESHOLD` | 30j / 60 / 0.75 | backend.py |
-| `MISTRAL_MAX_RETRIES` / `MISTRAL_RETRY_BASE_S` | 3 / 2.0s (×2^n) | backend.py |
+| `CACHE_TTL_DAYS` / `CACHE_MIN_CONF` / `CACHE_SIM_THRESHOLD` | 30j / 60 / 0.75 | server/config.py |
+| `MISTRAL_MAX_RETRIES` / `MISTRAL_RETRY_BASE_S` | 3 / 2.0s (×2^n) | server/config.py |
 | `HOLD_FACT_MS` / `FC_WAIT_MS` / `MAX_QUEUE` / `DUPE_MEMORY` | 13000 / 30000 / 8 / 6 | content.js |

@@ -104,44 +104,75 @@
   left: 18px;
   z-index: 10001;
   display: flex;
-  align-items: center;
+  align-items: flex-end; /* le texte reste calé sur le bas de l'équaliseur */
   gap: 9px;
   padding: 7px 14px 7px 12px;
   border-radius: 999px;
   background: rgba(16, 18, 22, 0.65);
   backdrop-filter: blur(14px) saturate(1.2);
   border: 1px solid rgba(255, 255, 255, 0.12);
-  box-shadow: 0 6px 22px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 6px 22px rgba(0, 0, 0, 0.4), 0 0 0 0 rgba(224, 50, 79, 0);
   font-family: 'Archivo', system-ui, sans-serif;
   pointer-events: none;
   opacity: 0;
   transform: translateY(-6px);
-  transition: opacity 0.35s ease, transform 0.4s cubic-bezier(0.2, 0.9, 0.25, 1);
+  transition: opacity 0.35s ease, transform 0.4s cubic-bezier(0.2, 0.9, 0.25, 1),
+    border-radius 0.35s ease, box-shadow 0.5s ease;
 }
 #fct-speaker-badge.fct-badge--on {
   opacity: 1;
   transform: none;
 }
+/* Nom connu, empreinte vocale pas encore en banque : la pastille passe en 2
+   lignes (nom + "empreinte vocale…" juste dessous) — l'équaliseur se
+   recentre alors sur le bloc de texte plutôt que de rester calé sur la
+   dernière ligne. */
+#fct-speaker-badge.fct-badge--enrolling {
+  border-radius: 16px;
+  padding-top: 9px;
+  padding-bottom: 9px;
+  align-items: center;
+}
+
+#fct-speaker-badge.fct-badge--pulsing { animation: fct-badge-pop 0.46s cubic-bezier(0.34, 1.56, 0.64, 1); }
+/* Anneau qui pulse au moment précis où un nom vient d'être identifié
+   (transition état gris/en recherche → nom connu). */
+#fct-speaker-badge.fct-badge--flash { animation: fct-badge-ring 0.65s ease-out; }
 
 .fct-badge-name {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
   font-size: 12.5px;
   font-weight: 600;
   color: rgba(255, 255, 255, 0.92);
-  max-width: 260px;
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  transition: max-width 0.35s ease;
+  transition: color 0.4s ease; /* le texte grise EXACTEMENT comme l'équaliseur */
 }
-/* Nom + capture d'empreinte vocale en cours : la pastille s'élargit pour
-   accueillir l'indicateur au lieu de le tronquer. */
-#fct-speaker-badge.fct-badge--enrolling .fct-badge-name {
-  max-width: 420px;
+/* Le gap n'existe qu'en état 2 lignes : sinon il laisse un blanc fantôme
+   sous le texte (la ligne d'empreinte repliée compte pour 0px mais le gap
+   restait), ce qui décalait le texte hors du bas réel du badge. */
+#fct-speaker-badge.fct-badge--enrolling .fct-badge-name { gap: 3px; }
+#fct-speaker-badge.fct-badge--pending-id .fct-badge-name { color: rgba(255, 255, 255, 0.42); }
+#fct-speaker-badge.fct-badge--unknown .fct-badge-name { font-style: italic; }
+
+.fct-badge-enroll-wrap {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 0.42s cubic-bezier(0.22, 0.9, 0.3, 1.05);
 }
+#fct-speaker-badge.fct-badge--enrolling .fct-badge-enroll-wrap { grid-template-rows: 1fr; }
+.fct-badge-enroll-inner { overflow: hidden; }
 .fct-badge-enroll {
+  opacity: 0;
+  transform: translateX(-6px);
+  /* padding vertical : laisse la place au point vert agrandi (transform:scale,
+     cf. .fct-ident-icon--done) sans que l'overflow:hidden du repli ne le rogne */
+  padding: 3px 0;
+  transition: opacity 0.32s ease 0.1s, transform 0.32s cubic-bezier(0.22, 1, 0.36, 1) 0.1s;
+}
+#fct-speaker-badge.fct-badge--enrolling .fct-badge-enroll { opacity: 1; transform: translateX(0); }
+.fct-badge-enroll-text {
   font-size: 11px;
   font-weight: 500;
   white-space: nowrap;
@@ -159,6 +190,7 @@
   border-radius: 2px;
   background: #e0324f;
   animation: fct-eq 1s ease-in-out infinite;
+  transition: background 0.4s ease;
 }
 .fct-eq span:nth-child(2) { animation-delay: 0.2s; }
 .fct-eq span:nth-child(3) { animation-delay: 0.4s; }
@@ -188,6 +220,7 @@
   height: 8px;
   border-radius: 50%;
   flex-shrink: 0;
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 .fct-ident-icon--progress {
   border: 1.4px solid rgba(255, 255, 255, 0.22);
@@ -197,11 +230,31 @@
 .fct-ident-icon--unknown {
   background: rgba(255, 255, 255, 0.32);
 }
+/* Capture d'empreinte réussie : l'anneau qui tourne devient un point plein
+   vert avec un petit rebond d'échelle, affiché un instant avant que la ligne
+   ne se replie (séquence gérée en JS, voir onVoiceEnrolled dans content.js). */
+.fct-ident-icon--done {
+  animation: none;
+  border: none;
+  background: oklch(0.75 0.16 145);
+  transform: scale(1.2);
+}
 .fct-ident--progress { color: oklch(0.72 0.14 240); }
 .fct-ident--unknown { color: rgba(255, 255, 255, 0.4); font-style: italic; }
+.fct-ident--done { color: oklch(0.75 0.16 145); }
 
 #fct-speaker-badge.fct-badge--pending-id .fct-eq span {
   background: rgba(255, 255, 255, 0.35); /* équaliseur rouge = voix identifiée ; gris = en recherche */
+}
+
+@keyframes fct-badge-pop {
+  0%   { transform: scale(1); }
+  45%  { transform: scale(1.045); }
+  100% { transform: scale(1); }
+}
+@keyframes fct-badge-ring {
+  0%   { box-shadow: 0 6px 22px rgba(0, 0, 0, 0.4), 0 0 0 0 rgba(224, 50, 79, 0.45); }
+  100% { box-shadow: 0 6px 22px rgba(0, 0, 0, 0.4), 0 0 0 11px rgba(224, 50, 79, 0); }
 }
 
 /* ── Card slot ─────────────────────────────────────────────────────────────── */

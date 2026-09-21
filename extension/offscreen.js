@@ -112,6 +112,13 @@ async function start({ streamId, emission, guests, description, videoDate, token
     if (d.name) forward({ type: 'voice_enrolled', name: d.name });
   });
 
+  // Empreinte vocale comparée à la banque et non trouvée : le locuteur n'est
+  // pas quelqu'un de déjà connu — l'extension peut passer de "identification
+  // en cours" à "non identifié" sans attendre le vote LLM.
+  socket.on('voice_not_in_bank', (d) => {
+    if (Array.isArray(d.labels) && d.labels.length) forward({ type: 'voice_not_in_bank', labels: d.labels });
+  });
+
   socket.on('fact_check_result', (d) => {
     forward({
       type: 'fact_check_result',

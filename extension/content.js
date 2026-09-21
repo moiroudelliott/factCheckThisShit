@@ -46,6 +46,14 @@ const IDENT_TIMEOUT_MS = 150000;
 // intervenant qui n'a pas assez parlé pour être enrôlé.
 const ENROLL_INDICATOR_TIMEOUT_MS = 60000;
 
+// L'enrôlement backend est souvent déjà acquis au moment même où le nom est
+// confirmé (le seuil de segments est atteint avant le vote LLM) : sans ce
+// plancher, le loader "empreinte vocale…" n'aurait jamais le temps de
+// s'afficher avant de se replier sur le succès.
+const MIN_ENROLL_DISPLAY_MS = 5000;
+// Durée d'affichage du point vert "empreinte enregistrée" avant le repli.
+const ENROLL_SUCCESS_HOLD_MS = 700;
+
 const PENDING_ACCENT = 'oklch(0.72 0.025 255)';
 
 const VERDICT_CFG = {
@@ -79,8 +87,12 @@ const S = {
   shownWords: [],    // sets de mots-clés des dernières cartes affichées (anti-doublon)
   speakerMap: {},    // "Intervenant A" → nom réel confirmé par le backend
   speakerFirstSeen: {}, // "Intervenant A" → Date.now() du premier segment vu avec ce label (pour "identification en cours" → "échec")
-  enrolledNames: new Set(), // noms dont l'empreinte vocale est déjà en banque (backend) — sinon "capture en cours" dans le badge
+  bankMissLabels: new Set(), // labels déjà comparés à la banque de voix sans correspondance → "non identifié" tout de suite, sans attendre IDENT_TIMEOUT_MS
+  enrolledNames: new Set(), // noms déjà en banque AU MOMENT où leur nom a été révélé (via speaker_map.enrolled) — rien à capturer, jamais d'indicateur pour eux
   nameFirstSeen: {}, // nom réel → Date.now() du premier affichage (abandonne l'indicateur de capture après ENROLL_INDICATOR_TIMEOUT_MS)
+  enrollDisplayed: new Set(), // noms pour qui le cycle capture→succès a déjà été joué (ou jugé inutile) une fois — n'affiche plus jamais l'indicateur ensuite
+  pendingEnrollSuccess: new Set(), // voice_enrolled reçu avant que le badge n'ait eu la chance d'afficher "capture en cours" pour ce nom (course LLM/auto-enrôlement côté backend) — rejoué dès que le badge le montre
+  enrollShownAt: null, // Date.now() du passage à "capture en cours" du badge actuel (plancher d'affichage MIN_ENROLL_DISPLAY_MS)
   badgeTimer: null,  // auto-masquage du badge "qui parle" pendant les silences
   recapOpen: false,
   showAll: true,     // filtre récap : true = tout voir (défaut)
@@ -113,6 +125,10 @@ function identState(rawLabelOrName) {
   if (!rawLabelOrName) return null;
   const resolved = S.speakerMap[rawLabelOrName] || rawLabelOrName;
   if (!RAW_LABEL_RE.test(resolved)) return { kind: 'name', text: resolved };
+  // Empreinte déjà comparée à la banque de voix, sans correspondance : ce
+  // n'est pas quelqu'un de déjà connu — "non identifié" tout de suite, sans
+  // attendre IDENT_TIMEOUT_MS, même si le vote LLM tourne encore.
+  if (S.bankMissLabels.has(resolved)) return { kind: 'unknown', text: 'Locuteur non identifié' };
   if (!S.speakerFirstSeen[resolved]) S.speakerFirstSeen[resolved] = Date.now();
   const elapsed = Date.now() - S.speakerFirstSeen[resolved];
   return elapsed < IDENT_TIMEOUT_MS
@@ -128,21 +144,46 @@ function displayName(rawLabelOrName) {
 // HTML (carte, récap, badge) : petite icône cohérente avec le spinner/point de
 // verdict des cartes — spinner tant que la recherche tourne, point statique
 // une fois qu'on a renoncé.
-function displayNameHtml(rawLabelOrName) {
-  const st = identState(rawLabelOrName);
+function identHtml(st) {
   if (!st) return '';
   if (st.kind === 'name') return esc(st.text);
   const iconCls = st.kind === 'progress' ? 'fct-ident-icon--progress' : 'fct-ident-icon--unknown';
   return `<span class="fct-ident fct-ident--${st.kind}"><span class="fct-ident-icon ${iconCls}"></span>${esc(st.text)}</span>`;
 }
 
+function displayNameHtml(rawLabelOrName) {
+  return identHtml(identState(rawLabelOrName));
+}
+
 // Une fois le nom connu, son empreinte vocale n'est pas forcément encore en
 // banque (voir ENROLL_INDICATOR_TIMEOUT_MS) — seul le badge "qui parle" a la
 // place de le montrer ; la carte/le récap n'affichent que le nom.
 function needsEnrollIndicator(name) {
-  if (S.enrolledNames.has(name)) return false;
-  if (!S.nameFirstSeen[name]) S.nameFirstSeen[name] = Date.now();
+  if (S.enrollDisplayed.has(name)) return false;
+  if (!S.nameFirstSeen[name]) {
+    S.nameFirstSeen[name] = Date.now();
+    // Déjà en banque AVANT même qu'on apprenne son nom (match acoustique
+    // immédiat, ou personne déjà connue d'une session précédente) : rien à
+    // capturer, pas d'indicateur à jouer. À distinguer du cas où le backend
+    // enrôle PENDANT cette session (voir onVoiceEnrolled) : ce dernier doit
+    // toujours montrer l'animation au moins une fois.
+    if (S.enrolledNames.has(name)) {
+      S.enrollDisplayed.add(name);
+      return false;
+    }
+  }
   return Date.now() - S.nameFirstSeen[name] < ENROLL_INDICATOR_TIMEOUT_MS;
+}
+
+// Petit "pop" d'échelle à chaque changement d'état du badge ; l'anneau
+// (withFlash) ne s'ajoute qu'au moment précis où un nom vient d'être
+// identifié, pour distinguer ce moment-là d'un simple rafraîchissement.
+function pulseBadge(badge, withFlash) {
+  badge.classList.remove('fct-badge--pulsing');
+  if (withFlash) badge.classList.remove('fct-badge--flash');
+  void badge.offsetWidth; // relance l'animation
+  badge.classList.add('fct-badge--pulsing');
+  if (withFlash) badge.classList.add('fct-badge--flash');
 }
 
 // Construit et applique le contenu du badge pour un label/nom donné — point
@@ -153,22 +194,41 @@ function applyBadgeContent(badge, rawLabelOrName) {
   const nameEl = badge.querySelector('.fct-badge-name');
   const st = identState(rawLabelOrName);
   const enrolling = st.kind === 'name' && needsEnrollIndicator(st.text);
+  // Le badge n'affiche JAMAIS l'icône spinner/point de identHtml() : trop
+  // petit pour une 2e icône animée à côté de l'équaliseur, qui porte déjà
+  // l'état (rouge/gris) à lui seul. Texte brut uniquement — cf. plus bas.
   const html = enrolling
-    ? `${esc(st.text)}<span class="fct-ident fct-ident--progress fct-badge-enroll"><span class="fct-ident-icon fct-ident-icon--progress"></span>empreinte vocale…</span>`
+    ? `<span class="fct-badge-main">${esc(st.text)}</span><span class="fct-badge-enroll-wrap"><span class="fct-badge-enroll-inner"><span class="fct-ident fct-ident--progress fct-badge-enroll"><span class="fct-ident-icon fct-ident-icon--progress"></span><span class="fct-badge-enroll-text">empreinte vocale…</span></span></span></span>`
     : esc(st.text);
+
+  const becameIdentified = st.kind === 'name' && badge.classList.contains('fct-badge--pending-id');
 
   // Le badge est trop petit pour une 2e icône animée à côté de l'équaliseur
   // quand on ne fait QUE chercher qui parle : seule sa couleur porte cet état
   // (rouge = voix identifiée, gris = en recherche). Une fois le nom connu, la
-  // capture d'empreinte a sa propre icône — le badge s'élargit pour l'accueillir.
+  // capture d'empreinte a sa propre ligne — le badge passe en 2 lignes pour
+  // l'accueillir.
+  const wasEnrolling = badge.classList.contains('fct-badge--enrolling');
   badge.classList.toggle('fct-badge--pending-id', st.kind !== 'name');
+  badge.classList.toggle('fct-badge--unknown', st.kind === 'unknown');
   badge.classList.toggle('fct-badge--enrolling', enrolling);
-  if (nameEl.innerHTML !== html) {
-    nameEl.innerHTML = html;
-    nameEl.classList.remove('fct-risein');
-    void nameEl.offsetWidth; // relance l'animation
-    nameEl.classList.add('fct-risein');
+  if (enrolling && !wasEnrolling) {
+    S.enrollShownAt = Date.now();
+    // voice_enrolled est arrivé avant qu'on ait pu montrer "capture en
+    // cours" pour ce nom (course LLM/auto-enrôlement côté backend) : on
+    // rejoue la séquence de succès maintenant que le badge l'affiche enfin,
+    // plutôt que de sauter directement au nom nu.
+    if (S.pendingEnrollSuccess.has(st.text)) {
+      S.pendingEnrollSuccess.delete(st.text);
+      runEnrollSuccess(badge, st.text);
+    }
   }
+  if (nameEl.innerHTML === html) return;
+  nameEl.innerHTML = html;
+  nameEl.classList.remove('fct-risein');
+  void nameEl.offsetWidth; // relance l'animation
+  nameEl.classList.add('fct-risein');
+  pulseBadge(badge, becameIdentified);
 }
 
 function esc(s) {
@@ -247,6 +307,7 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     if (msg.type === 'speaker_live')      onSegment(msg);
     if (msg.type === 'mistral_rate_limited') onRateLimited(msg);
     if (msg.type === 'voice_enrolled')    onVoiceEnrolled(msg);
+    if (msg.type === 'voice_not_in_bank') onVoiceNotInBank(msg);
   } catch (e) {
     // Un message malformé ne doit jamais tuer le pipeline d'affichage
     console.error('[FCT] message handler error:', e);
@@ -276,8 +337,12 @@ function teardown() {
   S.shownWords = [];
   S.speakerMap = {};
   S.speakerFirstSeen = {};
+  S.bankMissLabels = new Set();
   S.enrolledNames = new Set();
   S.nameFirstSeen = {};
+  S.enrollDisplayed = new Set();
+  S.pendingEnrollSuccess = new Set();
+  S.enrollShownAt = null;
   S.badgeTimer = null;
   S.recapOpen = false;
   S.showAll = true;
@@ -446,14 +511,79 @@ function onSpeakerMap(map, enrolled) {
   if (changed && S.recapOpen) renderRecap();
 }
 
-// L'empreinte vocale de ce nom vient d'être sauvegardée en banque — si le
-// badge affiché correspond, retirer l'indicateur "capture en cours" tout de
-// suite plutôt que d'attendre le prochain segment/sonde de ce locuteur.
+// Joue la séquence de succès (icône → point vert "empreinte enregistrée",
+// affichée au moins MIN_ENROLL_DISPLAY_MS depuis le début de la capture,
+// puis repli). Appelée par onVoiceEnrolled quand le badge montre déjà la
+// capture pour ce nom, ou par applyBadgeContent quand une réussite était en
+// attente (voir S.pendingEnrollSuccess) au moment où le badge finit par
+// afficher ce nom.
+function runEnrollSuccess(badge, name) {
+  const finish = () => {
+    // Le badge a pu changer de locuteur (ou quitter l'état capture) pendant
+    // l'attente du plancher MIN_ENROLL_DISPLAY_MS — ne rien faire dans ce cas,
+    // applyBadgeContent a déjà repris la main sur son contenu.
+    if (!badge.classList.contains('fct-badge--enrolling') || S.speakerMap[badge.dataset.label] !== name) return;
+    const icon = badge.querySelector('.fct-badge-enroll .fct-ident-icon');
+    const textEl = badge.querySelector('.fct-badge-enroll-text');
+    const label = badge.querySelector('.fct-badge-enroll');
+    if (!icon || !textEl || !label) {
+      applyBadgeContent(badge, badge.dataset.label);
+      return;
+    }
+    icon.classList.add('fct-ident-icon--done');
+    label.classList.add('fct-ident--done');
+    textEl.textContent = 'empreinte enregistrée';
+    pulseBadge(badge);
+    later(() => {
+      S.enrollDisplayed.add(name);
+      applyBadgeContent(badge, badge.dataset.label);
+    }, ENROLL_SUCCESS_HOLD_MS);
+  };
+
+  // Le seuil d'enrôlement backend est souvent déjà atteint au moment même où
+  // le nom est confirmé : sans ce plancher, le loader n'aurait jamais le
+  // temps de s'afficher avant de se replier sur le succès.
+  const shownFor = Date.now() - (S.enrollShownAt || Date.now());
+  const wait = Math.max(0, MIN_ENROLL_DISPLAY_MS - shownFor);
+  if (wait > 0) later(finish, wait);
+  else finish();
+}
+
+// L'empreinte vocale de ce nom vient d'être sauvegardée en banque. Le vote
+// LLM (qui révèle le nom) et l'auto-enrôlement (déclenché à chaque chunk
+// audio, dans une tâche de fond séparée côté backend) tournent en parallèle
+// : voice_enrolled peut donc arriver AVANT que le badge n'ait jamais eu la
+// chance d'afficher "capture en cours" pour ce nom. Dans ce cas on mémorise
+// juste la réussite (pendingEnrollSuccess) — applyBadgeContent la rejouera
+// dès que ce nom apparaîtra enfin sur le badge, au lieu de sauter
+// directement au nom nu sans jamais montrer l'animation.
 function onVoiceEnrolled({ name }) {
-  if (!name) return;
-  S.enrolledNames.add(name);
+  if (!name || S.enrollDisplayed.has(name)) return;
   const badge = document.getElementById('fct-speaker-badge');
-  if (badge?.dataset.label && S.speakerMap[badge.dataset.label] === name) {
+  const showingThisName = badge?.dataset.label
+    && S.speakerMap[badge.dataset.label] === name
+    && badge.classList.contains('fct-badge--enrolling');
+  if (!showingThisName) {
+    S.pendingEnrollSuccess.add(name);
+    return;
+  }
+  runEnrollSuccess(badge, name);
+}
+
+// Le backend a comparé une ou plusieurs empreintes à la banque de voix sans
+// trouver de correspondance : ces locuteurs ne sont pas quelqu'un de déjà
+// connu. On peut afficher "Locuteur non identifié" tout de suite plutôt que
+// d'attendre IDENT_TIMEOUT_MS — le vote LLM continue en parallèle et
+// remplacera cet état dès qu'un nom sera confirmé (via onSpeakerMap).
+function onVoiceNotInBank({ labels }) {
+  if (!Array.isArray(labels) || !labels.length) return;
+  let changed = false;
+  for (const label of labels) {
+    if (!S.bankMissLabels.has(label)) { S.bankMissLabels.add(label); changed = true; }
+  }
+  if (!changed) return;
+  const badge = document.getElementById('fct-speaker-badge');
+  if (badge?.dataset.label && labels.includes(badge.dataset.label)) {
     applyBadgeContent(badge, badge.dataset.label);
   }
 }

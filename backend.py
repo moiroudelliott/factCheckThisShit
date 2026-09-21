@@ -843,23 +843,34 @@ def match_clusters_to_bank(sid: str):
     l'empreinte la moins dissemblable de toute la banque (cas vécu : un
     présentateur identifié comme "François Ruffin", absent de l'émission).
     Si des intervenants ont été déclarés pour cette session, on restreint
-    donc les candidats à cette liste."""
-    if not DIARIZATION or not _voice_bank:
+    donc les candidats à cette liste.
+
+    Un label comparé à la banque sans correspondance déclenche
+    voice_not_in_bank : l'extension peut afficher "Locuteur non identifié"
+    tout de suite (en attendant toujours le vote LLM) plutôt que d'attendre
+    un délai fixe côté frontend sans savoir si la recherche a seulement pas
+    encore abouti, ou si la voix n'est vraiment pas dans la banque."""
+    if not DIARIZATION:
         return
     tracker = session_speakers.get(sid)
     if not tracker or not tracker.sums:
         return
     guests = session_contexts.get(sid, {}).get("guests") or []
     candidates = {n: e for n, e in _voice_bank.items() if not guests or n in guests}
-    if not candidates:
-        return
     confirmed = session_speaker_map.setdefault(sid, {})
     locked = session_voice_locked.setdefault(sid, set())
+    bank_missed = session_bank_miss.setdefault(sid, set())
     labels = speaker_labels_list(tracker)
     changed = False
+    newly_missed = []
     for i, label in enumerate(labels):
         if label in locked or tracker.counts[i] < 3:
             continue  # déjà identifié par la voix, ou pas assez de matière
+        if not candidates:
+            if label not in bank_missed:
+                bank_missed.add(label)
+                newly_missed.append(label)
+            continue
         centroid = tracker.sums[i] / tracker.counts[i]
         centroid = centroid / (np.linalg.norm(centroid) + 1e-8)
         sims = sorted(((float(np.dot(centroid, ref)), name)
@@ -872,9 +883,14 @@ def match_clusters_to_bank(sid: str):
                 confirmed[label] = best_name
                 changed = True
                 print(f"[Voix] {label} = {best_name} (cos {best:.2f})")
+        elif label not in bank_missed:
+            bank_missed.add(label)
+            newly_missed.append(label)
     if changed:
         session_speaker_map[sid] = confirmed
         _emit_speaker_map(sid, confirmed)
+    if newly_missed:
+        socketio.emit("voice_not_in_bank", {"labels": newly_missed}, to=sid)
 
 
 def auto_enroll_voices(sid: str):
@@ -1090,6 +1106,7 @@ session_speaker_map: dict[str, dict] = {}    # { sid: {"Intervenant A": "Éric Z
 session_map_votes: dict[str, dict] = {}      # { sid: {label: {nom: nb_votes}} — une identification = un vote }
 session_map_state: dict[str, dict] = {}      # { sid: {"flushes": int, "inflight": bool} }
 session_voice_locked: dict[str, set] = {}    # { sid: labels identifiés ACOUSTIQUEMENT — définitifs, les votes LLM ne peuvent pas les changer }
+session_bank_miss: dict[str, set] = {}       # { sid: labels déjà comparés à la banque sans correspondance (évite de réémettre voice_not_in_bank en boucle) }
 
 
 @app.route("/health")
@@ -1175,6 +1192,7 @@ def on_disconnect():
     session_map_votes.pop(sid, None)
     session_map_state.pop(sid, None)
     session_voice_locked.pop(sid, None)
+    session_bank_miss.pop(sid, None)
     print(f"Client déconnecté: {sid}")
 
 

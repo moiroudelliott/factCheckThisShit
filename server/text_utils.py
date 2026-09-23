@@ -84,6 +84,22 @@ def claims_match(a: ClaimSig, b: ClaimSig, threshold: float) -> bool:
     return len(a.words & b.words) / min(len(a.words), len(b.words)) >= threshold
 
 
+def strip_overlap(prev: str, text: str, min_words: int = 2, max_words: int = 15) -> str:
+    """Retire du début de `text` les mots qui répètent la fin de `prev`.
+    Deux chunks audio se chevauchent de 1,5 s (pour ne jamais couper un mot) :
+    Whisper retranscrit donc souvent la fin du chunk précédent au début du
+    suivant (« …le chômage a baissé de » / « a baissé de 2 % en 2023 »), et le
+    filtre à l'identique ne voyait pas ces doublons partiels. Au moins
+    `min_words` mots identiques sont exigés (un « de » commun ne suffit pas)."""
+    pw, tw = prev.split(), text.split()
+    norm = lambda w: re.sub(r'\W', '', w.lower())  # noqa: E731
+    pn, tn = [norm(w) for w in pw], [norm(w) for w in tw]
+    for k in range(min(len(pn), len(tn), max_words), min_words - 1, -1):
+        if pn[-k:] == tn[:k]:
+            return " ".join(tw[k:])
+    return text
+
+
 def build_transcript(entries: list) -> str:
     """Transcript annoté par locuteur, tours de parole consécutifs fusionnés."""
     if not any(label for label, _ in entries):

@@ -16,6 +16,7 @@ from server.config import (
 )
 from server.text_utils import _STOPWORDS
 from server import cache
+from server.notify import describe_error, warn_client
 from server.sources import finalize_result, is_excluded, source_tier, video_year
 from server.state import session_contexts
 
@@ -400,6 +401,7 @@ def fact_check_affirmation(sid: str, claim_id: str, claim_text: str):
         socketio.emit("fact_check_result", {"id": claim_id, **result}, to=sid)
     except Exception as e:
         print(f"[FactCheck error] {type(e).__name__}: {e}")
+        warn_client(sid, describe_error(e))
         # Toujours émettre un résultat, sinon la carte côté extension reste
         # bloquée en spinner et gèle toute la file d'affichage
         # « indisponible » : l'extension l'affiche comme une panne, pas comme

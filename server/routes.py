@@ -16,17 +16,21 @@ from flask_socketio import emit, ConnectionRefusedError
 from faster_whisper.audio import decode_audio
 
 from server.app import app, socketio, model, model_lock, DIARIZATION
-from server.config import BACKEND_TOKEN, MISTRAL_API_KEY, FLUSH_INTERVAL, MIN_WORDS, MAX_BUFFER_WORDS, PROBE_MATCH_T
+from server.config import (
+    BACKEND_TOKEN, MISTRAL_API_KEY, FLUSH_INTERVAL, MIN_WORDS, MAX_BUFFER_WORDS, PROBE_MATCH_T,
+    MIN_WORDS_ON_PAUSE, MIN_WORDS_ON_STOP, FINISH_TIMEOUT_S, CHUNK_OVERLAP_S,
+)
 from server import cache
 from server.dedup import dupe_index_add, is_duplicate_indexed
 from server.factcheck import call_mistral, call_mistral_api, fact_check_affirmation, VIDEO_ANALYSIS_PROMPT
+from server.notify import describe_error, warn_client
 from server.state import (
     session_history, session_starts, session_buffers, session_contexts, session_points,
     session_dupe_index, session_flush_locks, session_chunk_locks, session_speakers,
     session_excerpts, session_speaker_map, session_map_votes, session_map_state,
-    session_voice_locked, session_bank_miss,
+    session_voice_locked, session_bank_miss, session_pending, session_warned,
 )
-from server.text_utils import claim_signature, clean_description, build_transcript, is_hallucination
+from server.text_utils import claim_signature, clean_description, build_transcript, is_hallucination, strip_overlap
 from server.voices import (
     SpeakerTracker, speaker_label, probe_speaker, apply_speaker_map,
     match_clusters_to_bank, auto_enroll_voices, identify_speakers, load_voice_bank, _voice_bank,
@@ -90,6 +94,7 @@ def on_connect(auth=None):
     session_map_votes[sid] = {}
     session_map_state[sid] = {"flushes": 0, "inflight": False}
     session_voice_locked[sid] = set()
+    session_pending[sid] = 0
     # Recharger la banque : des voix ont pu être ajoutées (harvest_voices.py,
     # enroll.py, auto-enrôlement) depuis le démarrage du serveur
     load_voice_bank(verbose=False)
@@ -119,16 +124,21 @@ def on_disconnect():
     session_map_state.pop(sid, None)
     session_voice_locked.pop(sid, None)
     session_bank_miss.pop(sid, None)
+    session_pending.pop(sid, None)
+    session_warned.pop(sid, None)
     print(f"Client déconnecté: {sid}")
 
 
 @socketio.on("set_context")
 def on_set_context(data):
     sid = request.sid
+    data = data if isinstance(data, dict) else {}
     guests_raw = data.get("guests", "")
-    guests = [g.strip() for g in guests_raw.replace(",", "\n").split("\n") if g.strip()]
+    if isinstance(guests_raw, list):
+        guests_raw = "\n".join(str(g) for g in guests_raw)
+    guests = [g.strip()[:60] for g in str(guests_raw).replace(",", "\n").split("\n") if g.strip()][:12]
     session_contexts[sid] = {
-        "emission": data.get("emission", "").strip(),
+        "emission": str(data.get("emission", "")).strip()[:200],
         "guests": guests,
         "date": str(data.get("date", "")).strip()[:20],
         "description": clean_description(str(data.get("description", ""))),
@@ -143,6 +153,50 @@ def on_set_context(data):
 def on_start():
     session_starts[request.sid] = time.time()
     emit("ready", {"status": "listening"})
+    if not MISTRAL_API_KEY:
+        warn_client(request.sid, "MISTRAL_API_KEY absente — transcription seule, aucune analyse")
+
+
+@socketio.on("stop_transcription")
+def on_stop():
+    """Arrêt demandé par l'extension (le dernier chunk audio est déjà parti) :
+    analyser ce qui reste dans le buffer — sans ça, les ~20 dernières
+    secondes du débat n'étaient jamais analysées — puis prévenir le client
+    quand plus rien n'est en vol (session_done), pour qu'il ne coupe pas la
+    connexion avant les derniers verdicts."""
+    sid = request.sid
+    lock = session_chunk_locks.get(sid)
+    if lock:
+        lock.acquire()  # attendre la fin du chunk éventuellement en cours de transcription
+    try:
+        buf = session_buffers.get(sid)
+        if MISTRAL_API_KEY and buf and buf["entries"] \
+                and sum(len(t.split()) for _, t in buf["entries"]) >= MIN_WORDS_ON_STOP:
+            session_buffers[sid] = _flush_buffer(sid, buf, time.time())
+    finally:
+        if lock:
+            lock.release()
+    socketio.start_background_task(_finish_session, sid)
+
+
+def _finish_session(sid: str):
+    deadline = time.time() + FINISH_TIMEOUT_S
+    while session_pending.get(sid, 0) > 0 and time.time() < deadline:
+        eventlet.sleep(0.5)
+    socketio.emit("session_done", {"complete": session_pending.get(sid, 0) == 0}, to=sid)
+
+
+def _spawn_tracked(sid: str, fn, *args):
+    """Tâche de fond comptée dans session_pending (voir _finish_session)."""
+    session_pending[sid] = session_pending.get(sid, 0) + 1
+
+    def run():
+        try:
+            fn(*args)
+        finally:
+            if sid in session_pending:
+                session_pending[sid] -= 1
+    socketio.start_background_task(run)
 
 
 @socketio.on("speaker_probe")
@@ -217,6 +271,14 @@ def _transcribe_and_diarize(path: str, sid: str, chunk_offset: float, chunk_abs_
         if is_hallucination(text):
             print(f"  → filtré (hallucination): {text[:50]}")
             continue
+        if history and seg.start < CHUNK_OVERLAP_S + 0.5:
+            # Début de chunk = zone de chevauchement avec le précédent
+            trimmed = strip_overlap(history[-1], text)
+            if trimmed != text:
+                print(f"  → chevauchement retiré: {text[:len(text) - len(trimmed)][:50]}")
+                text = trimmed
+                if not text:
+                    continue
         if text in history:
             print(f"  → filtré (doublon): {text[:50]}")
             continue
@@ -290,12 +352,27 @@ def flush_to_mistral(sid: str, text: str, ts: float = None):
         # Fact-check uniquement les affirmations
         for p in unique:
             if p["type"] == "affirmation":
-                socketio.start_background_task(fact_check_affirmation, sid, p["id"], p["texte"])
+                _spawn_tracked(sid, fact_check_affirmation, sid, p["id"], p["texte"])
     except Exception as e:
         print(f"[Mistral error] {type(e).__name__}: {e}")
+        warn_client(sid, describe_error(e))
     finally:
         if lock:
             lock.release()
+
+
+def _flush_buffer(sid: str, buf: dict, fallback_ts: float) -> dict:
+    """Envoie le buffer à Mistral (tâche de fond) et renvoie un buffer vide."""
+    text_to_send = build_transcript(buf["entries"])
+    # Conserver le transcript annoté (labels d'origine) comme preuve pour
+    # l'identification des locuteurs — 6 derniers extraits
+    ex = session_excerpts.get(sid)
+    if ex is not None and DIARIZATION:
+        ex.append(text_to_send)
+        del ex[:-6]
+    ts = buf.get("start_abs") or fallback_ts
+    _spawn_tracked(sid, flush_to_mistral, sid, text_to_send, ts)
+    return {"entries": [], "last_flush": time.time(), "start_abs": None}
 
 
 @socketio.on("audio_chunk")
@@ -333,33 +410,29 @@ def handle_audio_chunk(data):
             # doit être réessayé au fur et à mesure que tracker.counts grandit.
             auto_enroll_voices(sid)
 
-        if not MISTRAL_API_KEY:
-            print("[Buffer] MISTRAL_API_KEY manquante — flush désactivé")
-        elif emitted:
+        if MISTRAL_API_KEY:  # sans clé : transcription seule (averti dans on_start)
             buf = session_buffers.get(sid) or {"entries": [], "last_flush": time.time(), "start_abs": None}
-            if not buf["entries"]:
-                # Début (approximatif) du texte accumulé — sert d'horodatage aux points
-                buf["start_abs"] = chunk_abs_time
-            buf["entries"].extend(emitted)
+            if emitted:
+                if not buf["entries"]:
+                    # Début (approximatif) du texte accumulé — sert d'horodatage aux points
+                    buf["start_abs"] = chunk_abs_time
+                buf["entries"].extend(emitted)
             elapsed_since_flush = time.time() - buf["last_flush"]
             word_count = sum(len(t.split()) for _, t in buf["entries"])
-            print(f"[Buffer] {word_count} mots, {elapsed_since_flush:.0f}s depuis dernier flush")
-            if word_count >= MIN_WORDS and (elapsed_since_flush >= FLUSH_INTERVAL or word_count >= MAX_BUFFER_WORDS):
-                text_to_send = build_transcript(buf["entries"])
-                # Conserver le transcript annoté (labels d'origine) comme preuve
-                # pour l'identification des locuteurs — 6 derniers extraits
-                ex = session_excerpts.get(sid)
-                if ex is not None and DIARIZATION:
-                    ex.append(text_to_send)
-                    del ex[:-6]
-                ts = buf.get("start_abs") or chunk_abs_time
-                buf = {"entries": [], "last_flush": time.time(), "start_abs": None}
-                socketio.start_background_task(flush_to_mistral, sid, text_to_send, ts)
+            if buf["entries"]:
+                print(f"[Buffer] {word_count} mots, {elapsed_since_flush:.0f}s depuis dernier flush")
+            dense = word_count >= MIN_WORDS and (elapsed_since_flush >= FLUSH_INTERVAL or word_count >= MAX_BUFFER_WORDS)
+            # Plus rien de neuf dans ce chunk (pause, fin de tirade, pub) : le
+            # buffer n'était vidé qu'à l'arrivée de NOUVEAU texte — une fin
+            # d'intervention restait en attente indéfiniment
+            paused = not emitted and word_count >= MIN_WORDS_ON_PAUSE and elapsed_since_flush >= FLUSH_INTERVAL
+            if dense or paused:
+                buf = _flush_buffer(sid, buf, chunk_abs_time)
             session_buffers[sid] = buf
 
     except Exception as e:
-        emit("transcription_error", {"error": str(e)})
         print(f"[ERREUR] {type(e).__name__}: {e}")
+        warn_client(sid, f"erreur de transcription ({type(e).__name__})")
 
     finally:
         if lock:

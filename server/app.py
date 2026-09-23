@@ -25,12 +25,24 @@ socketio = SocketIO(app, cors_allowed_origins="*", async_mode="eventlet", max_ht
 
 # ── Whisper (transcription) ────────────────────────────────────────────────
 # Chargement au démarrage du serveur (pas au premier chunk).
-print(f"Chargement du modèle Whisper {WHISPER_MODEL} (CUDA)…")
-try:
-    model = WhisperModel(WHISPER_MODEL, device="cuda", compute_type="float16")
-except Exception as e:
-    print(f"⚠️  Échec du chargement de {WHISPER_MODEL} ({type(e).__name__}: {e}) — repli sur medium")
-    model = WhisperModel("medium", device="cuda", compute_type="float16")
+# Repli en cascade : le modèle demandé sur GPU, puis medium sur GPU (VRAM
+# insuffisante), puis small sur CPU — sans GPU CUDA le backend plantait à
+# l'import sur une trace brute au lieu de démarrer (lentement) avec un
+# message clair.
+_WHISPER_ATTEMPTS = [(WHISPER_MODEL, "cuda", "float16"), ("medium", "cuda", "float16"), ("small", "cpu", "int8")]
+model = None
+for _name, _device, _compute in dict.fromkeys(_WHISPER_ATTEMPTS):
+    print(f"Chargement du modèle Whisper {_name} ({_device.upper()})…")
+    try:
+        model = WhisperModel(_name, device=_device, compute_type=_compute)
+        break
+    except Exception as e:
+        print(f"⚠️  Échec du chargement de {_name} sur {_device} ({type(e).__name__}: {e})")
+if model is None:
+    raise SystemExit("✗ Aucun modèle Whisper n'a pu être chargé — voir SETUP_GUIDE.md (CUDA, FFmpeg).")
+if _device == "cpu":
+    print("⚠️  Pas de GPU CUDA utilisable : transcription sur CPU avec le modèle small — nettement plus "
+          "lente et moins précise (voir SETUP_GUIDE.md, étape 1).")
 print("Modèle prêt.")
 
 import threading

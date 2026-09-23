@@ -102,7 +102,7 @@ python backend.py
 Attendre: `Modèle prêt.` puis `Running on http://127.0.0.1:5000`
 
 **Extension:**
-1. Ouvrir une vidéo de débat sur YouTube
+1. Ouvrir une vidéo de débat sur YouTube (ou le direct d'une chaîne : france.tv, LCP, Public Sénat, Twitch…)
 2. Cliquer l'icône SOURCÉ (point rouge) dans la barre d'extensions
 3. Vérifier que l'émission/les intervenants sont bien détectés (ou les
    compléter à la main), puis *Démarrer l'analyse*
@@ -137,7 +137,7 @@ et les autres fichiers de `tests/` — voir `ARCHITECTURE.md` §12.
 | `ffprobe: command not found` | Ajouter FFmpeg au PATH (étape 2) |
 | Popup affiche "backend éteint" | Le backend n'écoute que sur `127.0.0.1:5000` — vérifier qu'il tourne (`python backend.py`) et qu'aucun autre process n'occupe le port |
 | Puce affiche "jeton invalide" | `BACKEND_TOKEN` est défini dans `.env` mais ne correspond pas au champ "Jeton d'accès" (section Avancé de la popup) — ou vice-versa |
-| Pas de transcription mais pas d'erreur | Vérifier que l'onglet capturé joue bien du son (icône haut-parleur dans l'onglet Chrome) et que le son du lecteur YouTube n'est pas coupé (la puce l'indique) |
+| Pas de transcription mais pas d'erreur | Vérifier que l'onglet capturé joue bien du son (icône haut-parleur dans l'onglet Chrome) et que le son du lecteur vidéo n'est pas coupé (la puce l'indique) |
 | Puce affiche "clé Mistral invalide" / "crédit Mistral épuisé" | Vérifier `MISTRAL_API_KEY` dans `.env` et le crédit sur console.mistral.ai, puis relancer le backend |
 | Console backend : "repli sur small (CPU)" | Pas de GPU CUDA utilisable : refaire l'étape 1 — la transcription fonctionne mais lentement |
 | Puce affiche "arrêtée : vidéo changée" | Normal : l'analyse est liée à une vidéo ; relancer depuis la popup sur la nouvelle |

@@ -1,12 +1,29 @@
 <!doctype html>
-<html lang="fr">
+<html lang="fr" class="no-js">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>SOURCÉ — vérification factuelle des débats politiques</title>
   <meta name="description" content="Prototype étudiant de vérification factuelle en temps réel pour les débats politiques : transcription en direct, identification des intervenants, verdict sourcé.">
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:ital,wght@1,500&family=Archivo:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500&display=swap">
+  <meta name="theme-color" content="#0d0f13">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="canonical" href="https://source.codeminds.fr/">
+  <meta property="og:type" content="website">
+  <meta property="og:locale" content="fr_FR">
+  <meta property="og:url" content="https://source.codeminds.fr/">
+  <meta property="og:title" content="SOURCÉ — vérifier ce qui est dit, pendant que c'est dit">
+  <meta property="og:description" content="Prototype étudiant : transcription en direct des débats politiques, identification des intervenants et vérification sourcée des affirmations.">
+  <meta property="og:image" content="https://source.codeminds.fr/videos/poster.jpg">
+  <meta name="twitter:card" content="summary_large_image">
+  <script>document.documentElement.classList.replace('no-js', 'js');</script>
   <style>
+    /* Polices hébergées ici (plus d'appel à Google Fonts : aucune donnée de
+       visite ne part chez un tiers) — licences OFL dans fonts/licenses */
+    @font-face { font-family: 'Archivo'; font-style: normal; font-weight: 400 800; font-display: swap; src: url('fonts/archivo-latin.woff2') format('woff2'); }
+    @font-face { font-family: 'Newsreader'; font-style: italic; font-weight: 400 500; font-display: swap; src: url('fonts/newsreader-italic-latin.woff2') format('woff2'); }
+    @font-face { font-family: 'IBM Plex Mono'; font-style: normal; font-weight: 400; font-display: swap; src: url('fonts/ibm-plex-mono-400-latin.woff2') format('woff2'); }
+    @font-face { font-family: 'IBM Plex Mono'; font-style: normal; font-weight: 500; font-display: swap; src: url('fonts/ibm-plex-mono-500-latin.woff2') format('woff2'); }
+
     * { box-sizing: border-box; }
     html { --mx: 50vw; --my: 12vh; }
     body { margin: 0; color: #f2f1ee; font-family: 'Archivo', system-ui, sans-serif; line-height: 1.6; background: #0d0f13; }
@@ -49,7 +66,12 @@
       .scene-aurora { animation: none; }
     }
 
-    a { color: #e0324f; text-decoration: none; }
+    /* Rouge de marque éclairci pour le petit texte sur fond sombre : #e0324f
+       ne fait que 4,3:1, #f0435f passe 5:1 */
+    a { color: #f0435f; text-decoration: none; }
+    .eyebrow { font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: #f0435f; margin: 0 0 16px; }
+    h2 { line-height: 1.25; }
+    :focus-visible { outline: 2px solid #f0435f; outline-offset: 3px; }
     .navlink { color: #f2f1ee !important; transition: color 0.2s ease; }
     .navlink:hover { color: #e0324f !important; }
     .btn-primary, .btn-ghost {
@@ -59,27 +81,40 @@
     .btn-ghost:hover { transform: translateY(-2px); border-color: rgba(242,241,238,0.5) !important; }
     .video-frame { border: 1px solid rgba(242,241,238,0.14); background: #000; box-shadow: 0 32px 70px -28px rgba(224,50,79,0.28), 0 12px 40px -16px rgba(0,0,0,0.55); }
     .video-frame video { width: 100%; display: block; }
-    section[id] { scroll-margin-top: 76px; }
-    .reveal { opacity: 0; transform: translateY(16px); transition: opacity 0.7s ease, transform 0.7s ease; }
-    .reveal.in { opacity: 1; transform: none; }
+    section[id] { scroll-margin-top: 88px; }
+    /* Sans JavaScript, rien ne doit rester invisible */
+    .js .reveal { opacity: 0; transform: translateY(16px); transition: opacity 0.7s ease, transform 0.7s ease; }
+    .js .reveal.in { opacity: 1; transform: none; }
 
     /* ── Titre héros : révélation mot par mot, deuxième ligne en dégradé,
        dernier mot en serif italique — un seul contraste de police, assumé ── */
-    .hero-h1 { font-family:'Archivo',sans-serif; font-weight:800; font-size:40px; line-height:1.14; letter-spacing:-0.01em; margin:0 0 18px; }
+    .hero-h1 { font-family:'Archivo',sans-serif; font-weight:800; font-size:clamp(30px, 7.4vw, 40px); line-height:1.14; letter-spacing:-0.01em; margin:0 0 18px; text-wrap:balance; }
     .word { display: inline-block; opacity: 0; transform: translateY(16px); animation: word-rise 0.62s cubic-bezier(0.16,1,0.3,1) forwards; animation-delay: var(--d, 0s); }
     @keyframes word-rise { to { opacity: 1; transform: none; } }
+    /* Un seul dégradé pour toute la ligne : chaque mot en affiche sa portion
+       (--line-w / --x calculés en JS) — sinon il redémarrait à chaque mot */
     .word-accent {
       background: linear-gradient(95deg, #ff7a63, #e0324f 55%);
+      background-size: var(--line-w, 100%) 100%;
+      background-position: calc(-1 * var(--x, 0px)) 0;
+      background-repeat: no-repeat;
       -webkit-background-clip: text; background-clip: text; color: transparent;
     }
     .word-serif { font-family: 'Newsreader', serif; font-style: italic; font-weight: 500; }
     @media (prefers-reduced-motion: reduce) {
-      .reveal { opacity: 1; transform: none; transition: none; }
+      .js .reveal { opacity: 1; transform: none; transition: none; }
       .word { opacity: 1; transform: none; animation: none; }
     }
+    .legal { font-size: 12.5px; color: rgba(242,241,238,0.62); max-width: 68ch; }
+    .legal h3 { font-size: 13px; color: rgba(242,241,238,0.85); margin: 18px 0 4px; }
+    .legal p { margin: 0 0 4px; }
     @media (max-width: 720px) {
-      .nav-links { display: none !important; }
+      /* Mobile : on garde le bouton de contact, seuls les liens texte partent */
+      .navlink { display: none !important; }
       .hero-eyebrow, .hero-lede { padding-left: 8px; padding-right: 8px; }
+      .hero-ctas { flex-direction: column; align-items: stretch; max-width: 320px; margin: 0 auto; }
+      .hero-ctas a { text-align: center; }
+      .contact-box { padding: 36px 24px !important; }
     }
   </style>
 </head>
@@ -104,31 +139,31 @@
         <a class="navlink" href="#methode" style="font-family:'IBM Plex Mono', monospace; font-size:12px; letter-spacing:0.04em; text-transform:uppercase;">Méthode</a>
         <a class="navlink" href="#demo" style="font-family:'IBM Plex Mono', monospace; font-size:12px; letter-spacing:0.04em; text-transform:uppercase;">Démonstration</a>
         <a class="navlink" href="#projet" style="font-family:'IBM Plex Mono', monospace; font-size:12px; letter-spacing:0.04em; text-transform:uppercase;">Le projet</a>
-        <a class="btn-primary" href="#contact" style="font-family:'Archivo', sans-serif; font-weight:700; font-size:13px; color:#0d0f13; background:#e0324f; padding:9px 20px;">Nous contacter</a>
+        <a class="btn-primary" href="#contact" style="font-family:'Archivo', sans-serif; font-weight:700; font-size:13px; color:#000; background:#e0324f; padding:9px 20px;">Nous contacter</a>
       </nav>
     </div>
   </header>
 
   <section style="max-width:920px; margin:0 auto; padding:72px 28px 64px;">
     <div style="max-width:640px; margin:0 auto; text-align:center;">
-      <p class="hero-eyebrow word" style="--d:0s; font-family:'IBM Plex Mono', monospace; font-size:11px; letter-spacing:0.08em; text-transform:uppercase; color:#e0324f; margin:0 0 16px;">Prototype étudiant</p>
+      <p class="hero-eyebrow eyebrow word" style="--d:0s;">Prototype étudiant</p>
       <h1 class="hero-h1">
         <span class="word" style="--d:.08s">Vérifier</span> <span class="word" style="--d:.13s">ce</span> <span class="word" style="--d:.18s">qui</span> <span class="word" style="--d:.23s">est</span> <span class="word" style="--d:.28s">dit,</span><br>
-        <span class="word word-accent word-serift" style="--d:.36s">pendant</span> <span class="word word-accent word-serif" style="--d:.41s">que</span> <span class="word word-accent word-serif" style="--d:.46s">c'est</span> <span class="word word-accent word-serif" style="--d:.52s">dit.</span>
+        <span class="word word-accent word-serif" style="--d:.36s">pendant</span> <span class="word word-accent word-serif" style="--d:.41s">que</span> <span class="word word-accent word-serif" style="--d:.46s">c'est</span> <span class="word word-accent word-serif" style="--d:.52s">dit.</span>
       </h1>
       <p class="hero-lede word" style="--d:.62s; font-size:16px; color:rgba(242,241,238,0.7); margin:0 auto 32px; max-width:52ch;">
         Transcription en direct, identification des intervenants et vérification automatique
         des affirmations chiffrées, avec un verdict et sa source en quelques dizaines de secondes.
       </p>
-      <div class="word" style="--d:.7s; display:flex; gap:14px; flex-wrap:wrap; justify-content:center;">
-        <a class="btn-primary" href="#demo" style="font-family:'Archivo',sans-serif; font-weight:700; font-size:14px; color:#0d0f13; background:#e0324f; padding:13px 26px;">Voir la démonstration</a>
+      <div class="word hero-ctas" style="--d:.7s; display:flex; gap:14px; flex-wrap:wrap; justify-content:center;">
+        <a class="btn-primary" href="#demo" style="font-family:'Archivo',sans-serif; font-weight:700; font-size:14px; color:#000; background:#e0324f; padding:13px 26px;">Voir la démonstration</a>
         <a class="btn-ghost" href="#methode" style="font-family:'Archivo',sans-serif; font-weight:700; font-size:14px; color:#f2f1ee; padding:13px 26px; border:1.5px solid rgba(242,241,238,0.25);">Voir la méthode</a>
       </div>
     </div>
   </section>
 
   <section id="methode" style="max-width:920px; margin:0 auto; padding:56px 28px;">
-    <p style="font-family:'IBM Plex Mono', monospace; font-size:11px; letter-spacing:0.08em; text-transform:uppercase; color:#e0324f; margin:0 0 16px;">Méthode</p>
+    <p class="eyebrow">Méthode</p>
     <h2 style="font-family:'Archivo',sans-serif; font-weight:800; font-size:26px; margin:0 0 14px;">Quatre étapes, une seule question posée à chaque phrase</h2>
     <p style="font-size:14.5px; color:rgba(242,241,238,0.65); max-width:62ch; margin:0 0 8px;">Seules les affirmations vérifiables donnent lieu à un verdict. Le reste (opinions, joutes, questions) reste consultable, sans jamais encombrer l'écran.</p>
 
@@ -153,7 +188,7 @@
   </section>
 
   <section id="demo" style="max-width:920px; margin:0 auto; padding:56px 28px;">
-    <p style="font-family:'IBM Plex Mono', monospace; font-size:11px; letter-spacing:0.08em; text-transform:uppercase; color:#e0324f; margin:0 0 16px;">Démonstration</p>
+    <p class="eyebrow">Démonstration</p>
     <h2 style="font-family:'Archivo',sans-serif; font-weight:800; font-size:26px; margin:0 0 24px;">Le pipeline sur un vrai débat</h2>
 
     <div class="video-frame reveal">
@@ -161,11 +196,11 @@
         <source src="videos/demo-1.mp4" type="video/mp4">
       </video>
     </div>
-    <p style="font-family:'Archivo',sans-serif; font-size:13px; color:rgba(242,241,238,0.4); text-align:center; margin:14px 0 0;">Capture d'écran réelle du débat des législatives, France 2, 27 juin 2024. Aucun montage du contenu des vérifications.</p>
+    <p style="font-family:'Archivo',sans-serif; font-size:13px; color:rgba(242,241,238,0.62); text-align:center; margin:14px 0 0;">Enregistrement d'écran réel pendant le débat des législatives (France 2, 27 juin 2024). Aucun montage du contenu des vérifications.</p>
   </section>
 
   <section id="projet" style="max-width:920px; margin:0 auto; padding:56px 28px;">
-    <p style="font-family:'IBM Plex Mono', monospace; font-size:11px; letter-spacing:0.08em; text-transform:uppercase; color:#e0324f; margin:0 0 16px;">Le projet</p>
+    <p class="eyebrow">Le projet</p>
     <h2 style="font-family:'Archivo',sans-serif; font-weight:800; font-size:26px; margin:0 0 24px;">Ce que c'est, et ce que ce n'est pas encore</h2>
     <div class="reveal" style="background:#17191f; padding:32px 36px;">
       <p style="font-family:'Archivo',sans-serif; font-weight:700; font-size:19px; line-height:1.45; color:#f2f1ee; margin:0 0 18px;">Ce projet est mené par Elliott Moiroud, étudiant à l'Université Savoie Mont Blanc. Ce n'est pas un produit commercial, et il n'est pas présenté comme tel.</p>
@@ -174,16 +209,27 @@
   </section>
 
   <section id="contact" style="max-width:920px; margin:0 auto; padding:0 28px 64px;">
-    <div class="reveal" style="background:#e0324f; padding:48px 44px;">
-      <p style="font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:0.08em; text-transform:uppercase; color:rgba(13,15,19,0.6); margin:0 0 16px;">Contact</p>
-      <h2 style="font-family:'Archivo',sans-serif; font-weight:800; font-size:26px; color:#0d0f13; margin:0 0 12px;">Une question, une remarque, une idée de collaboration ?</h2>
-      <p style="font-family:'Archivo',sans-serif; font-size:14.5px; color:rgba(13,15,19,0.72); max-width:56ch; margin:0 0 26px;">Le projet continue d'évoluer. Vos retours nous aident à savoir dans quelle direction le faire avancer.</p>
-      <a class="btn-primary" href="mailto:contact@source.codeminds.fr?subject=Sourc%C3%A9%20contact" style="display:inline-block; font-family:'Archivo',sans-serif; font-weight:700; font-size:14px; color:#e0324f; background:#0d0f13; padding:13px 26px;">Nous écrire</a>
+    <div class="reveal contact-box" style="background:#e0324f; padding:48px 44px;">
+      <p style="font-family:'IBM Plex Mono',monospace; font-size:11px; font-weight:500; letter-spacing:0.08em; text-transform:uppercase; color:#000; margin:0 0 16px;">Contact</p>
+      <h2 style="font-family:'Archivo',sans-serif; font-weight:800; font-size:26px; color:#000; margin:0 0 12px;">Une question, une remarque, une idée de collaboration ?</h2>
+      <p style="font-family:'Archivo',sans-serif; font-size:14.5px; color:#000; max-width:56ch; margin:0 0 26px;">Le projet continue d'évoluer. Vos retours nous aident à savoir dans quelle direction le faire avancer.</p>
+      <a class="btn-primary" href="mailto:contact@source.codeminds.fr?subject=Sourc%C3%A9%20contact" style="display:inline-block; font-family:'Archivo',sans-serif; font-weight:700; font-size:14px; color:#f2f1ee; background:#0d0f13; padding:13px 26px;">Nous écrire</a>
     </div>
   </section>
 
   <footer style="max-width:920px; margin:0 auto; padding:0 28px 40px;">
-    <p style="font-family:'Archivo',sans-serif; font-size:12px; color:rgba(242,241,238,0.4); margin:0;">SOURCÉ, un projet mené par Elliott Moiroud, étudiant à l'Université Savoie Mont Blanc. Aucune donnée n'est collectée par cette page.</p>
+    <p style="font-family:'Archivo',sans-serif; font-size:12px; color:rgba(242,241,238,0.62); margin:0;">SOURCÉ, un projet mené par Elliott Moiroud, étudiant à l'Université Savoie Mont Blanc. Aucun cookie, aucun traceur ni service tiers sur cette page. <a href="#mentions">Mentions légales</a></p>
+    <section id="mentions" class="legal" aria-labelledby="mentions-titre">
+      <h2 id="mentions-titre" style="font-size:14px; margin:28px 0 0; color:rgba(242,241,238,0.85);">Mentions légales</h2>
+      <h3>Éditeur et directeur de la publication</h3>
+      <p>Elliott Moiroud, particulier — <a href="mailto:contact@source.codeminds.fr">contact@source.codeminds.fr</a></p>
+      <h3>Hébergeur</h3>
+      <p>Hostinger International Ltd, 61 Lordou Vironos Street, 6023 Larnaca, Chypre — <a href="https://www.hostinger.fr" rel="noopener">hostinger.fr</a></p>
+      <h3>Données personnelles</h3>
+      <p>Cette page ne dépose aucun cookie et n'utilise aucun outil de mesure d'audience. Les messages envoyés via le lien de contact servent uniquement à y répondre.</p>
+      <h3>Extrait vidéo</h3>
+      <p>La démonstration montre un extrait du débat des élections législatives diffusé par France 2 le 27 juin 2024 (© France Télévisions), présenté à titre d'illustration du prototype.</p>
+    </section>
   </footer>
 
   </div>
@@ -204,6 +250,32 @@
           raf = null;
         });
       }, { passive: true });
+    })();
+
+    // Dégradé du titre : un seul dégradé par ligne, chaque mot en affiche sa
+    // portion (sinon background-clip:text le faisait repartir à chaque mot).
+    (function () {
+      const words = [...document.querySelectorAll('.hero-h1 .word-accent')];
+      if (!words.length) return;
+      const sync = () => {
+        const lines = new Map();
+        for (const w of words) {
+          const top = w.offsetTop;
+          if (!lines.has(top)) lines.set(top, []);
+          lines.get(top).push(w);
+        }
+        for (const ws of lines.values()) {
+          const left = Math.min(...ws.map(w => w.offsetLeft));
+          const right = Math.max(...ws.map(w => w.offsetLeft + w.offsetWidth));
+          for (const w of ws) {
+            w.style.setProperty('--line-w', (right - left) + 'px');
+            w.style.setProperty('--x', (w.offsetLeft - left) + 'px');
+          }
+        }
+      };
+      sync();
+      if (document.fonts) document.fonts.ready.then(sync);
+      window.addEventListener('resize', sync, { passive: true });
     })();
 
     // Apparition douce des blocs au scroll.

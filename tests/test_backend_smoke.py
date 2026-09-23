@@ -178,6 +178,24 @@ def test_full_session():
     client.disconnect()
 
 
+def test_only_the_extension_origin_is_accepted():
+    http = app.test_client()
+    ext = "chrome-extension://" + "a" * 32
+    evil = "https://site-quelconque.example"
+    # Préflight CORS de /analyze_video : autorisé pour l'extension seulement
+    ok = http.options("/analyze_video", headers={"Origin": ext, "Access-Control-Request-Method": "POST"})
+    ko = http.options("/analyze_video", headers={"Origin": evil, "Access-Control-Request-Method": "POST"})
+    assert ok.headers.get("Access-Control-Allow-Origin") == ext
+    assert "Access-Control-Allow-Origin" not in ko.headers
+    # Handshake Socket.IO depuis une page tierce : refusé
+    r = http.get("/socket.io/?EIO=4&transport=polling", headers={"Origin": evil})
+    assert r.status_code == 400
+    r = http.get("/socket.io/?EIO=4&transport=polling", headers={"Origin": ext})
+    assert r.status_code == 200
+
+
 if __name__ == "__main__":
     test_full_session()
     print("ok  test_full_session")
+    test_only_the_extension_origin_is_accepted()
+    print("ok  test_only_the_extension_origin_is_accepted")

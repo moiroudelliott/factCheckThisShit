@@ -52,6 +52,10 @@ CHUNK_OVERLAP_S = 1.5    # chevauchement entre deux chunks (= OVERLAP_MS de offs
 # historique) mais le signale au démarrage.
 BACKEND_TOKEN = os.environ.get("BACKEND_TOKEN", "").strip()
 
+# Origines navigateur autorisées EN PLUS de l'extension Chrome (voir app.py),
+# séparées par des virgules. Vide par défaut.
+ALLOWED_ORIGINS = [o.strip() for o in os.environ.get("ALLOWED_ORIGINS", "").split(",") if o.strip()]
+
 # ── Whisper ────────────────────────────────────────────────────────────────
 # large-v3-turbo : nettement meilleur que medium sur les chiffres et noms
 # propres (ce qu'on fact-checke), ~6 Go VRAM. Repli sur medium si le

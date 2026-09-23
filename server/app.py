@@ -6,7 +6,7 @@ moment de l'import — il ne doit être importé qu'APRÈS eventlet.monkey_patch
 (voir backend.py, le point d'entrée). C'est pour ça que ce monkey_patch ne
 peut pas vivre ici : il doit précéder même l'import de `requests`."""
 
-import os
+import re
 
 import requests
 from flask import Flask
@@ -16,12 +16,25 @@ from flask_socketio import SocketIO
 from faster_whisper import WhisperModel
 
 from server.config import (
-    SEARXNG_URL, MISTRAL_API_KEY, BACKEND_TOKEN, WHISPER_MODEL, DIARIZATION_DEVICE,
+    SEARXNG_URL, MISTRAL_API_KEY, BACKEND_TOKEN, WHISPER_MODEL, DIARIZATION_DEVICE, ALLOWED_ORIGINS,
 )
 
+# Origines autorisées : l'extension Chrome (popup + document offscreen,
+# origine chrome-extension://<id>) — plus « * ». Avec « * », n'importe quelle
+# page ouverte dans le navigateur pouvait appeler /analyze_video ou ouvrir
+# un socket et consommer la clé Mistral (le jeton reste désactivé par
+# défaut). Les clients hors navigateur n'envoient pas d'Origin et ne sont
+# pas concernés. ALLOWED_ORIGINS (.env) ajoute d'autres origines si besoin.
+_EXTENSION_ORIGIN = re.compile(r"^chrome-extension://[a-p]{32}$")
+
+
+def origin_allowed(origin, environ=None) -> bool:
+    return bool(origin) and (bool(_EXTENSION_ORIGIN.match(origin)) or origin in ALLOWED_ORIGINS)
+
+
 app = Flask(__name__)
-CORS(app, origins="*")
-socketio = SocketIO(app, cors_allowed_origins="*", async_mode="eventlet", max_http_buffer_size=50 * 1024 * 1024)
+CORS(app, origins=[_EXTENSION_ORIGIN, *ALLOWED_ORIGINS])
+socketio = SocketIO(app, cors_allowed_origins=origin_allowed, async_mode="eventlet", max_http_buffer_size=50 * 1024 * 1024)
 
 # ── Whisper (transcription) ────────────────────────────────────────────────
 # Chargement au démarrage du serveur (pas au premier chunk).

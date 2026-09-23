@@ -10,14 +10,18 @@ function getState() {
   return chrome.storage.session.get({ tabId: null, capturing: false, videoId: null });
 }
 
-// Identifiant de la vidéo d'une URL YouTube (watch?v=…, /live/…), ou null
+// Identifiant de ce qu'on analyse : la vidéo YouTube (watch?v=…, /live/…),
+// sinon la page (origine + chemin) — ou null (page YouTube sans vidéo, URL
+// inconnue). Même règle que currentVideoId() du content script.
 function videoIdFromUrl(url) {
   try {
     const u = new URL(url);
-    if (!/(^|\.)youtube\.com$/.test(u.hostname)) return null;
-    if (u.pathname === '/watch') return u.searchParams.get('v');
-    const m = u.pathname.match(/^\/live\/([\w-]{6,})/);
-    return m ? m[1] : null;
+    if (/(^|\.)youtube\.com$/.test(u.hostname)) {
+      if (u.pathname === '/watch') return u.searchParams.get('v');
+      const m = u.pathname.match(/^\/live\/([\w-]{6,})/);
+      return m ? m[1] : null;
+    }
+    return /^https?:$/.test(u.protocol) ? u.origin + u.pathname : null;
   } catch (_) {
     return null;
   }
@@ -105,14 +109,16 @@ chrome.tabs.onRemoved.addListener(async (closedTabId) => {
 });
 
 // Arrêt automatique si l'onglet capturé change de vidéo (navigation SPA de
-// YouTube) ou quitte YouTube : l'analyse est liée à UNE vidéo (invités,
-// date, horodatages), et l'audio d'un autre site n'a pas à partir au backend.
-// Un rechargement de la même vidéo (F5) ne coupe rien.
+// YouTube, autre page du site) ou quitte le site : l'analyse est liée à UNE
+// vidéo (invités, date, horodatages), et l'audio d'un autre site n'a pas à
+// partir au backend. Un rechargement de la même vidéo (F5) ne coupe rien —
+// sauf sur un site hors manifest, où la permission (activeTab) tombe au
+// rechargement.
 chrome.tabs.onUpdated.addListener(async (tid, info, tab) => {
   if (!info.url && info.status !== 'loading') return;
   const { tabId, capturing, videoId } = await getState();
   if (!capturing || tid !== tabId) return;
-  // Sans permission sur le nouveau site, tab.url est absent : on a quitté YouTube
+  // Sans permission sur la nouvelle page, tab.url est absent : on arrête
   const vid = videoIdFromUrl(info.url || tab.url || '');
   if (vid && (!videoId || vid === videoId)) return;
   handleStop('navigation');
@@ -149,7 +155,7 @@ async function handleStart({ tabId, emission, guests, description, videoDate, to
       await chrome.offscreen.createDocument({
         url: chrome.runtime.getURL('offscreen.html'),
         reasons: [chrome.offscreen.Reason.USER_MEDIA],
-        justification: "Capture audio de l'onglet YouTube pour transcription Whisper",
+        justification: "Capture audio de l'onglet de la vidéo pour transcription Whisper",
       });
     }
 

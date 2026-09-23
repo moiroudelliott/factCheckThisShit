@@ -155,17 +155,48 @@ function setCardTimer(fn, ms) {
 
 // ── Vidéo ──────────────────────────────────────────────────────────────────────
 
+// YouTube a un support dédié (calque dans #movie_player, pubs, repères sur
+// la barre) ; ailleurs (france.tv, Twitch, Public Sénat, LCP…), l'overlay
+// se cale sur le plus grand lecteur visible de la page — balise <video>, ou
+// iframe d'un lecteur externe (Dailymotion…) — voir playerTarget().
+const IS_YOUTUBE = /(^|\.)youtube\.com$/.test(location.hostname);
+
+// Plus grand élément visible correspondant au sélecteur, d'au moins minW × minH
+// et aux proportions d'une vidéo (écarte bannières et iframes reCAPTCHA)
+function largestVisible(selector, minW, minH, accept = () => true) {
+  let best = null, bestArea = 0;
+  for (const el of document.querySelectorAll(selector)) {
+    const r = el.getBoundingClientRect();
+    const ratio = r.height / (r.width || 1);
+    if (r.width < minW || r.height < minH || ratio < 0.35 || ratio > 1.2 || !accept(el)) continue;
+    if (r.width * r.height > bestArea) { best = el; bestArea = r.width * r.height; }
+  }
+  return best;
+}
+
 function mainVideo() {
-  return document.querySelector('#movie_player video.html5-main-video')
-    || document.querySelector('#movie_player video')
-    || document.querySelector('video');
+  if (IS_YOUTUBE) {
+    return document.querySelector('#movie_player video.html5-main-video')
+      || document.querySelector('#movie_player video')
+      || document.querySelector('video');
+  }
+  return largestVisible('video', 200, 112);
+}
+
+// Élément sur lequel caler l'overlay hors YouTube : la vidéo de la page, ou
+// l'iframe du lecteur (alors, pas d'horodatage : la vidéo est inaccessible)
+function playerTarget() {
+  return largestVisible('video', 320, 180)
+    || largestVisible('iframe', 320, 180, f => !/recaptcha|captcha|\/ads?\b|doubleclick/i.test(f.src || ''));
 }
 
 function isAdShowing() {
-  return Boolean(document.querySelector('#movie_player.ad-showing, #movie_player.ad-interrupting'));
+  return IS_YOUTUBE && Boolean(document.querySelector('#movie_player.ad-showing, #movie_player.ad-interrupting'));
 }
 
+// Identifiant de ce qu'on analyse : la vidéo YouTube, sinon la page elle-même
 function currentVideoId() {
+  if (!IS_YOUTUBE) return location.origin + location.pathname;
   const v = new URLSearchParams(location.search).get('v');
   if (v) return v;
   const m = location.pathname.match(/^\/live\/([\w-]{6,})/);
@@ -445,6 +476,7 @@ function startOverlay({ restore = false } = {}) {
   injectSlot();
   injectBadge();
   startSampler();
+  followPlayer(true);
   if (restore) {
     restoreRecap();
     flashStatus('page rechargée — analyse toujours en cours', 'warn', 5000);
@@ -455,6 +487,7 @@ function startOverlay({ restore = false } = {}) {
 
 function teardown() {
   S.gen++; // tous les timers en vol deviennent des no-ops
+  followPlayer(false);
   clearTimeout(S.cardTimer);
   clearTimeout(S.flashTimer);
   clearTimeout(S.saveTimer);
@@ -497,16 +530,48 @@ function injectFonts() {
 // Repli sur la page si aucun lecteur n'est trouvé. Rappelé régulièrement :
 // si YouTube recrée le lecteur, le calque y est replacé.
 function overlayRoot() {
-  const player = document.querySelector('#movie_player');
   let layer = document.getElementById('fct-layer');
   if (!layer) {
     layer = document.createElement('div');
     layer.id = 'fct-layer';
   }
-  const host = player || document.body;
+  if (IS_YOUTUBE) {
+    const player = document.querySelector('#movie_player');
+    const host = player || document.body;
+    if (layer.parentElement !== host) host.appendChild(layer);
+    layer.classList.toggle('fct-layer--page', !player);
+    return layer;
+  }
+  // Hors YouTube : calque en position fixe, recalé sur le rectangle du
+  // lecteur (défilement, redimensionnement, chaque seconde). En plein écran
+  // d'un conteneur, le calque passe dans l'élément plein écran ; si c'est la
+  // vidéo ou l'iframe elle-même, rien ne peut s'afficher par-dessus.
+  const fs = document.fullscreenElement;
+  const fsHost = fs && !/^(VIDEO|IFRAME)$/.test(fs.tagName) ? fs : null;
+  const target = fsHost ? null : playerTarget();
+  const host = fsHost || document.body;
   if (layer.parentElement !== host) host.appendChild(layer);
-  layer.classList.toggle('fct-layer--page', !player);
+  layer.classList.toggle('fct-layer--fs', Boolean(fsHost));
+  layer.classList.toggle('fct-layer--rect', Boolean(target));
+  layer.classList.toggle('fct-layer--page', !fsHost && !target);
+  if (target) {
+    const r = target.getBoundingClientRect();
+    Object.assign(layer.style, { left: `${r.left}px`, top: `${r.top}px`, width: `${r.width}px`, height: `${r.height}px` });
+  } else {
+    Object.assign(layer.style, { left: '', top: '', width: '', height: '' });
+  }
   return layer;
+}
+
+// Hors YouTube, le calque suit le lecteur quand la page défile ou change de taille
+const onViewportChange = () => { if (S.active) overlayRoot(); };
+
+function followPlayer(on) {
+  if (IS_YOUTUBE) return;
+  const method = on ? 'addEventListener' : 'removeEventListener';
+  window[method]('scroll', onViewportChange, { passive: true, capture: true });
+  window[method]('resize', onViewportChange, { passive: true });
+  document[method]('fullscreenchange', onViewportChange);
 }
 
 // ── Échantillonnage vidéo (horodatages, pubs, son coupé) ─────────────────────
@@ -524,7 +589,7 @@ function startSampler() {
 
 function sampleVideo() {
   if (!S.active) return;
-  overlayRoot(); // lecteur recréé par YouTube → y replacer le calque
+  overlayRoot(); // lecteur recréé (YouTube) ou déplacé (autres sites) → y recaler le calque
   const video = mainVideo();
   const ad = isAdShowing();
   if (ad !== S.lastAd) {
@@ -1296,11 +1361,13 @@ function clearSavedRecap() {
 
 function exportRecap() {
   const vid = S.videoId || '';
-  const link = (p) => (p.vt != null && vid) ? `https://www.youtube.com/watch?v=${vid}&t=${Math.floor(p.vt)}s` : null;
+  // Liens horodatés : YouTube seulement (ailleurs, pas de format d'URL commun)
+  const link = (p) => (IS_YOUTUBE && p.vt != null && vid) ? `https://www.youtube.com/watch?v=${vid}&t=${Math.floor(p.vt)}s` : null;
   const title = (document.title || '').replace(/^\(\d+\)\s*/, '').replace(/ - YouTube$/, '').trim();
+  const pageUrl = IS_YOUTUBE ? `https://www.youtube.com/watch?v=${vid}` : vid;
 
   const lines = [`# SOURCÉ — Récapitulatif (${new Date().toLocaleDateString('fr-FR')})`, ''];
-  if (vid) lines.push(`Vidéo : [${title || vid}](https://www.youtube.com/watch?v=${vid})`, '');
+  if (vid) lines.push(`Vidéo : [${title || vid}](${pageUrl})`, '');
   const affs = [], others = [];
   for (const entry of S.points.values()) {
     (entry.point.type === 'affirmation' ? affs : others).push(entry);
@@ -1336,7 +1403,8 @@ function exportRecap() {
   const blob = new Blob([lines.join('\n')], { type: 'text/markdown' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = `source-recap_${new Date().toISOString().slice(0, 10)}${vid ? '_' + vid : ''}.md`;
+  const suffix = IS_YOUTUBE ? vid : location.hostname.replace(/^www\./, '');
+  a.download = `source-recap_${new Date().toISOString().slice(0, 10)}${suffix ? '_' + suffix : ''}.md`;
   a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 5000);
 }

@@ -18,13 +18,17 @@ let capturing = false;
 
 init();
 
+// Identifiant de ce qu'on analyse (même règle que background.js) : la vidéo
+// YouTube, sinon la page (origine + chemin) ; null si rien d'analysable
 function videoIdFromUrl(url) {
   try {
     const u = new URL(url);
-    if (!/(^|\.)youtube\.com$/.test(u.hostname)) return null;
-    if (u.pathname === '/watch') return u.searchParams.get('v');
-    const m = u.pathname.match(/^\/live\/([\w-]{6,})/);
-    return m ? m[1] : null;
+    if (/(^|\.)youtube\.com$/.test(u.hostname)) {
+      if (u.pathname === '/watch') return u.searchParams.get('v');
+      const m = u.pathname.match(/^\/live\/([\w-]{6,})/);
+      return m ? m[1] : null;
+    }
+    return /^https?:$/.test(u.protocol) ? u.origin + u.pathname : null;
   } catch (_) {
     return null;
   }
@@ -157,6 +161,24 @@ async function detectVideo(tabId) {
       target: { tabId },
       world: 'MAIN', // accès aux variables de la page (ytInitialPlayerResponse)
       func: () => {
+        // Autres sites (replay, direct d'une chaîne) : balises Open Graph et
+        // meta standard, présentes sur la quasi-totalité des pages vidéo
+        if (!/(^|\.)youtube\.com$/.test(location.hostname)) {
+          const meta = (...names) => {
+            for (const n of names) {
+              const v = document.querySelector(`meta[property="${n}"], meta[name="${n}"]`)?.content;
+              if (v && v.trim()) return v.trim();
+            }
+            return '';
+          };
+          const date = meta('article:published_time', 'video:release_date', 'og:updated_time', 'date');
+          return {
+            title: meta('og:title', 'twitter:title') || document.title.trim(),
+            channel: meta('og:site_name', 'application-name') || location.hostname.replace(/^www\./, ''),
+            desc: meta('og:description', 'description', 'twitter:description').slice(0, 1200),
+            publishDate: /^\d{4}-\d{2}-\d{2}/.test(date) ? date.slice(0, 10) : '',
+          };
+        }
         const params = new URLSearchParams(location.search);
         const vid = params.get('v') || (location.pathname.match(/^\/live\/([\w-]{6,})/) || [])[1];
         const pr = window.ytInitialPlayerResponse;
@@ -211,7 +233,7 @@ $('btn-start').addEventListener('click', async () => {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
 
   if (!videoIdFromUrl(tab?.url || '')) {
-    setStatus('ouvre une vidéo YouTube');
+    setStatus('ouvre la page de la vidéo');
     return;
   }
 

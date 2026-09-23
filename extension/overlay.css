@@ -21,6 +21,18 @@
   text-align: left;
   letter-spacing: normal;
 }
+/* Hors YouTube : calque fixe recalé sur le rectangle du lecteur (inline
+   left/top/width/height, voir overlayRoot), ou plein écran d'un conteneur */
+#fct-layer.fct-layer--rect {
+  position: fixed;
+  inset: auto;
+  z-index: 2147483000;
+}
+#fct-layer.fct-layer--fs {
+  position: fixed;
+  inset: 0;
+  z-index: 2147483000;
+}
 /* Repli sans lecteur trouvé : calque sur la page, sous le masthead */
 #fct-layer.fct-layer--page {
   position: fixed;

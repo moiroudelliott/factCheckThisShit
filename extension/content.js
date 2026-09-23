@@ -468,7 +468,7 @@ function teardown() {
     recapOpen: false, showAll: true, lastStatus: 'connected', flash: null, flashTimer: null, notes: {},
     samples: [], samplerTimer: null, lastAd: false, saveTimer: null,
   });
-  ['fct-layer', 'fct-chip', 'fct-card-slot', 'fct-recap', 'fct-speaker-badge'].forEach(id => document.getElementById(id)?.remove());
+  ['fct-layer', 'fct-chip', 'fct-card-slot', 'fct-recap', 'fct-speaker-badge', 'fct-markers'].forEach(id => document.getElementById(id)?.remove());
 }
 
 // Polices embarquées dans l'extension (plus d'appel à Google Fonts depuis
@@ -540,6 +540,55 @@ function sampleVideo() {
   }
   const muted = S.phase === 'live' && !ad && (video.muted || video.volume === 0);
   setNote('muted', muted ? "son coupé — l'analyse n'entend rien" : null);
+  renderMarkers();
+}
+
+// ── Repères sur la barre de progression YouTube ───────────────────────────────
+// Un trait par affirmation, à la couleur de son verdict, pour repérer d'un
+// coup d'œil les passages vérifiés. Purement visuel (pointer-events: none) :
+// ne gêne jamais le déplacement dans la vidéo ; le bouton ▶ des cartes et du
+// récap sert à y aller. Pour un direct, la barre couvre la plage lisible
+// (DVR), pas une durée.
+
+function seekRange(video) {
+  const s = video.seekable;
+  if (s && s.length) return [s.start(0), s.end(s.length - 1)];
+  return Number.isFinite(video.duration) ? [0, video.duration] : [0, 0];
+}
+
+function renderMarkers() {
+  let box = document.getElementById('fct-markers');
+  const bar = document.querySelector('#movie_player .ytp-progress-bar');
+  const video = mainVideo();
+  if (!S.active || !bar || !video || !canSeek() || isAdShowing()) {
+    box?.remove();
+    return;
+  }
+  const [start, end] = seekRange(video);
+  if (!(end > start)) {
+    box?.remove();
+    return;
+  }
+  const items = [...S.points.values()].filter(({ point }) => point.type === 'affirmation' && Number.isFinite(point.vt));
+  const sig = `${Math.round(start)}:${Math.round(end)}|` + items.map(({ point, fc }) => `${point.id}:${verdictCfg(fc)?.tag || ''}`).join(',');
+  if (box && box.parentElement === bar && box.dataset.sig === sig) return;
+  if (!box || box.parentElement !== bar) {
+    box?.remove();
+    box = document.createElement('div');
+    box.id = 'fct-markers';
+    bar.insertBefore(box, bar.querySelector('.ytp-scrubber-container'));
+  }
+  box.dataset.sig = sig;
+  box.textContent = '';
+  for (const { point, fc } of items) {
+    const pct = ((point.vt - start) / (end - start)) * 100;
+    if (pct < 0 || pct > 100) continue;
+    const m = document.createElement('span');
+    m.className = 'fct-marker';
+    m.style.left = `${pct}%`;
+    m.style.background = verdictCfg(fc)?.accent || PENDING_ACCENT;
+    box.appendChild(m);
+  }
 }
 
 // Position vidéo (s) à l'instant `wall` (horloge unix, s), ou null si inconnue

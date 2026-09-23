@@ -657,6 +657,24 @@
   animation: fct-risein 0.4s ease both;
 }
 
+/* ── Repères sur la barre de progression YouTube ───────────────────────────── */
+
+#fct-markers {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 34;
+}
+.fct-marker {
+  position: absolute;
+  top: -3px;
+  bottom: -3px;
+  width: 4px;
+  margin-left: -2px;
+  border-radius: 2px;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.45);
+}
+
 /* ── Recap panel ───────────────────────────────────────────────────────────── */
 
 /* Panneau de page (pas dans le lecteur : il a besoin de hauteur), sous le

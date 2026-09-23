@@ -1,10 +1,13 @@
 <!DOCTYPE html>
-<html>
+<html lang="fr">
 <head>
   <meta charset="utf-8">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400;1,6..72,500&family=Archivo:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <title>SOURCÉ</title>
   <style>
+    /* Polices embarquées (pas d'appel à Google Fonts) — voir fonts/licenses */
+    @font-face { font-family: 'FCT Archivo'; font-style: normal; font-weight: 400 800; src: url('fonts/archivo-latin.woff2') format('woff2'); }
+    @font-face { font-family: 'FCT Newsreader'; font-style: italic; font-weight: 400 500; src: url('fonts/newsreader-italic-latin.woff2') format('woff2'); }
+
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
     body {
@@ -12,7 +15,7 @@
       padding: 18px 18px 16px;
       background: #0d0f13;
       color: rgba(255, 255, 255, 0.9);
-      font-family: 'Archivo', system-ui, sans-serif;
+      font-family: 'FCT Archivo', system-ui, sans-serif;
       font-size: 13px;
     }
 
@@ -52,55 +55,64 @@
     .active .fct-ping-ring { display: block; }
 
     .fct-brand {
-      font-family: 'Newsreader', serif;
+      font-family: 'FCT Newsreader', serif;
       font-style: italic;
       font-size: 15px;
       font-weight: 500;
       color: #fff;
+      flex-shrink: 0;
     }
     .fct-brand-dot { color: #e0324f; }
 
+    /* Une seule ligne quoi qu'il arrive : un statut long passait à la ligne
+       et faisait sauter l'en-tête */
     .fct-status-pill {
       margin-left: auto;
+      min-width: 0;
       font-size: 10px;
       font-weight: 600;
       letter-spacing: 0.06em;
-      color: rgba(255, 255, 255, 0.28);
+      color: rgba(255, 255, 255, 0.55);
       text-transform: uppercase;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
       transition: color 0.3s;
     }
     .fct-status-pill.active {
-      color: #e0324f;
+      color: #f0435f;
     }
 
     /* ── Form ── */
     .fct-section { margin-bottom: 9px; }
     .fct-label {
-      font-size: 9.5px;
+      display: block;
+      font-size: 10px;
       font-weight: 700;
       letter-spacing: 0.1em;
       text-transform: uppercase;
-      color: rgba(255, 255, 255, 0.3);
+      color: rgba(255, 255, 255, 0.58);
       margin-bottom: 5px;
     }
+    .fct-label-hint { opacity: 0.8; text-transform: none; letter-spacing: 0; font-weight: 500; }
 
     input, textarea {
       width: 100%;
       background: rgba(255, 255, 255, 0.04);
-      color: rgba(255, 255, 255, 0.88);
-      border: 1px solid rgba(255, 255, 255, 0.09);
+      color: rgba(255, 255, 255, 0.9);
+      border: 1px solid rgba(255, 255, 255, 0.14);
       border-radius: 8px;
       padding: 8px 11px;
       font-size: 12px;
-      font-family: 'Archivo', system-ui, sans-serif;
+      font-family: 'FCT Archivo', system-ui, sans-serif;
       transition: border-color 0.15s, background 0.15s;
     }
     input:focus, textarea:focus {
       outline: none;
-      border-color: rgba(224, 50, 79, 0.45);
+      border-color: rgba(224, 50, 79, 0.6);
       background: rgba(255, 255, 255, 0.06);
     }
-    input::placeholder, textarea::placeholder { color: rgba(255, 255, 255, 0.2); }
+    input::placeholder, textarea::placeholder { color: rgba(255, 255, 255, 0.4); }
     textarea { resize: none; height: 62px; }
 
     /* ── Buttons ── */
@@ -111,51 +123,79 @@
       border: none;
       font-size: 12.5px;
       font-weight: 600;
-      font-family: 'Archivo', system-ui, sans-serif;
+      font-family: 'FCT Archivo', system-ui, sans-serif;
       cursor: pointer;
       transition: background 0.15s, color 0.15s;
       margin-top: 6px;
     }
+    .fct-btn:focus-visible, .fct-advanced-toggle:focus-visible, .fct-link:focus-visible {
+      outline: 2px solid rgba(240, 67, 95, 0.8);
+      outline-offset: 2px;
+    }
 
     #btn-start {
       background: #e0324f;
-      color: #0d0f13;
+      color: #000; /* noir : 4,7:1 sur ce rouge (le quasi-noir d'avant faisait 4,3:1) */
     }
-    #btn-start:hover { background: #c8283f; }
+    #btn-start:hover { background: #ec4a65; }
     #btn-start:disabled {
       background: rgba(255, 255, 255, 0.08);
-      color: rgba(255, 255, 255, 0.3);
+      color: rgba(255, 255, 255, 0.45);
       cursor: default;
     }
 
     #btn-stop {
       background: rgba(224, 50, 79, 0.1);
-      color: rgba(224, 50, 79, 0.85);
-      border: 1px solid rgba(224, 50, 79, 0.22);
+      color: #f28a9c;
+      border: 1px solid rgba(224, 50, 79, 0.3);
       display: none;
     }
     #btn-stop:hover {
       background: rgba(224, 50, 79, 0.2);
-      color: #f28a9c;
+      color: #ffb3c0;
     }
 
-    .fct-warn {
-      font-size: 10.5px;
-      color: oklch(0.78 0.15 75);
+    .fct-note {
+      font-size: 11px;
+      line-height: 1.45;
+      color: rgba(255, 255, 255, 0.62);
       margin-top: 8px;
       display: none;
+    }
+    .fct-warn {
+      font-size: 11px;
+      line-height: 1.45;
+      color: oklch(0.8 0.15 75);
+      margin-top: 8px;
+      display: none;
+    }
+    .fct-warn code {
+      font-family: ui-monospace, Consolas, monospace;
+      font-size: 10.5px;
+      background: rgba(255, 255, 255, 0.07);
+      padding: 1px 4px;
+      border-radius: 4px;
+    }
+    .fct-link {
+      background: none;
+      border: none;
+      padding: 0;
+      font: inherit;
+      color: #f28a9c;
+      text-decoration: underline;
+      cursor: pointer;
     }
 
     .fct-advanced-toggle {
       background: none;
       border: none;
-      color: rgba(255, 255, 255, 0.35);
-      font-size: 10.5px;
-      font-family: 'Archivo', system-ui, sans-serif;
+      color: rgba(255, 255, 255, 0.55);
+      font-size: 11px;
+      font-family: 'FCT Archivo', system-ui, sans-serif;
       cursor: pointer;
       padding: 2px 0;
     }
-    .fct-advanced-toggle:hover { color: rgba(255, 255, 255, 0.6); }
+    .fct-advanced-toggle:hover { color: rgba(255, 255, 255, 0.8); }
     #advanced-panel { margin-top: 8px; }
 
     @keyframes fct-ping {
@@ -171,29 +211,30 @@
       <div class="fct-ping-ring"></div>
     </div>
     <span class="fct-brand">SOURC<span class="fct-brand-dot">É</span></span>
-    <span class="fct-status-pill" id="status-text">inactif</span>
+    <span class="fct-status-pill" id="status-text" role="status">inactif</span>
   </div>
 
   <div id="briefing-section">
     <div class="fct-section">
-      <div class="fct-label">Émission</div>
+      <label class="fct-label" for="emission">Émission</label>
       <input id="emission" type="text" placeholder="C à vous, BFM Politique…" />
     </div>
     <div class="fct-section">
-      <div class="fct-label">Intervenants <span style="opacity:0.5;text-transform:none;letter-spacing:0">(optionnel — déduits de la vidéo)</span></div>
-      <textarea id="guests" placeholder="Détectés automatiquement via la description.&#10;Complète ici si besoin…"></textarea>
+      <label class="fct-label" for="guests">Intervenants <span class="fct-label-hint">(un par ligne — déduits de la vidéo)</span></label>
+      <textarea id="guests" placeholder="Détectés automatiquement via la description.&#10;Complète ici si besoin (Prénom Nom)…"></textarea>
     </div>
 
-    <button type="button" class="fct-advanced-toggle" id="advanced-toggle">Avancé ▾</button>
+    <button type="button" class="fct-advanced-toggle" id="advanced-toggle" aria-expanded="false" aria-controls="advanced-panel">Avancé ▾</button>
     <div id="advanced-panel" style="display:none">
-      <div class="fct-label">Jeton d'accès <span style="opacity:0.5;text-transform:none;letter-spacing:0">(si BACKEND_TOKEN est défini côté serveur)</span></div>
+      <label class="fct-label" for="token">Jeton d'accès <span class="fct-label-hint">(si BACKEND_TOKEN est défini côté serveur)</span></label>
       <input id="token" type="password" placeholder="Laisser vide si non configuré" autocomplete="off" />
     </div>
   </div>
 
   <button class="fct-btn" id="btn-start">▶ Démarrer l'analyse</button>
   <button class="fct-btn" id="btn-stop">■ Arrêter</button>
-  <p class="fct-warn" id="warn">⚠ Lance d'abord le backend Flask</p>
+  <p class="fct-note" id="other-tab">L'analyse tourne sur un autre onglet. <button type="button" class="fct-link" id="goto-tab">Y aller</button></p>
+  <p class="fct-warn" id="warn">⚠ Backend éteint — lance <code>python backend.py</code>, puis <button type="button" class="fct-link" id="retry">réessaie</button>.</p>
 
   <script src="popup.js"></script>
 </body>

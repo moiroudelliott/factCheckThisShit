@@ -26,7 +26,7 @@ from server.state import (
     session_excerpts, session_speaker_map, session_map_votes, session_map_state,
     session_voice_locked, session_bank_miss,
 )
-from server.text_utils import key_words, clean_description, build_transcript, is_hallucination
+from server.text_utils import claim_signature, clean_description, build_transcript, is_hallucination
 from server.voices import (
     SpeakerTracker, speaker_label, probe_speaker, apply_speaker_map,
     match_clusters_to_bank, auto_enroll_voices, identify_speakers, load_voice_bank, _voice_bank,
@@ -278,7 +278,7 @@ def flush_to_mistral(sid: str, text: str, ts: float = None):
                 # ts = horodatage (unix) approximatif du moment où le propos a été
                 # tenu → permet le "sauter à ce moment de la vidéo" côté extension
                 entry = {"id": uuid.uuid4().hex[:8], "ts": ts, **p}
-                dupe_index_add(index, key_words(entry['texte']), len(combined))
+                dupe_index_add(index, claim_signature(entry['texte']).words, len(combined))
                 combined.append(entry)
                 unique.append(entry)
         if not unique:

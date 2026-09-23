@@ -63,7 +63,8 @@ VOICE_ENROLL_MIN_SEGMENTS = 8  # segments min pour auto-enrôler une voix en fin
 # Les politiques répètent les mêmes claims pendant des mois : un claim déjà
 # vérifié (cette session ou une précédente) obtient son verdict
 # instantanément, sans recherche web ni appel Mistral.
-CACHE_DB = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "factcheck_cache.db")
+CACHE_DB = os.environ.get("FACTCHECK_CACHE_DB") or os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "factcheck_cache.db")
 CACHE_TTL_DAYS = 30      # les chiffres politiques/économiques périment
 CACHE_MIN_CONF = 60      # ne jamais mettre en cache un verdict peu sûr
 CACHE_SIM_THRESHOLD = 0.75  # similarité (mots-clés) pour considérer deux claims identiques

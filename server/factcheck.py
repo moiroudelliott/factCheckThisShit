@@ -386,18 +386,26 @@ def call_mistral_factcheck(claim: str, context: dict = None, sid: str = None) ->
     return {"verdict": "non_verifiable", "confiance": None, "explication": "Impossible de vérifier.", "source": "", "url": ""}
 
 
+def video_year(context: dict) -> int:
+    """Année des propos vérifiés : celle de la publication de la vidéo si
+    connue (replay), sinon l'année en cours (direct)."""
+    date = str((context or {}).get("date") or "")
+    return int(date[:4]) if re.match(r"^(19|20)\d\d", date) else time.localtime().tm_year
+
+
 def fact_check_affirmation(sid: str, claim_id: str, claim_text: str):
     print(f"[FactCheck] «{claim_text[:60]}»")
+    context = session_contexts.get(sid, {})
+    year = video_year(context)
     # Claim déjà vérifié (cette session ou une précédente) → verdict instantané
-    cached = cache.lookup(claim_text)
+    cached = cache.lookup(claim_text, year)
     if cached:
         print(f"[FactCheck] cache hit → {cached['verdict']} ({cached.get('confiance')}%)")
         socketio.emit("fact_check_result", {"id": claim_id, **cached}, to=sid)
         return
-    context = session_contexts.get(sid, {})
     try:
         result = call_mistral_factcheck(claim_text, context=context, sid=sid)
-        cache.store(claim_text, result)
+        cache.store(claim_text, result, year)
         socketio.emit("fact_check_result", {"id": claim_id, **result}, to=sid)
     except Exception as e:
         print(f"[FactCheck error] {type(e).__name__}: {e}")

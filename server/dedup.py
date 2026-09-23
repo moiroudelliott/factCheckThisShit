@@ -1,8 +1,13 @@
 """Déduplication sémantique locale des talking points (index inversé par
-mot-clé, comparaison par recouvrement) — reste volontairement globale sur
-toute la session (cf. flush_to_mistral), seul le coût du scan est réduit."""
+mot-clé, comparaison par claims_match) — reste volontairement globale sur
+toute la session (cf. flush_to_mistral), seul le coût du scan est réduit.
 
-from server.text_utils import key_words
+claims_match (voir text_utils) refuse de fusionner deux affirmations dont un
+nombre, la négation ou un mot de sens diffère : sans ça, la réplique de
+l'adversaire (« a voté pour » face à « a voté contre ») était jetée comme
+doublon."""
+
+from server.text_utils import claim_signature, claims_match
 
 
 def dupe_index_add(index: dict, words: set, idx: int) -> None:
@@ -11,17 +16,11 @@ def dupe_index_add(index: dict, words: set, idx: int) -> None:
 
 
 def is_duplicate_indexed(new_text: str, points: list, index: dict, threshold: float = 0.45) -> bool:
-    new_w = key_words(new_text)
-    if len(new_w) < 3:
+    new_sig = claim_signature(new_text)
+    if len(new_sig.words) < 3:
         return False
     candidates = set()
-    for w in new_w:
+    for w in new_sig.words:
         candidates.update(index.get(w, ()))
-    for idx in candidates:
-        ex_w = key_words(points[idx]['texte'])
-        if len(ex_w) < 3:
-            continue
-        overlap = len(new_w & ex_w)
-        if overlap / min(len(new_w), len(ex_w)) >= threshold:
-            return True
-    return False
+    return any(claims_match(new_sig, claim_signature(points[idx]['texte']), threshold)
+               for idx in candidates)

@@ -1,8 +1,9 @@
-"""Petits utilitaires texte partagés : mots-clés (dédup + cache), filtre
-anti-hallucination Whisper, transcript annoté par locuteur, nettoyage de
-description YouTube."""
+"""Petits utilitaires texte partagés : comparaison d'affirmations (dédup +
+cache), filtre anti-hallucination Whisper, transcript annoté par locuteur,
+nettoyage de description YouTube."""
 
 import re
+from typing import NamedTuple
 
 _STOPWORDS = {
     'avec', 'aussi', 'alors', 'autre', 'autres', 'bien', 'mais', 'même',
@@ -15,8 +16,72 @@ _STOPWORDS = {
 
 
 def key_words(text: str) -> set:
-    tokens = re.findall(r'\b(?:[a-zàâçéèêëîïôùûü]{4,}|\d{3,})\b', text.lower())
+    """Mots de contenu (≥ 4 lettres, hors mots vides). Les nombres sont
+    volontairement exclus : ils sont comparés à part, exactement (voir
+    claim_signature)."""
+    tokens = re.findall(r'\b[a-zàâçéèêëîïôùûüœ]{4,}\b', text.lower())
     return {t for t in tokens if t not in _STOPWORDS}
+
+
+# ── Comparaison d'affirmations ─────────────────────────────────────────────
+# Le recouvrement de mots-clés seul ne voit pas ce qui change le SENS d'une
+# affirmation : « le chômage a baissé » / « le chômage a augmenté », « a voté
+# contre » / « a voté pour », « 43 milliards » / « 12 milliards », « a gelé »
+# / « n'a jamais gelé » partagent presque tous leurs mots-clés. Deux
+# affirmations ne sont donc « la même » que si, en plus du recouvrement :
+#   - leurs nombres sont identiques,
+#   - leur polarité (négation) est identique,
+#   - elles emploient les mêmes mots de sens/direction (hausse, baisse,
+#     double, contre, plus, moins…).
+
+_NEGATION_RE = re.compile(r"(?<!\w)(?:ne|jamais|aucune?|nullement|guère)(?!\w)|(?<!\w)n['’]", re.IGNORECASE)
+
+# Mots (exacts, ou par leur début) dont la présence d'un seul côté change le
+# sens d'une affirmation
+_POLARITY_WORDS = {'plus', 'moins', 'contre', 'davantage'}
+_POLARITY_STEMS = (
+    'hauss', 'baiss', 'augment', 'diminu', 'rédui', 'réduc', 'recul', 'chut', 'explos',
+    'effondr', 'stagn', 'stab', 'progressé', 'progression', 'progresse',
+    'doubl', 'tripl', 'quadrupl', 'moitié',
+    'supérieur', 'inférieur', 'majorit', 'minorit',
+    'favorable', 'défavorable', 'oppos', 'soutien', 'soutenu',
+    'gagn', 'perd', 'pert', 'excédent', 'déficit', 'record',
+    'interdi', 'autoris', 'obligatoire', 'légal', 'illégal',
+)
+
+
+class ClaimSig(NamedTuple):
+    words: frozenset     # mots de contenu
+    numbers: frozenset   # nombres normalisés ("3 000" → "3000", "5,50" → "5.5")
+    negative: bool       # contient une négation
+    polar: frozenset     # mots de sens/direction présents
+
+
+def _norm_number(raw: str) -> str:
+    s = raw.replace(',', '.')
+    if '.' in s:
+        s = s.rstrip('0').rstrip('.')
+    return s.lstrip('0') or '0'
+
+
+def claim_signature(text: str) -> ClaimSig:
+    low = str(text).lower()
+    # Séparateurs de milliers ("3 000", "3 000", "1.000") → un seul nombre
+    compact = re.sub(r'(?<=\d)[\s  .](?=\d{3}(?!\d))', '', low)
+    numbers = frozenset(_norm_number(n) for n in re.findall(r'\d+(?:[.,]\d+)?', compact))
+    tokens = re.findall(r'[a-zàâçéèêëîïôùûüœ]+', low)
+    polar = frozenset(t for t in tokens if t in _POLARITY_WORDS or t.startswith(_POLARITY_STEMS))
+    return ClaimSig(frozenset(key_words(low)), numbers, bool(_NEGATION_RE.search(low)), polar)
+
+
+def claims_match(a: ClaimSig, b: ClaimSig, threshold: float) -> bool:
+    """Vrai si a et b disent la même chose (reformulation), faux dès qu'un
+    nombre, la négation ou un mot de sens diffère."""
+    if a.numbers != b.numbers or a.negative != b.negative or a.polar != b.polar:
+        return False
+    if len(a.words) < 3 or len(b.words) < 3:
+        return False
+    return len(a.words & b.words) / min(len(a.words), len(b.words)) >= threshold
 
 
 def build_transcript(entries: list) -> str:

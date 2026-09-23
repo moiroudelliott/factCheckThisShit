@@ -31,6 +31,7 @@ from server.state import (
     session_voice_locked, session_bank_miss, session_pending, session_warned,
 )
 from server.text_utils import claim_signature, clean_description, build_transcript, is_hallucination, strip_overlap
+from server.vocabulary import build_hotwords, is_hotword_echo, learn
 from server.voices import (
     SpeakerTracker, speaker_label, probe_speaker, apply_speaker_map,
     match_clusters_to_bank, auto_enroll_voices, identify_speakers, load_voice_bank, _voice_bank,
@@ -142,11 +143,22 @@ def on_set_context(data):
         "guests": guests,
         "date": str(data.get("date", "")).strip()[:20],
         "description": clean_description(str(data.get("description", ""))),
+        "learned": [],  # noms propres appris pendant le débat (vocabulary.learn)
     }
+    _refresh_hotwords(sid)
     print(f"[Context] emission={session_contexts[sid]['emission']!r} "
           f"guests={session_contexts[sid]['guests']} "
           f"date={session_contexts[sid]['date']!r} "
           f"description={len(session_contexts[sid]['description'])} chars")
+    print(f"[Context] mots attendus par Whisper: {session_contexts[sid]['hotwords'][:160]}…")
+
+
+def _refresh_hotwords(sid: str):
+    """Mots attendus par Whisper pour cette session (voir server/vocabulary.py)."""
+    ctx = session_contexts.get(sid)
+    if ctx is not None:
+        ctx["hotwords"] = build_hotwords(ctx.get("guests", []), ctx.get("emission", ""),
+                                         ctx.get("description", ""), ctx.get("learned", []))
 
 
 @socketio.on("start_transcription")
@@ -244,6 +256,7 @@ def _transcribe_and_diarize(path: str, sid: str, chunk_offset: float, chunk_abs_
     muter tracker/history ici, un seul chunk de CETTE session est traité à la
     fois."""
     with model_lock:
+        hotwords = session_contexts.get(sid, {}).get("hotwords") or None
         segments_gen, _ = model.transcribe(
             path,
             language="fr",
@@ -253,6 +266,7 @@ def _transcribe_and_diarize(path: str, sid: str, chunk_offset: float, chunk_abs_
             vad_parameters={"threshold": 0.3, "min_silence_duration_ms": 300},
             no_speech_threshold=0.45,
             compression_ratio_threshold=2.4,
+            hotwords=hotwords,
         )
         segments = list(segments_gen)
 
@@ -270,7 +284,7 @@ def _transcribe_and_diarize(path: str, sid: str, chunk_offset: float, chunk_abs_
         text = seg.text.strip()
         if not text:
             continue
-        if is_hallucination(text):
+        if is_hallucination(text) or is_hotword_echo(text, hotwords or ""):
             print(f"  → filtré (hallucination): {text[:50]}")
             continue
         if history and seg.start < CHUNK_OVERLAP_S + 0.5:
@@ -367,6 +381,13 @@ def flush_to_mistral(sid: str, text: str, ts: float = None):
         socketio.emit("talking_points", {"points": unique}, to=sid)
         # Garder TOUS les points de la session (pas de cap) pour déduplication globale
         session_points[sid] = combined
+        # Les noms propres des points (« Lecornu », « Fessenheim »…) deviennent
+        # des mots attendus par Whisper pour la suite du débat
+        ctx = session_contexts.get(sid)
+        if ctx is not None:
+            for p in unique:
+                learn(ctx.setdefault("learned", []), p["texte"])
+            _refresh_hotwords(sid)
         # Fact-check uniquement les affirmations
         for p in unique:
             if p["type"] == "affirmation":

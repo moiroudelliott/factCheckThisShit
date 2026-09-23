@@ -49,6 +49,7 @@ et les autres fichiers de [`tests/`](tests/) — voir [ARCHITECTURE.md](ARCHITEC
 | `searxng/` | Instance SearxNG auto-hébergée (recherche web sans dépendance à un moteur tiers) |
 | `site/` | Page vitrine statique du projet |
 | `enroll.py`, `harvest_voices.py`, `remove_voice.py` | Outils CLI pour peupler/retirer des voix dans `voices/` (banque d'empreintes vocales) |
+| `vocabulaire.txt` | Mots que Whisper doit s'attendre à entendre (sigles, partis, termes souvent mal transcrits) — modifiable |
 | `purge_cache.py` | Purge les verdicts douteux du cache de fact-checks (`--dry-run` d'abord ; sauvegarde automatique) |
 | `voices/` | Empreintes vocales enregistrées (gitignored, générées localement) |
 | `ARCHITECTURE.md` | Fonctionnement technique détaillé du pipeline |

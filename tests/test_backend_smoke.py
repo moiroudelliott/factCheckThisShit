@@ -41,11 +41,13 @@ class _Seg:
 
 class _FakeWhisper:
     calls = 0
+    hotwords = []  # hotwords reçus à chaque appel
 
     def __init__(self, *a, **k):
         pass
 
     def transcribe(self, path, **k):
+        _FakeWhisper.hotwords.append(k.get("hotwords") or "")
         i = _FakeWhisper.calls
         _FakeWhisper.calls += 1
         segs = [_Seg(0.2, 6.0, SCRIPT[i])] if i < len(SCRIPT) else []
@@ -154,6 +156,9 @@ def test_full_session():
     client.emit("stop_transcription")
     got = _wait_for(client, "session_done", timeout=20)
     names = [m["name"] for m in got]
+
+    # Whisper reçoit les intervenants déclarés comme mots attendus
+    assert all("Jordan Bardella" in h and "Gabriel Attal" in h for h in _FakeWhisper.hotwords)
 
     segments = [m["args"][0] for m in got if m["name"] == "transcript_segment"]
     assert len(segments) == len(SCRIPT) and all(s["speaker"] == "Intervenant A" for s in segments)

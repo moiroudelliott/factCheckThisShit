@@ -1,0 +1,38 @@
+# Mots attendus par Whisper (paramètre hotwords) — sigles, partis, institutions
+# et termes que la transcription écorche souvent (« Mereaux » pour « maires
+# ruraux », « Baïa » pour « abaya »).
+# Un terme par ligne, # = commentaire. Les intervenants déclarés, les noms
+# propres de la vidéo et ceux appris pendant le débat passent AVANT cette
+# liste : la place est limitée (~200 tokens), les derniers termes d'ici
+# peuvent être coupés. Mettre les plus utiles en haut.
+
+INSEE
+Eurostat
+OCDE
+SMIC
+RSA
+TVA
+CSG
+PLF
+PLFSS
+49.3
+Assemblée nationale
+Sénat
+Conseil constitutionnel
+Cour des comptes
+Matignon
+Élysée
+Bercy
+Rassemblement national
+Renaissance
+La France insoumise
+LFI
+Les Républicains
+Reconquête
+Les Écologistes
+Parti socialiste
+Horizons
+MoDem
+maires ruraux
+abaya
+laïcité

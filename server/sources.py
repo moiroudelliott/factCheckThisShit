@@ -11,7 +11,7 @@ import time
 import unicodedata
 from urllib.parse import urlparse
 
-from server.config import EXCLUDED_SOURCE_DOMAINS
+from server.config import EXCLUDED_SOURCE_DOMAINS, FACTCHECK_SECTIONS
 
 # Hiérarchie de fiabilité des domaines — annotée dans le prompt pour que le
 # verdict pèse une source officielle plus lourd qu'un blog. Noms de domaine
@@ -58,8 +58,20 @@ def is_excluded(url: str) -> bool:
     return on_domain(host(url), EXCLUDED_SOURCE_DOMAINS)
 
 
+def is_factcheck_section(url: str) -> bool:
+    """Article d'une rubrique de fact-checking (hôte + début du chemin)."""
+    try:
+        path = urlparse(url or "").path.rstrip("/")
+    except ValueError:
+        return False
+    where = f"{host(url)}{path}/"
+    return any(where.startswith(s.rstrip("/") + "/") for s in FACTCHECK_SECTIONS)
+
+
 def source_tier(url: str) -> str:
     h = host(url)
+    if is_factcheck_section(url):
+        return "FACT-CHECK PUBLIÉ"
     if on_domain(h, TIER_OFFICIAL):
         return "SOURCE OFFICIELLE"
     if on_domain(h, TIER_PRESS):
@@ -101,7 +113,7 @@ def source_label(claimed: str, url: str, kind: str = "") -> str:
     return h or "source"
 
 
-def finalize_result(data: dict, results: list, academic: list, official: list) -> dict:
+def finalize_result(data: dict, results: list, academic: list, official: list, known: list = ()) -> dict:
     """Normalise la réponse Mistral : verdict connu, URL issue des résultats
     de recherche (jamais inventée ; http(s) uniquement — une URL javascript:
     serait un vecteur XSS), nom de source cohérent avec l'URL, confiance
@@ -112,11 +124,14 @@ def finalize_result(data: dict, results: list, academic: list, official: list) -
     kinds = {r.get("href"): "web" for r in results}
     kinds.update({r.get("href"): "academic" for r in academic})
     kinds.update({r.get("href"): "official" for r in official})
+    outlets = {k.get("url"): k.get("outlet", "") for k in known}
+    kinds.update({u: "factcheck" for u in outlets})
     url = data.get("url", "")
     if not (isinstance(url, str) and url.startswith(("http://", "https://")) and url in kinds):
         url = ""
     out["url"] = url
-    out["source"] = source_label(str(data.get("source") or ""), url, kinds.get(url, ""))
+    # Fact-check déjà publié : on nomme la rédaction (connue), pas ce que dit Mistral
+    out["source"] = outlets[url] if url in outlets else source_label(str(data.get("source") or ""), url, kinds.get(url, ""))
     conf = data.get("confiance")
     conf = max(0, min(100, int(conf))) if isinstance(conf, (int, float)) else None
     if not url and conf is not None:

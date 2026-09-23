@@ -37,6 +37,27 @@ EXCLUDED_SOURCE_DOMAINS = (
     "sputniknews.com", "rt.com",
 )
 
+# Rédactions de vérification françaises dont les fact-checks publiés sont
+# indexés (server/known_factchecks.py) : (nom affiché, flux RSS). L'AFP
+# Factuel refuse les requêtes automatiques (403) et n'est donc pas listée.
+FACTCHECK_FEEDS = (
+    ("Les Décodeurs (Le Monde)", "https://www.lemonde.fr/les-decodeurs/rss_full.xml"),
+    ("CheckNews (Libération)", "https://www.liberation.fr/arc/outboundfeeds/rss-all/category/checknews/?outputType=xml"),
+    ("Vrai ou fake (franceinfo)", "https://www.francetvinfo.fr/vrai-ou-fake.rss"),
+    ("Fake off (20 Minutes)", "https://www.20minutes.fr/feeds/rss-fake-off.xml"),
+    ("Les Surligneurs", "https://www.lessurligneurs.eu/feed/"),
+)
+FACTCHECK_FEEDS_REFRESH_S = 3600
+FACTCHECK_INDEX_DB = os.environ.get("FACTCHECK_INDEX_DB") or os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "factchecks_index.db")
+# Rubriques de fact-checking reconnues dans les résultats web (hôte + début
+# du chemin) : annotées « FACT-CHECK PUBLIÉ », au-dessus de la presse
+FACTCHECK_SECTIONS = (
+    "factuel.afp.com", "lemonde.fr/les-decodeurs", "liberation.fr/checknews",
+    "francetvinfo.fr/vrai-ou-fake", "20minutes.fr/fake-off", "lessurligneurs.eu",
+    "tf1info.fr/politique/les-verificateurs", "tf1info.fr/societe/les-verificateurs",
+)
+
 # ── Buffer de transcription → analyse Mistral ─────────────────────────────
 FLUSH_INTERVAL = 22    # secondes max entre deux analyses Mistral
 MIN_WORDS = 30         # ne pas appeler Mistral avec moins de 30 mots (trop peu pour un talking point)

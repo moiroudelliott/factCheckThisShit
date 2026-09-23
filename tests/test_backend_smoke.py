@@ -19,6 +19,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 TMP = tempfile.mkdtemp(prefix="fct_smoke_")
 os.environ["FACTCHECK_CACHE_DB"] = os.path.join(TMP, "cache.db")
+os.environ["FACTCHECK_INDEX_DB"] = os.path.join(TMP, "index.db")
 os.environ["MISTRAL_API_KEY"] = "test"  # load_dotenv n'écrase pas une variable déjà définie
 os.environ["BACKEND_TOKEN"] = ""
 
@@ -89,8 +90,8 @@ PROMPTS = []
 
 
 class _Resp:
-    def __init__(self, payload, status=200):
-        self._p, self.status_code, self.headers = payload, status, {}
+    def __init__(self, payload, status=200, text=""):
+        self._p, self.status_code, self.headers, self.text = payload, status, {}, text
 
     def json(self):
         return self._p
@@ -122,7 +123,15 @@ def _fake_post(url, json=None, **k):
     return _Resp({"choices": [{"message": {"content": __import__("json").dumps(content, ensure_ascii=False)}}]})
 
 
+CHECKNEWS = "https://www.liberation.fr/checknews/chomage-2017/"
+RSS = f"""<rss><channel><item><title>Le chômage a-t-il vraiment baissé de 2 points depuis 2017 ?</title>
+<link>{CHECKNEWS}</link><description>Oui, selon l'Insee.</description>
+<pubDate>Mon, 21 Sep 2026 10:00:00 +0200</pubDate></item></channel></rss>"""
+
+
 def _fake_get(url, params=None, **k):
+    if "checknews" in url:  # flux RSS d'une rédaction de fact-checking
+        return _Resp({}, text=RSS)
     if "/search" in url and "archives-ouvertes" not in url:
         return _Resp({"results": [
             {"url": "https://www.facebook.com/page/posts/1", "title": "Post", "content": "…"},
@@ -192,6 +201,9 @@ def test_full_session():
     assert r["url"] == LEMONDE and r["source"] == "Le Monde"  # nom cohérent avec le lien
     evidence = next(p for p in PROMPTS if "fact-checker" in p)
     assert "facebook.com" not in evidence                # réseau social exclu
+    # fact-check déjà publié par une rédaction : en tête des preuves
+    baisse = next(p for p in PROMPTS if "fact-checker" in p and "baissé de 2 points" in p)
+    assert "FACT-CHECK DÉJÀ PUBLIÉ — CheckNews (Libération)" in baisse and CHECKNEWS in baisse
     assert "2024" in json.dumps(evidence, ensure_ascii=False)  # replay : année de la vidéo
 
     done = next(m["args"][0] for m in got if m["name"] == "session_done")

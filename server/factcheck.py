@@ -15,7 +15,7 @@ from server.config import (
     MISTRAL_API_KEY, MISTRAL_MODEL, MISTRAL_MAX_RETRIES, MISTRAL_RETRY_BASE_S, SEARXNG_URL,
 )
 from server.text_utils import _STOPWORDS
-from server import cache
+from server import cache, known_factchecks
 from server.notify import describe_error, warn_client
 from server.sources import finalize_result, is_excluded, source_tier, video_year
 from server.state import session_contexts
@@ -87,6 +87,7 @@ RÈGLES DE RIGUEUR:
 - Pour une affirmation CAUSALE ou sociologique ("X provoque Y", "X n'a pas d'effet sur Y"), les SOURCES ACADÉMIQUES (études évaluées par les pairs) pèsent plus lourd que la presse et que tes intuitions. Ne les utilise que si elles portent réellement sur le sujet de l'affirmation.
 - "confiance" (0-100) = ta certitude dans le verdict: ~90+ = sources officielles concordantes; ~70 = bien sourcé; ~50 = plausible mais mal sourcé; en dessous de 40, utilise plutôt "non_verifiable".
 - Quand les sources donnent un chiffre exact, cite-le dans "explication".
+- Un FACT-CHECK DÉJÀ PUBLIÉ (rédaction de vérification) ou un article annoté FACT-CHECK PUBLIÉ fait autorité s'il porte sur la MÊME affirmation (même chiffre, même période) : reprends sa conclusion et son URL. S'il porte sur un sujet voisin, ignore-le.
 - Une fiche de JEU DE DONNÉES (data.gouv.fr) prouve seulement qu'une donnée existe : elle ne confirme pas un chiffre à elle seule.
 - "url" doit être COPIÉE depuis un des résultats de recherche fournis — jamais inventée. Si aucun résultat n'appuie ton verdict, url vide ET confiance ≤ 50.
 - "source" = le nom du site de l'URL choisie (ex: "Le Monde" pour lemonde.fr), jamais une autorité que ce site se contente de citer.
@@ -340,11 +341,16 @@ def datagouv_search(claim: str, max_results: int = 3) -> list:
         return []
 
 
-def build_evidence_block(results: list, academic: list = None, official: list = None) -> str:
-    if not results and not academic and not official:
+def build_evidence_block(results: list, academic: list = None, official: list = None, known: list = None) -> str:
+    if not results and not academic and not official and not known:
         return "Aucun résultat de recherche disponible — base-toi sur tes connaissances uniquement."
     lines = ["Résultats de recherche (fiabilité annotée):"]
     i = 0
+    for k in (known or []):
+        i += 1
+        date = time.strftime("%d/%m/%Y", time.localtime(k["published"])) if k.get("published") else "date inconnue"
+        lines.append(f"[{i}] [FACT-CHECK DÉJÀ PUBLIÉ — {k['outlet']}, {date}] {k['title']} — "
+                     f"{k.get('summary', '')[:300]}\n    URL: {k['url']}")
     for r in (official or []):
         i += 1
         lines.append(f"[{i}] [JEU DE DONNÉES OFFICIEL — fiche du catalogue data.gouv.fr, ne contient pas "
@@ -374,7 +380,9 @@ def call_mistral_factcheck(claim: str, context: dict = None, sid: str = None, ci
     jobs = (eventlet.spawn(web_search, web_query), eventlet.spawn(scholar_search, claim),
             eventlet.spawn(datagouv_search, claim))
     results, academic, official = (j.wait() for j in jobs)
-    print(f"[Search] {len(results)} web + {len(academic)} académique(s) + {len(official)} data.gouv.fr pour «{claim[:50]}»")
+    known = known_factchecks.search(claim)  # index local, instantané
+    print(f"[Search] {len(known)} fact-check(s) publié(s) + {len(results)} web + {len(academic)} académique(s) "
+          f"+ {len(official)} data.gouv.fr pour «{claim[:50]}»")
     prompt = FACTCHECK_PROMPT_TEMPLATE.format(
         today=time.strftime("%d/%m/%Y"),
         context_block=build_context_block(context),
@@ -383,7 +391,7 @@ def call_mistral_factcheck(claim: str, context: dict = None, sid: str = None, ci
         # peut durcir ou déformer ce qui a réellement été dit
         citation_block=(f"Propos exact (transcription automatique) : « {citation} » — juge ce qui a été "
                         "réellement dit si la reformulation ci-dessus s'en écarte.\n") if citation else "",
-        evidence_block=build_evidence_block(results, academic, official),
+        evidence_block=build_evidence_block(results, academic, official, known),
     )
     content = call_mistral_api(prompt, sid=sid)
     print(f"[FactCheck résultat] {content[:150]}")
@@ -392,7 +400,7 @@ def call_mistral_factcheck(claim: str, context: dict = None, sid: str = None, ci
         if start != -1:
             data, _ = json.JSONDecoder().raw_decode(content, start)
             if isinstance(data, dict) and "verdict" in data:
-                return finalize_result(data, results, academic, official)
+                return finalize_result(data, results, academic, official, known)
     except (json.JSONDecodeError, ValueError):
         pass
     return {"verdict": "non_verifiable", "confiance": None, "explication": "Réponse du modèle illisible.",

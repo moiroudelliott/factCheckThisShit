@@ -26,14 +26,16 @@ Les références pointent vers des **fonctions** (`fichier` → `fonction`) plut
 Quatre composants, trois frontières réseau :
 
 ```
-[Onglet YouTube]  --tabCapture-->  [offscreen.js]  --socket.io-->  [server/routes.py]  --HTTP-->  [Mistral / SearxNG / HAL / OpenAlex / data.gouv.fr]
-       ^                                                                 |
-       |________________forwardToContent (via background.js)____________|
+[Onglet vidéo]  --tabCapture-->  [offscreen.js]  --socket.io-->  [server/routes.py]  --HTTP-->  [Mistral / SearxNG / HAL / OpenAlex / data.gouv.fr
+       ^                                                               |                          / flux RSS des fact-checkers / Eurostat / open data AN]
+       |_______________forwardToContent (via background.js)___________|
        |
 [content.js : state machine + DOM, calque dans le lecteur vidéo]
 ```
 
-- **`extension/background.js`** — service worker MV3, **sans état mémoire** (Chrome le tue après ~30 s d'inactivité) : tout vit dans `chrome.storage.session` (`getState`). Il orchestre : injecter `content.js`, créer le document offscreen, relayer les messages, et **arrêter la capture** si l'onglet est fermé, change de vidéo (navigation SPA) ou quitte YouTube (`tabs.onUpdated`).
+L'onglet vidéo est YouTube (support complet : calque dans `#movie_player`, pubs, repères sur la barre de progression) ou n'importe quel autre site avec un lecteur — france.tv, LCP, Public Sénat, Twitch, Dailymotion… (§10).
+
+- **`extension/background.js`** — service worker MV3, **sans état mémoire** (Chrome le tue après ~30 s d'inactivité) : tout vit dans `chrome.storage.session` (`getState`). Il orchestre : injecter `content.js`, créer le document offscreen, relayer les messages, transmettre les signalements de verdict (`reportVerdict` → `POST /report_verdict`), et **arrêter la capture** si l'onglet est fermé, change de vidéo (navigation SPA, autre page du site) ou quitte le site (`tabs.onUpdated`). Identifiant de ce qu'on analyse (`videoIdFromUrl`) : l'id de la vidéo YouTube, sinon origine + chemin de la page.
 - **`extension/offscreen.js`** — le seul endroit où l'audio existe. Un document offscreen a accès à `MediaRecorder`/`AudioContext`, ce qu'un service worker n'a pas. Une **session** par capture (`startSession`) : connexion, tabId, timers. À l'arrêt, l'audio est coupé tout de suite mais la session attend que le backend ait fini d'analyser (`stopSession`).
 - **`backend.py`** — point d'entrée : monkey-patch eventlet puis lance `server/routes.py`. Toute la logique vit dans le package `server/` :
   - `server/app.py` — app Flask/SocketIO (origines autorisées : l'extension Chrome uniquement), chargement des modèles (Whisper avec repli GPU → CPU, ECAPA), diagnostics de démarrage.
@@ -43,7 +45,12 @@ Quatre composants, trois frontières réseau :
   - `server/names.py` — comparaison de noms de personnes (invités ↔ banque ↔ votes).
   - `server/voice_store.py` — lecture/écriture de la banque (`voices/index.json` + `.npy`), partagé avec les outils CLI.
   - `server/factcheck.py` — appels Mistral, recherches web/académique/officielle en parallèle, prompts.
-  - `server/sources.py` — règles pures sur les sources et les verdicts (domaines exclus/officiels/presse, verdict normalisé, nom de source, plafond de confiance).
+  - `server/sources.py` — règles pures sur les sources et les verdicts (domaines exclus/officiels/presse/rubriques de fact-checking, verdict normalisé, nom de source, plafond de confiance).
+  - `server/vocabulary.py` — mots attendus par Whisper (`hotwords`) : invités, noms propres du titre/de la description, noms appris pendant le débat, lexique `vocabulaire.txt`.
+  - `server/points.py` — règles pures sur les points extraits : note de vérifiabilité (« trop vague »), validation de la citation exacte et instant où elle a été dite.
+  - `server/known_factchecks.py` — index local (SQLite) des articles des rédactions de fact-checking, alimenté par leurs flux RSS.
+  - `server/indicators.py` — séries officielles Eurostat (chômage, dette, déficit, inflation…) déclenchées par les mots de l'affirmation.
+  - `server/votes.py` — scrutins publics de l'Assemblée nationale (open data, législatures 16 et 17) : qui a voté quoi.
   - `server/cache.py` / `server/dedup.py` / `server/text_utils.py` — cache SQLite des fact-checks, déduplication, comparaison d'affirmations et utilitaires texte.
   - `server/notify.py` — avertissements `server_warning` vers l'extension.
   - `server/routes.py` — routes Flask + handlers Socket.IO, la couche d'orchestration qui relie tout ça.
@@ -64,7 +71,7 @@ Le chevauchement de 1,5 s n'est pas cosmétique : chaque enregistreur **planifie
 
 Chaque chunk est un blob WebM envoyé en binaire brut (`ArrayBuffer`) — pas de JSON, pas de base64.
 
-**Publicités** : le content script détecte `#movie_player.ad-showing` et le signale (`adState` → `setAdState`). Tout enregistreur qui a entendu une pub est marqué `tainted` et n'envoie rien : l'audio d'une pub n'est jamais transcrit ni vérifié.
+**Publicités** (YouTube) : le content script détecte `#movie_player.ad-showing` et le signale (`adState` → `setAdState`). Tout enregistreur qui a entendu une pub est marqué `tainted` et n'envoie rien : l'audio d'une pub n'est jamais transcrit ni vérifié.
 
 ---
 
@@ -87,18 +94,28 @@ Une erreur de transcription part en `server_warning` (message temporaire sur la 
 `_transcribe_and_diarize` retourne une liste de dicts, un par segment Whisper :
 
 ```python
-{"text": str, "speaker": "Intervenant A" | "", "start": float, "end": float, "abs_time": float}
+{"text": str, "speaker": "Intervenant A" | "", "start": float, "end": float, "abs_time": float,
+ "said_at": float}  # instant unix approximatif où le segment a été prononcé (abs_time − CHUNK_S + seg.start)
 ```
 
 Pipeline interne par segment :
 
-1. **Whisper** (`large-v3-turbo`, repli `medium` sur GPU puis `small` sur CPU si pas de GPU CUDA — avec un message clair au démarrage) — `vad_filter=True`, `no_speech_threshold=0.45`, `compression_ratio_threshold=2.4` (filtre les répétitions hallucinées).
-2. **Filtre hallucination** (`text_utils.is_hallucination`) — liste noire (`amara.org`, `sous-titres réalisés`…) + heuristique ponctuation (`meaningful/len < 0.2` → rejeté).
+1. **Whisper** (`large-v3-turbo`, repli `medium` sur GPU puis `small` sur CPU si pas de GPU CUDA — avec un message clair au démarrage) — `vad_filter=True`, `no_speech_threshold=0.45`, `compression_ratio_threshold=2.4` (filtre les répétitions hallucinées), et **`hotwords`** : les mots que Whisper doit s'attendre à entendre (voir ci-dessous).
+2. **Filtre hallucination** (`text_utils.is_hallucination`) — liste noire (`amara.org`, `sous-titres réalisés`…) + heuristique ponctuation (`meaningful/len < 0.2` → rejeté). Un segment qui ne fait que réciter la liste de hotwords (`vocabulary.is_hotword_echo` : ≥ 3 éléments, ≥ 80 % tirés de la liste) est rejeté aussi — sur un passage sans parole, Whisper peut « lire » ses mots attendus.
 3. **Chevauchement** (`text_utils.strip_overlap`) — un segment qui commence dans la zone de chevauchement (`seg.start < CHUNK_OVERLAP_S + 0.5`) perd les mots qui répètent la fin du segment précédent (au moins 2 mots identiques). Sans ça, Mistral recevait des bouts de phrase en double.
 4. **Filtre doublon local** — comparaison au texte exact des 5 derniers segments (`session_history[sid]`).
 5. **Diarisation** (`voices.speaker_label`) — découpe l'échantillon audio du segment (`seg.start:seg.end` en samples 16 kHz), encode via ECAPA-TDNN → embedding 192-d → `SpeakerTracker.assign()`.
 
 Chaque segment part immédiatement en `emit("transcript_segment", r)` — **avant** tout traitement Mistral. Côté extension, seul `speaker` est utilisé (l'offscreen ne relaie pas le texte), et seulement si aucune sonde n'est arrivée récemment (voir §10).
+
+**Mots attendus (`hotwords`)** — `vocabulary.build_hotwords`, recalculé à `set_context` et après chaque extraction (`_refresh_hotwords`). Par priorité, jusqu'à `MAX_HOTWORDS_CHARS=450` caractères (≈ 180 tokens, sous la limite de 223 du prompt Whisper) :
+
+1. les **intervenants déclarés** ;
+2. les **noms propres du titre et de la description** de la vidéo (`proper_nouns` : suites de mots à majuscule hors début de phrase, sigles, « 49.3 ») ;
+3. les **noms propres appris pendant le débat** dans les points extraits (`learn`, les `MAX_LEARNED=20` plus récents) — « Lecornu », « Fessenheim » ;
+4. le **lexique** `vocabulaire.txt` (sigles, institutions, partis, termes souvent mal transcrits), modifiable à la main.
+
+Un mot seul qui n'est que la tête d'un terme du lexique (« Cour » pour « Cour des comptes ») est écarté : Whisper le forçait partout.
 
 ---
 
@@ -135,7 +152,7 @@ Chaque changement de mapping émet `speaker_map` → l'extension **renomme rétr
 
 ## 6. Buffer → Mistral : la logique de flush
 
-`session_buffers[sid]` accumule les `(speaker, text)` de chaque chunk. Le buffer part à Mistral (`_flush_buffer` → `flush_to_mistral`) quand :
+`session_buffers[sid]` accumule les `(speaker, text, said_at)` de chaque chunk. Le buffer part à Mistral (`_flush_buffer` → `flush_to_mistral`) quand :
 
 ```python
 dense  = word_count >= MIN_WORDS(30) and (elapsed_since_flush >= FLUSH_INTERVAL(22s) or word_count >= MAX_BUFFER_WORDS(55))
@@ -154,7 +171,12 @@ Le texte accumulé passe par `build_transcript()` qui fusionne les tours de paro
 
 ## 7. Extraction Mistral → déduplication → dispatch
 
-`call_mistral()` renvoie une liste de `{"type", "texte", "qui"}`. Deux couches de dédup, **jamais une seule**, qui partagent la même règle de comparaison (`text_utils.claim_signature` / `claims_match`, portée à l'identique dans `content.js`) :
+`call_mistral()` renvoie une liste de `{"type", "texte", "qui", "verifiable", "citation"}` :
+
+- **`verifiable`** (0-10) — à quel point l'affirmation est vérifiable par des faits (chiffre, date, vote, fait daté). Une affirmation notée sous `CHECKWORTHY_MIN=6` devient `type: "vague"` (`points.apply_checkworthiness`) : affichée « TROP VAGUE », jamais envoyée au fact-check. Le prompt donne des contre-exemples (« il existe des fractures en France », « nous avons un projet »…). Note absente → l'affirmation est vérifiée, comme avant.
+- **`citation`** — les mots exacts prononcés, recopiés de la transcription (le champ `texte` est une reformulation). `points.validate_citation` ne la garde que si elle y figure vraiment, mot pour mot à la normalisation près (casse, accents, ponctuation) ; sinon elle est vidée. Gardée, elle **date le propos** : `points.citation_time` retrouve le segment qui la contient et en prend le `said_at` (plus fin que le début du buffer). Elle est affichée « Mot pour mot » sous la reformulation et passée au fact-check (§8).
+
+Deux couches de dédup, **jamais une seule**, qui partagent la même règle de comparaison (`text_utils.claim_signature` / `claims_match`, portée à l'identique dans `content.js`) :
 
 > Deux affirmations ne sont « la même » que si leurs **nombres** (normalisés : « 3 000 » = « 3000 »), leur **négation** (« ne », « n' », « jamais », « aucun »…) et leurs **mots de sens** (hausse, baisse, double, contre, plus, moins…) sont identiques — ET si le recouvrement de leurs mots-clés dépasse le seuil.
 
@@ -163,7 +185,7 @@ Sans les trois premières conditions, « a voté **contre** » et « a voté **p
 1. **Dédup serveur** (`dedup.is_duplicate_indexed`) — index inversé mot-clé → indices (`session_dupe_index[sid]`), seuil de recouvrement 0.45.
 2. **Dédup d'affichage extension** (`isDuplicateOfAny` + `isNearDupeOfShown`) — même règle, seuil 0.6 : `isDuplicateOfAny` compare à **tout** `S.points` (survit à un redémarrage backend), `isNearDupeOfShown` aux 6 dernières cartes affichées.
 
-Chaque point unique reçoit un `id = uuid4().hex[:8]` — **c'est cet id qui relie `talking_points` et `fact_check_result`**. Seuls les points `type == "affirmation"` déclenchent `fact_check_affirmation` en tâche de fond.
+Chaque point unique reçoit un `id = uuid4().hex[:8]` — **c'est cet id qui relie `talking_points` et `fact_check_result`**. Seuls les points `type == "affirmation"` déclenchent `fact_check_affirmation` en tâche de fond (les `vague` et `subjectif` jamais).
 
 ---
 
@@ -179,20 +201,28 @@ EN PARALLÈLE (greenlets) :
   web_search (SearxNG, 6 résultats, + année si replay, domaines exclus filtrés)
   scholar_search (HAL + OpenAlex, eux-mêmes en parallèle)
   datagouv_search (catalogue data.gouv.fr)
+  indicators.evidence (séries Eurostat, si l'affirmation parle chômage, dette, inflation…)
+ET EN LOCAL (index en mémoire, instantané) :
+  known_factchecks.search (articles déjà publiés par les rédactions de fact-checking)
+  votes.search (scrutins de l'Assemblée nationale, si l'affirmation parle d'un vote)
         │
         ▼
-annotation par domaine (sources.source_tier, sur le NOM D'HÔTE) :
-SOURCE OFFICIELLE / PRESSE ÉTABLIE / FIABILITÉ INCONNUE ; data.gouv.fr = « fiche de catalogue »
+bloc de preuves, dans cet ordre (factcheck.build_evidence_block) :
+  FACT-CHECK DÉJÀ PUBLIÉ / DONNÉE OFFICIELLE — Eurostat / VOTE OFFICIEL — Assemblée nationale
+  / JEU DE DONNÉES OFFICIEL (data.gouv.fr, « fiche de catalogue ») / SOURCE ACADÉMIQUE
+  / résultats web annotés par domaine (sources.source_tier, sur le NOM D'HÔTE) :
+    FACT-CHECK PUBLIÉ (rubrique de fact-checking) / SOURCE OFFICIELLE / PRESSE ÉTABLIE / FIABILITÉ INCONNUE
         │
         ▼
-prompt Mistral → JSON {verdict, confiance, explication, source, url}
+prompt Mistral (+ propos exact si citation validée, §7) → JSON {verdict, confiance, explication, source, url}
         │
         ▼
 sources.finalize_result :
   - verdict normalisé (« Vrai », « partiellement vrai »… → clé connue ; inconnu → non_verifiable)
   - url EXACTEMENT une des href retournées (sinon vidée — anti-hallucination + anti-XSS javascript:)
   - nom de source cohérent avec l'URL (sinon le domaine) — « Ministère de l'Économie » ne s'affiche
-    plus au-dessus d'un lien vers un blog
+    plus au-dessus d'un lien vers un blog ; pour un fact-check publié, le nom de la rédaction ;
+    pour une preuve structurée, « Eurostat » / « Assemblée nationale »
   - pas d'URL de preuve → confiance plafonnée à 50 %, source « non sourcé »
         │
         ▼
@@ -201,13 +231,23 @@ cache.store (seulement si sourcé, confiance ≥ 60 et verdict ≠ non_verifiabl
 
 **Recherches en parallèle** : en série, leurs timeouts s'additionnaient (jusqu'à ~26 s avant même l'appel Mistral) et dépassaient le délai d'attente de l'extension.
 
+**Fact-checks déjà publiés** (`known_factchecks.py`) — un article des Décodeurs, de CheckNews, de « Vrai ou fake » (franceinfo), de Fake off (20 Minutes) ou des Surligneurs qui porte sur la même affirmation passe **en tête** des preuves : c'est un travail de vérification humain, sourcé. Les flux RSS (`config.FACTCHECK_FEEDS`) sont relus toutes les heures (`FACTCHECK_FEEDS_REFRESH_S`) par une tâche de fond et indexés dans `factchecks_index.db` (SQLite, gardé entre redémarrages). Correspondance : au moins 3 mots-clés communs couvrant 40 % de ceux de l'affirmation, nombres communs en bonus ; 2 articles au plus. Côté web, un résultat dans une rubrique de fact-checking (`config.FACTCHECK_SECTIONS` : hôte + début de chemin) est annoté `FACT-CHECK PUBLIÉ`. Le prompt demande de reprendre sa conclusion s'il porte sur la même affirmation (même chiffre, même période), et de l'ignorer s'il porte sur un sujet voisin.
+
+**Séries officielles Eurostat** (`indicators.py`) — 16 indicateurs pour la France (chômage, chômage des jeunes, inflation, dette en % du PIB et en euros, déficit, dépense publique, prélèvements obligatoires, emploi des seniors, PIB par habitant, croissance, pauvreté, immigration, demandes d'asile, salaire minimum brut, émissions de gaz à effet de serre), chacun déclenché par une expression régulière sur l'affirmation (3 au plus). L'API JSON-stat d'Eurostat renvoie la série depuis 2015 (`decode_jsonstat` → `format_series` : « 2017 9,4 · 2024 7,4 »), gardée 24 h en mémoire. Le lien de preuve est la page du jeu de données. Le prompt demande de comparer le chiffre avancé à la série en vérifiant l'année, le périmètre (France / UE) et la définition (dette au sens de Maastricht, chômage au sens du BIT, SMIC brut ou net).
+
+**Votes de l'Assemblée nationale** (`votes.py`) — l'open data de l'Assemblée (tous les scrutins publics des législatures 16 et 17, ~12 500, et les députés) est téléchargé au démarrage dans `data/assemblee/` puis rafraîchi chaque semaine (`AN_REFRESH_S`) ; l'index est gardé en pickle (rechargement ~0,2 s). Une affirmation qui parle de vote (« a voté contre », « s'est abstenu »…) et nomme un député (nom complet, ou nom de famille s'il est unique) ou un groupe (`GROUP_ALIASES` : « le RN », « les Insoumis », « LR »…) est comparée aux titres des scrutins (racines des mots, synonymes, années et mois cités, bonus au vote sur l'ensemble d'un texte). La preuve donne la position du député ou le décompte du groupe, avec le lien du scrutin ; le prompt ne la retient que si le scrutin porte bien sur le texte dont parle l'affirmation (titre et date). Les groupes de la 16e législature, absents du fichier des députés actuels, sont déduits de leurs membres. `AN_VOTES=0` désactive le tout (tests).
+
+**Propos exact** — quand la citation a été validée (§7), le prompt reçoit les mots prononcés à côté de la reformulation : Mistral juge ce qui a été dit, pas le résumé. Si l'affirmation contient manifestement une erreur de transcription (nom déformé, mot incompréhensible), il répond `non_verifiable` avec une explication qui commence par « Transcription douteuse : » au lieu de conclure « faux ».
+
+**Signalements** — le bouton ⚑ d'une carte ou du récap envoie `POST /report_verdict` (via le service worker : seule l'origine de l'extension est acceptée) avec un motif parmi `verdict_faux`, `mauvaise_source`, `pas_un_fait`, `transcription`, `locuteur`. Le signalement est ajouté à `data/reports.jsonl` et, sauf pour un mauvais locuteur, le verdict **sort du cache** (`cache.mark_reported`) : il n'est plus jamais resservi, et `purge_cache.py` le supprime.
+
 **Sources exclues** (`config.EXCLUDED_SOURCE_DOMAINS`) : réseaux sociaux et plateformes vidéo (ce ne sont pas des sources, et la « preuve » y est souvent la déclaration même qu'on vérifie), plus une courte liste de sites de désinformation notoires — liste éditoriale, à ajuster dans `config.py`.
 
 **Souveraineté de la recherche web** — `web_search()` n'appelle pas un moteur tiers directement : elle interroge une instance **SearxNG auto-hébergée** (`searxng/docker-compose.yml`, `127.0.0.1:8080`), configurée pour ne solliciter que Brave et Mojeek (`searxng/config/settings.yml`). `datagouv_search()` interroge en direct l'API publique de `data.gouv.fr`. Si SearxNG est injoignable, `web_search()` retourne `[]` (dégradé, jamais bloquant).
 
 **Replays** : l'année de la vidéo (`sources.video_year`, depuis la date de publication) est ajoutée à la requête web, et le cache range chaque verdict sous cette année : un replay de 2024 et un direct de 2026 ne partagent pas leurs verdicts.
 
-Le cache (`factcheck_cache.db`, SQLite, colonne `video_year` ajoutée par migration) est à **deux niveaux** : la table persiste entre redémarrages, `_cache_mem` en est une copie en RAM pour le matching flou (`claims_match`, `CACHE_SIM_THRESHOLD=0.75`, `CACHE_TTL_DAYS=30` vérifié à chaque lookup). Ne sont jamais mis en cache les verdicts non sourcés ni ceux d'une affirmation datée par rapport au jour même (« ce soir », « actuellement », « il y a un an » — `text_utils.has_relative_time`). `purge_cache.py` applique ces mêmes règles aux verdicts déjà en base, plus une liste d'identifiants choisis à la main (sauvegarde automatique avant suppression).
+Le cache (`factcheck_cache.db`, SQLite, colonnes `video_year` et `reported_at` ajoutées par migration) est à **deux niveaux** : la table persiste entre redémarrages, `_cache_mem` en est une copie en RAM pour le matching flou (`claims_match`, `CACHE_SIM_THRESHOLD=0.75`, `CACHE_TTL_DAYS=30` vérifié à chaque lookup). Ne sont jamais mis en cache les verdicts non sourcés ni ceux d'une affirmation datée par rapport au jour même (« ce soir », « actuellement », « il y a un an » — `text_utils.has_relative_time`). `purge_cache.py` applique ces mêmes règles aux verdicts déjà en base, plus une liste d'identifiants choisis à la main (sauvegarde automatique avant suppression).
 
 **Retry sur 429** (`call_mistral_api`) — jusqu'à `MISTRAL_MAX_RETRIES=3` tentatives, délai = `Retry-After` si fourni, sinon `2s, 4s, 8s`, avec `mistral_rate_limited` au client à chaque tentative. **Les autres erreurs Mistral** (clé invalide 401, crédit épuisé 402, 5xx, timeout, réseau) partent en `server_warning` (`notify.describe_error`), et un fact-check en échec est émis avec `indisponible: true` — jamais confondu avec un vrai « non vérifiable ».
 
@@ -222,9 +262,9 @@ Le cache (`factcheck_cache.db`, SQLite, colonne `video_year` ajoutée par migrat
 | `audio_chunk` | C→S | `ArrayBuffer` (WebM) | pipeline complet §3-7 |
 | `speaker_probe` | C→S | `ArrayBuffer` (WebM, 2.5 s) | badge live |
 | `stop_transcription` | C→S | — | dernier buffer analysé, puis `session_done` |
-| `transcript_segment` | S→C | `{text, speaker, start, end, abs_time}` | badge, seulement sans sonde récente |
+| `transcript_segment` | S→C | `{text, speaker, start, end, abs_time, said_at}` | badge, seulement sans sonde récente |
 | `speaker_live` | S→C | `{speaker}` | badge (fait foi) |
-| `talking_points` | S→C | `{points: [...]}` | `addPoint()` par point |
+| `talking_points` | S→C | `{points: [{id, ts, type, texte, qui, qui_label, verifiable?, citation, said_at}]}` | `addPoint()` par point |
 | `fact_check_result` | S→C | `{id, verdict, confiance, explication, source, url, indisponible?}` | `onFactCheck()` |
 | `speaker_map` | S→C | `{map, enrolled: [nom], enrollable: [nom]}` | renommage rétroactif, indicateur d'empreinte |
 | `voice_enrolled` | S→C | `{name}` | fin de l'indicateur « capture de l'empreinte… » |
@@ -233,7 +273,9 @@ Le cache (`factcheck_cache.db`, SQLite, colonne `video_year` ajoutée par migrat
 | `server_warning` | S→C | `{message}` | message temporaire sur la puce (anti-répétition 60 s) |
 | `session_done` | S→C | `{complete}` | fin de la finalisation |
 
-Messages internes à l'extension (offscreen → content, via background) en plus des relais ci-dessus : `connection_status`, `session_reset` (reconnexion = nouvelle session backend, les labels repartent de zéro), `finalizing`, `session_done`. Background → content : `showOverlay`, `captureEnded` (`reason` : `user`, `navigation`, `tab_closed`). Content → background : `contentReady` (restauration après F5), `adState`, `stopCapture`.
+Messages internes à l'extension (offscreen → content, via background) en plus des relais ci-dessus : `connection_status`, `session_reset` (reconnexion = nouvelle session backend, les labels repartent de zéro), `finalizing`, `session_done`. Background → content : `showOverlay`, `captureEnded` (`reason` : `user`, `navigation`, `tab_closed`). Content → background : `contentReady` (restauration après F5), `adState`, `stopCapture`, `reportVerdict`.
+
+Routes HTTP (extension uniquement, `X-Backend-Token` si `BACKEND_TOKEN` est défini) : `GET /health`, `POST /analyze_video` (détection des intervenants depuis le titre et la description), `POST /report_verdict` (§8).
 
 ---
 
@@ -242,6 +284,12 @@ Messages internes à l'extension (offscreen → content, via background) en plus
 Un seul objet `S` porte tout l'état : `points` (Map id→{point, fc}, ordre d'insertion = ordre du récap), `queue` (ids en attente de carte), `current` (la carte affichée), `phase` (`live` → `stopping` → `ended`) et **`gen`** — un compteur incrémenté à chaque `teardown()` qui invalide tous les `setTimeout` en vol (`later()` vérifie `g === S.gen`).
 
 **Où s'affiche l'overlay** : un calque `#fct-layer` **dans `#movie_player`** (`overlayRoot`) — badge en haut à gauche de la vidéo, cartes en haut à droite, puce au-dessus de la barre de contrôle. Container queries : cartes compactes sur lecteur étroit, plus courtes sur lecteur bas, rien dans le mini-lecteur. Le récap est un panneau de page, sous le masthead.
+
+**Hors YouTube** (`IS_YOUTUBE` faux) : le calque est posé en `position: fixed` sur le rectangle du **plus grand lecteur visible** (`playerTarget` : balise `<video>`, sinon iframe d'un lecteur externe comme Dailymotion — proportions de vidéo exigées, iframes reCAPTCHA/pubs écartées), recalé au défilement, au redimensionnement et chaque seconde (`followPlayer`, `sampleVideo`). En plein écran d'un conteneur, le calque passe dans l'élément plein écran ; si c'est la vidéo ou l'iframe elle-même, rien ne peut s'afficher par-dessus. Sans lecteur trouvé, repli en calque de page. Pas de pubs ni de repères de barre de progression ; horodatages et bouton ▶ seulement si la vidéo est une balise `<video>` de la page (inaccessible dans une iframe) ; liens horodatés de l'export réservés à YouTube. La popup lit titre, chaîne, description et date dans les balises Open Graph. Les sites déclarés dans le manifest (france.tv, francetvinfo.fr, lcp.fr, publicsenat.fr, twitch.tv, dailymotion.com) retrouvent l'overlay après F5 ; ailleurs, l'extension fonctionne via `activeTab`, et un rechargement arrête l'analyse.
+
+**Carte** : type (AFFIRMATION, SUBJECTIF, TROP VAGUE), locuteur, reformulation, **citation exacte** (« Mot pour mot », si validée), verdict, explication, source. Bouton ⚑ (carte et récap) : menu de motifs → `reportVerdict` (§8), puis confirmation (ou « Backend injoignable ») dans le menu.
+
+**Repères sur la barre de progression** (YouTube, `renderMarkers`) : un trait par affirmation, à la couleur de son verdict, dans `.ytp-progress-bar` ; purement visuel (`pointer-events: none`). Pour un direct, la barre couvre la plage lisible (`video.seekable`), pas une durée.
 
 Cycle de vie d'une carte :
 
@@ -258,7 +306,7 @@ showCard (spinner)
 
 `MAX_QUEUE=8` : au-delà, les plus anciennes affirmations en attente quittent la file d'affichage (elles restent au récap). Récap ouvert : la file est gelée, et un verdict qui arrive ne lance pas le décompte de la carte cachée.
 
-**Horodatages** : la position de lecture est échantillonnée chaque seconde (`sampleVideo` : temps, vitesse, lecture/pause, hors pubs) ; à la réception d'un point, `videoTimeAt(ts − 8 s)` en déduit la position vidéo, **figée** dans `point.vt`. Juste malgré pause, saut, vitesse ×1,5. Bouton ▶ sur la carte et au récap, désactivé si l'onglet a changé de vidéo.
+**Horodatages** : la position de lecture est échantillonnée chaque seconde (`sampleVideo` : temps, vitesse, lecture/pause, hors pubs) ; à la réception d'un point, `videoTimeAt(said_at)` — l'instant du propos retrouvé grâce à sa citation exacte, sinon `ts − 8 s` — en déduit la position vidéo, **figée** dans `point.vt`. Juste malgré pause, saut, vitesse ×1,5. Bouton ▶ sur la carte et au récap, désactivé si l'onglet a changé de vidéo.
 
 **Badge** : les sondes (`speaker_live`) font foi ; les segments Whisper ne l'alimentent que si aucune sonde n'est arrivée depuis `PROBE_FRESH_MS=6000`.
 
@@ -290,6 +338,10 @@ showCard (spinner)
 | `MISTRAL_MAX_RETRIES` / `MISTRAL_RETRY_BASE_S` | 3 / 2.0s (×2^n) | server/config.py |
 | `HOLD_FACT_MS` / `HOLD_FACT_BUSY_MS` / `FC_WAIT_MS` / `MAX_CARD_AGE_MS` | 13000 / 8000 / 30000 / 150000 | content.js |
 | `MAX_QUEUE` / `DUPE_MEMORY` / `PROBE_FRESH_MS` | 8 / 6 / 6000 | content.js |
+| `CHECKWORTHY_MIN` | 6 (sur 10) | server/config.py |
+| `MAX_HOTWORDS_CHARS` / `MAX_LEARNED` | 450 / 20 | server/vocabulary.py |
+| `FACTCHECK_FEEDS_REFRESH_S` / `AN_REFRESH_S` | 1h / 7j | server/config.py |
+| cache Eurostat / `MAX_PER_CLAIM` | 24h / 3 | server/indicators.py |
 
 ---
 
@@ -303,4 +355,10 @@ Aucun GPU, aucune clé ni aucun réseau nécessaires — chaque fichier se lance
 | `tests/test_sources.py` | domaines, verdict normalisé, nom de source, plafond sans URL |
 | `tests/test_transcript.py` | chevauchement entre chunks, transcript annoté |
 | `tests/test_voices.py` | comparaison de noms, stockage de la banque de voix |
-| `tests/test_backend_smoke.py` | backend complet avec Whisper/ECAPA/Mistral/recherche simulés : chunk → points → verdict → arrêt propre ; origines CORS |
+| `tests/test_vocabulary.py` | mots attendus par Whisper : priorités, noms propres, limite de taille, écho des hotwords |
+| `tests/test_points.py` | note de vérifiabilité, validation et datation de la citation exacte |
+| `tests/test_known_factchecks.py` | lecture des flux RSS, correspondance affirmation ↔ fact-check publié |
+| `tests/test_official_data.py` | décodage JSON-stat Eurostat, déclencheurs d'indicateurs, parsing des scrutins et recherche de votes |
+| `tests/test_backend_smoke.py` | backend complet avec Whisper/ECAPA/Mistral/recherche/RSS/Eurostat simulés : chunk → points (vague, citation) → verdict (fact-check publié et série Eurostat en preuves) → arrêt propre ; signalement ; origines CORS |
+
+Sous Windows, si la sortie est redirigée, lancer avec `PYTHONIOENCODING=utf-8` (les messages du backend contiennent des emojis).

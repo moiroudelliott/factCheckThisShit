@@ -1,10 +1,12 @@
 # SOURCÉ
 
-Fact-checking en temps réel pour les débats politiques regardés sur YouTube :
+Fact-checking en temps réel pour les débats politiques regardés sur YouTube
+ou sur les lecteurs des chaînes (france.tv, LCP, Public Sénat, Twitch…) :
 transcription (Whisper), identification des locuteurs par empreinte vocale,
 extraction de talking points et vérification sourcée (Mistral + recherche
-web souveraine), avec un verdict et sa source en quelques dizaines de
-secondes — pendant que le débat est encore en cours.
+web souveraine, fact-checks déjà publiés par les rédactions, séries
+Eurostat, votes de l'Assemblée nationale), avec un verdict et sa source en
+quelques dizaines de secondes — pendant que le débat est encore en cours.
 
 Prototype étudiant mené par Elliott Moiroud, Université Savoie Mont Blanc.
 Site du projet : [source.codeminds.fr](https://source.codeminds.fr) — voir
@@ -26,7 +28,7 @@ FFmpeg, dépendances). En résumé :
 2. **Backend Python** : `python backend.py`. Attendre `Modèle prêt.`
 3. **Extension** : `chrome://extensions` → activer le *mode développeur* → *Charger
    l'extension non empaquetée* → sélectionner le dossier [`extension/`](extension/)
-4. Ouvrir une vidéo YouTube, cliquer l'icône de l'extension, remplir (ou laisser
+4. Ouvrir une vidéo (YouTube ou le direct d'une chaîne), cliquer l'icône de l'extension, remplir (ou laisser
    la détection automatique remplir) l'émission/les intervenants, puis
    *Démarrer l'analyse*
 
@@ -50,7 +52,8 @@ et les autres fichiers de [`tests/`](tests/) — voir [ARCHITECTURE.md](ARCHITEC
 | `site/` | Page vitrine statique du projet |
 | `enroll.py`, `harvest_voices.py`, `remove_voice.py` | Outils CLI pour peupler/retirer des voix dans `voices/` (banque d'empreintes vocales) |
 | `vocabulaire.txt` | Mots que Whisper doit s'attendre à entendre (sigles, partis, termes souvent mal transcrits) — modifiable |
-| `purge_cache.py` | Purge les verdicts douteux du cache de fact-checks (`--dry-run` d'abord ; sauvegarde automatique) |
+| `purge_cache.py` | Purge les verdicts douteux ou signalés du cache de fact-checks (`--dry-run` d'abord ; sauvegarde automatique) |
+| `data/` | Données téléchargées et journaux locaux (gitignored) : open data de l'Assemblée nationale (~40 Mo, au premier démarrage), signalements de verdicts (`reports.jsonl`) |
 | `voices/` | Empreintes vocales enregistrées (gitignored, générées localement) |
 | `ARCHITECTURE.md` | Fonctionnement technique détaillé du pipeline |
 | `SETUP_GUIDE.md` | Installation détaillée du backend (CUDA, FFmpeg, SearxNG…) |

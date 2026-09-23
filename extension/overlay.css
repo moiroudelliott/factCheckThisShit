@@ -507,6 +507,29 @@
   overflow: hidden;
 }
 
+/* Mots exacts du propos, sous la reformulation */
+.fct-quote {
+  margin: -4px 0 12px;
+  padding-left: 9px;
+  border-left: 2px solid color-mix(in oklch, var(--accent) 55%, transparent);
+  font-size: 12px;
+  line-height: 1.45;
+  color: rgba(255, 255, 255, 0.72);
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+.fct-quote-label,
+.fct-recap-quote .fct-quote-label {
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.5);
+  margin-right: 4px;
+}
+
 /* Checking */
 .fct-checking {
   display: flex;
@@ -759,6 +782,14 @@
   font-size: 14px;
   line-height: 1.38;
   color: rgba(255, 255, 255, 0.9);
+}
+.fct-recap-quote {
+  margin: -2px 0 6px;
+  padding-left: 8px;
+  border-left: 2px solid rgba(255, 255, 255, 0.14);
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: rgba(255, 255, 255, 0.68);
 }
 .fct-recap-explanation {
   margin: 0 0 6px;

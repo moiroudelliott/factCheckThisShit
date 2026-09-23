@@ -67,7 +67,7 @@ def _norm_number(raw: str) -> str:
 def claim_signature(text: str) -> ClaimSig:
     low = str(text).lower()
     # Séparateurs de milliers ("3 000", "3 000", "1.000") → un seul nombre
-    compact = re.sub(r'(?<=\d)[\s  .](?=\d{3}(?!\d))', '', low)
+    compact = re.sub(r'(?<=\d)[\s.](?=\d{3}(?!\d))', '', low)  # \s couvre aussi les espaces insécables
     numbers = frozenset(_norm_number(n) for n in re.findall(r'\d+(?:[.,]\d+)?', compact))
     tokens = re.findall(r'[a-zàâçéèêëîïôùûüœ]+', low)
     polar = frozenset(t for t in tokens if t in _POLARITY_WORDS or t.startswith(_POLARITY_STEMS))
@@ -118,11 +118,12 @@ def strip_overlap(prev: str, text: str, min_words: int = 2, max_words: int = 15)
 
 
 def build_transcript(entries: list) -> str:
-    """Transcript annoté par locuteur, tours de parole consécutifs fusionnés."""
-    if not any(label for label, _ in entries):
-        return " ".join(t for _, t in entries)
+    """Transcript annoté par locuteur, tours de parole consécutifs fusionnés.
+    entries : [(label, texte, …)] — les éléments suivants (horodatage) sont ignorés."""
+    if not any(e[0] for e in entries):
+        return " ".join(e[1] for e in entries)
     lines, cur_label, cur_texts = [], None, []
-    for label, t in entries:
+    for label, t, *_ in entries:
         label = label or cur_label or "Intervenant ?"
         if label != cur_label and cur_texts:
             lines.append(f"{cur_label}: {' '.join(cur_texts)}")

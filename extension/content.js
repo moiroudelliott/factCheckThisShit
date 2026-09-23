@@ -777,7 +777,11 @@ function addPoint(point) {
   if (point.qui && S.speakerMap[point.qui]) point.qui = S.speakerMap[point.qui];
   point.receivedAt = Date.now();
   // Position vidéo du propos, figée à la réception (voir videoTimeAt)
-  point.vt = Number.isFinite(point.ts) ? videoTimeAt(point.ts - SPEECH_LEAD_S) : null;
+  // said_at = instant du propos retrouvé grâce à sa citation exacte (plus
+  // précis) ; sinon ts = début du buffer analysé, moins la marge habituelle
+  const saidAt = Number.isFinite(point.said_at) ? point.said_at
+    : Number.isFinite(point.ts) ? point.ts - SPEECH_LEAD_S : null;
+  point.vt = saidAt != null ? videoTimeAt(saidAt) : null;
   S.points.set(point.id, { point, fc: null });
   updateCount();
   scheduleSave();
@@ -962,6 +966,14 @@ function pump() {
   }
 }
 
+// Mots exacts du propos (validés côté backend), sous la reformulation : la
+// reformulation de Mistral peut durcir ou déformer ce qui a été dit
+function quoteHtml(cls, point) {
+  return point.citation
+    ? `<p class="${cls}"><span class="fct-quote-label">Mot pour mot</span> « ${esc(point.citation)} »</p>`
+    : '';
+}
+
 function tsButton(cls, vt) {
   return vt != null && canSeek()
     ? `<button class="${cls}" data-vt="${Number(vt)}" title="Revoir ce passage">▶ ${fmtTime(vt)}</button>`
@@ -994,6 +1006,7 @@ function showCard(id, entry) {
         ${tsButton('fct-card-ts', point.vt)}
       </div>
       <p class="fct-claim">« ${esc(point.texte)} »</p>
+      ${quoteHtml('fct-quote', point)}
       <div class="fct-checking">
         <span class="fct-spinner"></span>
         <span>Recoupement des sources…</span>
@@ -1164,6 +1177,7 @@ function exportRecap() {
       const l = link(p);
       if (l) line += ` — [▶ ${fmtTime(p.vt)}](${l})`;
       lines.push(line);
+      if (p.citation) lines.push(`  - *Mot pour mot :* « ${p.citation} »`);
     }
     lines.push('');
   }
@@ -1173,6 +1187,7 @@ function exportRecap() {
       const tag = TYPE_CFG[p.type]?.tag || String(p.type || '?').toUpperCase();
       const l = link(p);
       lines.push(`- **[${tag}]**${p.qui ? ` ${exportName(p.qui)} —` : ''} « ${p.texte} »${l ? ` — [▶ ${fmtTime(p.vt)}](${l})` : ''}`);
+      if (p.citation) lines.push(`  - *Mot pour mot :* « ${p.citation} »`);
     }
   }
 
@@ -1314,6 +1329,7 @@ function renderRecap() {
             ${tsButton('fct-recap-ts', p.vt)}
           </div>
           <p class="fct-recap-claim">« ${esc(p.texte)} »</p>
+          ${quoteHtml('fct-recap-quote', p)}
           ${fc?.explication && !waiting ? `<p class="fct-recap-explanation">${esc(fc.explication)}</p>` : ''}
           ${vcfg && !waiting ? `<div class="fct-recap-footer">${srcHtml}<span class="fct-recap-footer-right" style="color:${vcfg.footerColor}">${vcfg.footerRight}${fc?.confiance != null ? ` · ${fc.confiance}%` : ''}</span></div>` : ''}
         </div>

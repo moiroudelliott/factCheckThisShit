@@ -32,7 +32,7 @@ MISSION: un passage de débat contient presque toujours 1 à 3 talking points. E
 Ne retourne [] QUE si le passage est réellement vide de contenu politique (politesses, gestion de parole, phrases incompréhensibles). Un tableau vide doit rester RARE.
 
 Réponds UNIQUEMENT avec un tableau JSON valide, sans markdown:
-[{{"type": "TYPE", "texte": "le point condensé en une phrase claire", "qui": "qui l'a dit, ou chaîne vide", "verifiable": 8}}]
+[{{"type": "TYPE", "texte": "le point condensé en une phrase claire", "qui": "qui l'a dit, ou chaîne vide", "verifiable": 8, "citation": "les mots exacts du passage"}}]
 
 Types:
 - "affirmation" = fait PRÉCIS et VÉRIFIABLE: chiffre, date, événement, vote, citation, fait historique ou économique.
@@ -54,6 +54,8 @@ Types:
 
 "verifiable" (0-10, pour chaque point) = peut-on le vérifier avec des sources ? 10 = chiffre, date, vote ou
 événement précis ; 5 = fait réel mais flou ; 0 = opinion ou généralité.
+"citation" (pour chaque point) = les mots EXACTS de la transcription où le point est dit (8 à 30 mots),
+recopiés sans rien changer ni corriger — pas de reformulation, pas de nom de locuteur.
 
 RÈGLES:
 1. {attribution_rule}
@@ -66,7 +68,7 @@ RÈGLES:
 FACTCHECK_PROMPT_TEMPLATE = """Tu es un fact-checker expert sur les données françaises et européennes. Nous sommes le {today}.
 {context_block}
 Affirmation à vérifier: "{claim}"
-
+{citation_block}
 {evidence_block}
 
 Évalue la véracité en te basant PRIORITAIREMENT sur les résultats de recherche ci-dessus (leur fiabilité est annotée), complétés par tes connaissances.
@@ -361,7 +363,7 @@ def build_evidence_block(results: list, academic: list = None, official: list = 
     return "\n".join(lines)
 
 
-def call_mistral_factcheck(claim: str, context: dict = None, sid: str = None) -> dict:
+def call_mistral_factcheck(claim: str, context: dict = None, sid: str = None, citation: str = "") -> dict:
     context = context or {}
     # Replay d'un débat passé : sans l'année, la recherche remonte les
     # chiffres d'aujourd'hui pour juger des propos d'alors
@@ -377,6 +379,10 @@ def call_mistral_factcheck(claim: str, context: dict = None, sid: str = None) ->
         today=time.strftime("%d/%m/%Y"),
         context_block=build_context_block(context),
         claim=claim,
+        # Propos d'origine : l'affirmation ci-dessus est une reformulation, qui
+        # peut durcir ou déformer ce qui a réellement été dit
+        citation_block=(f"Propos exact (transcription automatique) : « {citation} » — juge ce qui a été "
+                        "réellement dit si la reformulation ci-dessus s'en écarte.\n") if citation else "",
         evidence_block=build_evidence_block(results, academic, official),
     )
     content = call_mistral_api(prompt, sid=sid)
@@ -393,7 +399,7 @@ def call_mistral_factcheck(claim: str, context: dict = None, sid: str = None) ->
             "source": "", "url": "", "indisponible": True}
 
 
-def fact_check_affirmation(sid: str, claim_id: str, claim_text: str):
+def fact_check_affirmation(sid: str, claim_id: str, claim_text: str, citation: str = ""):
     print(f"[FactCheck] «{claim_text[:60]}»")
     context = session_contexts.get(sid, {})
     year = video_year(context)
@@ -404,7 +410,7 @@ def fact_check_affirmation(sid: str, claim_id: str, claim_text: str):
         socketio.emit("fact_check_result", {"id": claim_id, **cached}, to=sid)
         return
     try:
-        result = call_mistral_factcheck(claim_text, context=context, sid=sid)
+        result = call_mistral_factcheck(claim_text, context=context, sid=sid, citation=citation)
         cache.store(claim_text, result, year)
         socketio.emit("fact_check_result", {"id": claim_id, **result}, to=sid)
     except Exception as e:

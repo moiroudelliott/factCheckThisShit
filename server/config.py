@@ -46,6 +46,7 @@ MIN_WORDS_ON_PAUSE = 12  # pause de parole (chunk sans texte neuf) : analyser la
 MIN_WORDS_ON_STOP = 8    # à l'arrêt : dernier buffer analysé s'il reste au moins ça
 FINISH_TIMEOUT_S = 45    # arrêt propre : attente max des analyses / fact-checks encore en vol
 CHUNK_OVERLAP_S = 1.5    # chevauchement entre deux chunks (= OVERLAP_MS de offscreen.js)
+CHUNK_S = 10.0           # durée d'un chunk (= CHUNK_MS de offscreen.js) : date un segment (fin de chunk − CHUNK_S + début du segment)
 
 # Jeton partagé optionnel : sans lui, quiconque atteint ce port (même onglet
 # tiers ouvert dans le même navigateur) peut piloter le backend et consommer

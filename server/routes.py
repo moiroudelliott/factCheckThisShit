@@ -18,13 +18,13 @@ from faster_whisper.audio import decode_audio
 from server.app import app, socketio, model, model_lock, DIARIZATION
 from server.config import (
     BACKEND_TOKEN, MISTRAL_API_KEY, FLUSH_INTERVAL, MIN_WORDS, MAX_BUFFER_WORDS, PROBE_MATCH_T,
-    MIN_WORDS_ON_PAUSE, MIN_WORDS_ON_STOP, FINISH_TIMEOUT_S, CHUNK_OVERLAP_S,
+    MIN_WORDS_ON_PAUSE, MIN_WORDS_ON_STOP, FINISH_TIMEOUT_S, CHUNK_OVERLAP_S, CHUNK_S,
 )
 from server import cache
 from server.dedup import dupe_index_add, is_duplicate_indexed
 from server.factcheck import call_mistral, call_mistral_api, fact_check_affirmation, VIDEO_ANALYSIS_PROMPT
 from server.notify import describe_error, warn_client
-from server.points import apply_checkworthiness
+from server.points import apply_checkworthiness, citation_time, validate_citation
 from server.state import (
     session_history, session_starts, session_buffers, session_contexts, session_points,
     session_dupe_index, session_flush_locks, session_chunk_locks, session_speakers,
@@ -184,7 +184,7 @@ def on_stop():
     try:
         buf = session_buffers.get(sid)
         if MISTRAL_API_KEY and buf and buf["entries"] \
-                and sum(len(t.split()) for _, t in buf["entries"]) >= MIN_WORDS_ON_STOP:
+                and sum(len(e[1].split()) for e in buf["entries"]) >= MIN_WORDS_ON_STOP:
             session_buffers[sid] = _flush_buffer(sid, buf, time.time())
     finally:
         if lock:
@@ -310,12 +310,14 @@ def _transcribe_and_diarize(path: str, sid: str, chunk_offset: float, chunk_abs_
             "start": round(chunk_offset + seg.start, 3),
             "end": round(chunk_offset + seg.end, 3),
             "abs_time": chunk_abs_time,
+            # instant (unix) approximatif où le segment a été prononcé
+            "said_at": round(chunk_abs_time - CHUNK_S + seg.start, 2),
         })
     session_history[sid] = history
     return out
 
 
-def flush_to_mistral(sid: str, text: str, ts: float = None):
+def flush_to_mistral(sid: str, text: str, ts: float = None, entries: list = ()):
     print(f"[Mistral] Envoi de {len(text.split())} mots pour analyse…")
     lock = session_flush_locks.get(sid)
     if lock:
@@ -361,6 +363,11 @@ def flush_to_mistral(sid: str, text: str, ts: float = None):
         smap = session_speaker_map.get(sid, {})
         for p in raw_points:
             apply_checkworthiness(p)  # affirmation trop vague → « vague », pas de fact-check
+            # Mots exacts du propos : gardés seulement s'ils sont vraiment dans
+            # la transcription ; ils datent aussi le propos plus finement que
+            # le début du buffer
+            p["citation"] = validate_citation(p.get("citation"), text)
+            p["said_at"] = citation_time(p["citation"], entries) if p["citation"] else None
             qui = p.get("qui", "")
             p["qui_label"] = qui if qui in smap_used else label_of.get(qui, qui)
             p["qui"] = smap.get(p["qui_label"], qui)
@@ -393,7 +400,7 @@ def flush_to_mistral(sid: str, text: str, ts: float = None):
         # Fact-check uniquement les affirmations
         for p in unique:
             if p["type"] == "affirmation":
-                _spawn_tracked(sid, fact_check_affirmation, sid, p["id"], p["texte"])
+                _spawn_tracked(sid, fact_check_affirmation, sid, p["id"], p["texte"], p.get("citation", ""))
     except Exception as e:
         print(f"[Mistral error] {type(e).__name__}: {e}")
         warn_client(sid, describe_error(e))
@@ -412,7 +419,7 @@ def _flush_buffer(sid: str, buf: dict, fallback_ts: float) -> dict:
         ex.append(text_to_send)
         del ex[:-6]
     ts = buf.get("start_abs") or fallback_ts
-    _spawn_tracked(sid, flush_to_mistral, sid, text_to_send, ts)
+    _spawn_tracked(sid, flush_to_mistral, sid, text_to_send, ts, list(buf["entries"]))
     return {"entries": [], "last_flush": time.time(), "start_abs": None}
 
 
@@ -439,9 +446,9 @@ def handle_audio_chunk(data):
         results = eventlet.tpool.execute(_transcribe_and_diarize, tmp_path, sid, chunk_offset, chunk_abs_time)
         print(f"[Whisper] {len(results)} segment(s) émis")
 
-        emitted = []  # [(label_locuteur, texte)]
+        emitted = []  # [(label_locuteur, texte, instant prononcé)]
         for r in results:
-            emitted.append((r["speaker"], r["text"]))
+            emitted.append((r["speaker"], r["text"], r["said_at"]))
             emit("transcript_segment", r)
 
         if emitted:
@@ -459,7 +466,7 @@ def handle_audio_chunk(data):
                     buf["start_abs"] = chunk_abs_time
                 buf["entries"].extend(emitted)
             elapsed_since_flush = time.time() - buf["last_flush"]
-            word_count = sum(len(t.split()) for _, t in buf["entries"])
+            word_count = sum(len(e[1].split()) for e in buf["entries"])
             if buf["entries"]:
                 print(f"[Buffer] {word_count} mots, {elapsed_since_flush:.0f}s depuis dernier flush")
             dense = word_count >= MIN_WORDS and (elapsed_since_flush >= FLUSH_INTERVAL or word_count >= MAX_BUFFER_WORDS)

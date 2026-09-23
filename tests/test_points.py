@@ -7,7 +7,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from server.points import apply_checkworthiness, verifiable_score  # noqa: E402
+from server.points import apply_checkworthiness, citation_time, validate_citation, verifiable_score  # noqa: E402
 
 
 def test_vague_affirmations_are_not_checked():
@@ -30,6 +30,29 @@ def test_missing_or_bad_score_never_blocks_a_check():
 def test_other_types_untouched():
     p = apply_checkworthiness({"type": "subjectif", "texte": "x", "verifiable": 0})
     assert p["type"] == "subjectif"
+
+
+TRANSCRIPT = ("Intervenant A: Le chômage a baissé de deux points depuis 2017, et ça c'est un fait.\n"
+              "Jordan Bardella: Non, l’immigration coûte 40 milliards par an !")
+ENTRIES = [("Intervenant A", "Le chômage a baissé de deux points depuis 2017, et ça c'est un fait.", 1000.0),
+           ("Intervenant B", "Non, l’immigration coûte 40 milliards par an !", 1012.5)]
+
+
+def test_citation_must_be_in_the_transcript():
+    ok = validate_citation("« le chômage a baissé de deux points depuis 2017 »", TRANSCRIPT)
+    assert ok == "le chômage a baissé de deux points depuis 2017"
+    # apostrophes et ponctuation normalisées
+    assert validate_citation("l'immigration coûte 40 milliards par an", TRANSCRIPT)
+    # reformulation ou invention : rejetée
+    assert validate_citation("le chômage a baissé de 2 points depuis 2017", TRANSCRIPT) == ""
+    assert validate_citation("l'immigration coûte 60 milliards", TRANSCRIPT) == ""
+    assert validate_citation("oui", TRANSCRIPT) == ""
+
+
+def test_citation_dates_the_statement():
+    assert citation_time("l'immigration coûte 40 milliards par an", ENTRIES) == 1012.5
+    assert citation_time("le chômage a baissé de deux points", ENTRIES) == 1000.0
+    assert citation_time("absent de la transcription", ENTRIES) is None
 
 
 if __name__ == "__main__":

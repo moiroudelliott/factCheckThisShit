@@ -105,8 +105,10 @@ def _fake_post(url, json=None, **k):
     PROMPTS.append(prompt)
     if "Extrais les talking points" in prompt:
         content = [
-            {"type": "affirmation", "texte": "Le chômage a baissé de 2 points depuis 2017", "qui": "Intervenant A"},
-            {"type": "affirmation", "texte": "Le chômage a augmenté depuis 2017", "qui": "Intervenant A"},
+            {"type": "affirmation", "texte": "Le chômage a baissé de 2 points depuis 2017", "qui": "Intervenant A",
+             "citation": "Le chômage a baissé de deux points depuis 2017"},
+            {"type": "affirmation", "texte": "Le chômage a augmenté depuis 2017", "qui": "Intervenant A",
+             "citation": "le chômage a explosé depuis 2017"},  # inventée : absente de la transcription
             {"type": "subjectif", "texte": "Il faut protéger les Français", "qui": "Intervenant A"},
             {"type": "affirmation", "texte": "Il existe des fractures en France", "qui": "Intervenant A", "verifiable": 2},
         ]
@@ -166,6 +168,14 @@ def test_full_session():
 
     points = [p for m in got if m["name"] == "talking_points" for p in m["args"][0]["points"]]
     textes = [p["texte"] for p in points]
+    # citation exacte : gardée si elle est dans la transcription (et date le
+    # propos), écartée sinon
+    by_text = {p["texte"]: p for p in points}
+    real = by_text["Le chômage a baissé de 2 points depuis 2017"]
+    assert real["citation"] == "Le chômage a baissé de deux points depuis 2017"
+    assert isinstance(real["said_at"], float)
+    assert by_text["Le chômage a augmenté depuis 2017"]["citation"] == ""
+    assert any("Propos exact" in p and "deux points depuis 2017" in p for p in PROMPTS if "fact-checker" in p)
     # la contre-affirmation n'est plus jetée comme doublon
     assert "Le chômage a baissé de 2 points depuis 2017" in textes
     assert "Le chômage a augmenté depuis 2017" in textes

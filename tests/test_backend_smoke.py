@@ -108,6 +108,7 @@ def _fake_post(url, json=None, **k):
             {"type": "affirmation", "texte": "Le chômage a baissé de 2 points depuis 2017", "qui": "Intervenant A"},
             {"type": "affirmation", "texte": "Le chômage a augmenté depuis 2017", "qui": "Intervenant A"},
             {"type": "subjectif", "texte": "Il faut protéger les Français", "qui": "Intervenant A"},
+            {"type": "affirmation", "texte": "Il existe des fractures en France", "qui": "Intervenant A", "verifiable": 2},
         ]
     elif "fact-checker" in prompt:
         content = {"verdict": "Partiellement vrai", "confiance": 80, "explication": "Selon l'Insee…",
@@ -169,8 +170,13 @@ def test_full_session():
     assert "Le chômage a baissé de 2 points depuis 2017" in textes
     assert "Le chômage a augmenté depuis 2017" in textes
 
+    # affirmation trop vague : reclassée, jamais vérifiée
+    vague = next(p for p in points if p["texte"] == "Il existe des fractures en France")
+    assert vague["type"] == "vague"
+
     results = [m["args"][0] for m in got if m["name"] == "fact_check_result"]
     assert results, names
+    assert vague["id"] not in {r["id"] for r in results}
     r = results[0]
     assert r["verdict"] == "partiellement_vrai"          # normalisé
     assert r["url"] == LEMONDE and r["source"] == "Le Monde"  # nom cohérent avec le lien

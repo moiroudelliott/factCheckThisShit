@@ -24,6 +24,7 @@ from server import cache
 from server.dedup import dupe_index_add, is_duplicate_indexed
 from server.factcheck import call_mistral, call_mistral_api, fact_check_affirmation, VIDEO_ANALYSIS_PROMPT
 from server.notify import describe_error, warn_client
+from server.points import apply_checkworthiness
 from server.state import (
     session_history, session_starts, session_buffers, session_contexts, session_points,
     session_dupe_index, session_flush_locks, session_chunk_locks, session_speakers,
@@ -359,6 +360,7 @@ def flush_to_mistral(sid: str, text: str, ts: float = None):
             label_of.setdefault(name, label)
         smap = session_speaker_map.get(sid, {})
         for p in raw_points:
+            apply_checkworthiness(p)  # affirmation trop vague → « vague », pas de fact-check
             qui = p.get("qui", "")
             p["qui_label"] = qui if qui in smap_used else label_of.get(qui, qui)
             p["qui"] = smap.get(p["qui_label"], qui)

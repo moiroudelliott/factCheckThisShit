@@ -96,6 +96,9 @@ const TYPE_CFG = {
   question:    { tag: 'QUESTION',    accent: 'oklch(0.76 0.15 90)'  },
   accord:      { tag: 'ACCORD',      accent: 'oklch(0.74 0.13 145)' },
   désaccord:   { tag: 'DÉSACCORD',   accent: 'oklch(0.62 0.20 25)'  },
+  // Affirmation jugée trop vague pour être vérifiée (note de vérifiabilité
+  // basse, voir server/points.py) : ni fact-check ni carte, visible au récap
+  vague:       { tag: 'TROP VAGUE',  accent: 'oklch(0.62 0.03 255)' },
 };
 
 // ── State ──────────────────────────────────────────────────────────────────────

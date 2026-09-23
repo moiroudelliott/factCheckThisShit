@@ -32,13 +32,16 @@ MISSION: un passage de débat contient presque toujours 1 à 3 talking points. E
 Ne retourne [] QUE si le passage est réellement vide de contenu politique (politesses, gestion de parole, phrases incompréhensibles). Un tableau vide doit rester RARE.
 
 Réponds UNIQUEMENT avec un tableau JSON valide, sans markdown:
-[{{"type": "TYPE", "texte": "le point condensé en une phrase claire", "qui": "qui l'a dit, ou chaîne vide"}}]
+[{{"type": "TYPE", "texte": "le point condensé en une phrase claire", "qui": "qui l'a dit, ou chaîne vide", "verifiable": 8}}]
 
 Types:
-- "affirmation" = fait VÉRIFIABLE: chiffre, date, événement, fait historique ou économique.
+- "affirmation" = fait PRÉCIS et VÉRIFIABLE: chiffre, date, événement, vote, citation, fait historique ou économique.
   Ex: "BYD est le leader chinois de l'automobile électrique"
   Ex: "Les socialistes français et allemands se sont fait la guerre en 1914"
   Ex: "L'Union européenne impose la fin du moteur thermique en 2035"
+  Ne sont PAS des affirmations (→ "subjectif"): généralités vagues ("Il existe des fractures en France"),
+  définitions ou thèses ("L'islam est à la fois une civilisation et une religion"),
+  évidences sans contenu ("L'accord de Paris a été signé à une époque antérieure").
 - "argument" = raisonnement cause-effet ou proposition concrète.
   Ex: "Les fermetures d'usines s'expliquent d'abord par le niveau des charges sociales"
 - "subjectif" = opinion, jugement de valeur, promesse vague — non vérifiable.
@@ -48,6 +51,9 @@ Types:
   Ex: "L'adversaire est accusé de fantasmer une France qui n'a jamais existé"
 - "question" = interpellation directe sur un sujet politique
 - "accord" / "désaccord" = convergence ou réfutation explicite d'un propos adverse
+
+"verifiable" (0-10, pour chaque point) = peut-on le vérifier avec des sources ? 10 = chiffre, date, vote ou
+événement précis ; 5 = fait réel mais flou ; 0 = opinion ou généralité.
 
 RÈGLES:
 1. {attribution_rule}

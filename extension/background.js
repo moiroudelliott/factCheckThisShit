@@ -1,14 +1,27 @@
 // ══════════════════════════════════════════════════════════════════════════════
-// SOURCÉ — service worker (v2)
+// SOURCÉ — service worker
 // AUCUN état en mémoire : Chrome tue le worker après ~30 s d'inactivité, donc
 // tout vit dans chrome.storage.session. Chaque handler relit l'état.
 // ══════════════════════════════════════════════════════════════════════════════
 
 function getState() {
-  return chrome.storage.session.get({ tabId: null, capturing: false });
+  return chrome.storage.session.get({ tabId: null, capturing: false, videoId: null });
 }
 
-chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+// Identifiant de la vidéo d'une URL YouTube (watch?v=…, /live/…), ou null
+function videoIdFromUrl(url) {
+  try {
+    const u = new URL(url);
+    if (!/(^|\.)youtube\.com$/.test(u.hostname)) return null;
+    if (u.pathname === '/watch') return u.searchParams.get('v');
+    const m = u.pathname.match(/^\/live\/([\w-]{6,})/);
+    return m ? m[1] : null;
+  } catch (_) {
+    return null;
+  }
+}
+
+chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   (async () => {
     try {
       switch (msg.action) {
@@ -18,12 +31,39 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
           break;
 
         case 'stopCapture':
-          await handleStop();
+          await handleStop('user');
           sendResponse({ ok: true });
           break;
 
         case 'getStatus':
           sendResponse(await getState());
+          break;
+
+        // Content script (re)chargé : l'onglet est-il celui qu'on analyse ?
+        // Après un F5 pendant l'analyse, la capture continue — l'overlay doit
+        // revenir au lieu de laisser la capture tourner sans rien afficher.
+        case 'contentReady': {
+          const { tabId, capturing } = await getState();
+          sendResponse({ captured: Boolean(capturing && sender.tab && sender.tab.id === tabId) });
+          break;
+        }
+
+        // Pub YouTube en cours (détectée par le content script) → l'offscreen
+        // n'envoie pas l'audio de la pub au backend
+        case 'adState':
+          chrome.runtime.sendMessage({ action: 'setAdState', ad: Boolean(msg.ad) }).catch(() => {});
+          break;
+
+        // getUserMedia a échoué dans l'offscreen : ne pas rester « en direct »
+        case 'captureFailed':
+          await chrome.storage.session.set({ tabId: null, capturing: false, videoId: null });
+          await closeOffscreen();
+          break;
+
+        // L'offscreen a fini sa dernière analyse (session_done) — on peut le
+        // fermer, sauf si une nouvelle capture a démarré entre-temps
+        case 'offscreenDone':
+          if (!(await getState()).capturing) await closeOffscreen();
           break;
 
         case 'forwardToContent': {
@@ -45,12 +85,27 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
 // Arrêt automatique si l'onglet capturé est fermé
 chrome.tabs.onRemoved.addListener(async (closedTabId) => {
   const { tabId, capturing } = await getState();
-  if (capturing && closedTabId === tabId) handleStop();
+  if (capturing && closedTabId === tabId) handleStop('tab_closed');
+});
+
+// Arrêt automatique si l'onglet capturé change de vidéo (navigation SPA de
+// YouTube) ou quitte YouTube : l'analyse est liée à UNE vidéo (invités,
+// date, horodatages), et l'audio d'un autre site n'a pas à partir au backend.
+// Un rechargement de la même vidéo (F5) ne coupe rien.
+chrome.tabs.onUpdated.addListener(async (tid, info, tab) => {
+  if (!info.url && info.status !== 'loading') return;
+  const { tabId, capturing, videoId } = await getState();
+  if (!capturing || tid !== tabId) return;
+  // Sans permission sur le nouveau site, tab.url est absent : on a quitté YouTube
+  const vid = videoIdFromUrl(info.url || tab.url || '');
+  if (vid && (!videoId || vid === videoId)) return;
+  handleStop('navigation');
 });
 
 async function handleStart({ tabId, emission, guests, description, videoDate, token }) {
   try {
-    await chrome.storage.session.set({ tabId, capturing: true });
+    const tab = await chrome.tabs.get(tabId);
+    await chrome.storage.session.set({ tabId, capturing: true, videoId: videoIdFromUrl(tab.url || '') });
 
     // Injecter le content script si absent (ping/pong)
     const alive = await chrome.tabs.sendMessage(tabId, { action: 'ping' })
@@ -71,7 +126,9 @@ async function handleStart({ tabId, emission, guests, description, videoDate, to
 
     const streamId = await chrome.tabCapture.getMediaStreamId({ targetTabId: tabId });
 
-    // Toujours interroger hasDocument() — jamais de flag en mémoire
+    // Toujours interroger hasDocument() — jamais de flag en mémoire. Un
+    // document encore ouvert (session précédente qui finit sa dernière
+    // analyse) est réutilisé : l'offscreen gère plusieurs sessions.
     if (!(await chrome.offscreen.hasDocument())) {
       await chrome.offscreen.createDocument({
         url: chrome.runtime.getURL('offscreen.html'),
@@ -83,18 +140,25 @@ async function handleStart({ tabId, emission, guests, description, videoDate, to
     // tabId inclus pour que l'offscreen le propage dans chaque forwardToContent
     chrome.runtime.sendMessage({ action: 'doCapture', streamId, emission, guests, description, videoDate, token, tabId });
   } catch (e) {
-    await chrome.storage.session.set({ tabId: null, capturing: false });
+    await chrome.storage.session.set({ tabId: null, capturing: false, videoId: null });
     throw e; // remonte au listener → réponse {ok:false} vers la popup
   }
 }
 
-async function handleStop() {
-  const { tabId } = await getState();
+// reason : 'user' | 'navigation' | 'tab_closed' — affiché par le content script
+async function handleStop(reason) {
+  const { tabId, capturing } = await getState();
+  await chrome.storage.session.set({ tabId: null, capturing: false, videoId: null });
+  if (!capturing) return;
+  // L'offscreen arrête l'audio tout de suite, puis laisse le backend analyser
+  // la fin du débat avant de se déconnecter (il ferme le document ensuite,
+  // via offscreenDone). L'overlay passe en « finalisation » au lieu de
+  // disparaître : le récap reste consultable et exportable.
   chrome.runtime.sendMessage({ action: 'doStop' }).catch(() => {});
-  if (tabId) chrome.tabs.sendMessage(tabId, { action: 'hideOverlay' }).catch(() => {});
-  await chrome.storage.session.set({ tabId: null, capturing: false });
+  if (tabId) chrome.tabs.sendMessage(tabId, { action: 'captureEnded', reason }).catch(() => {});
+}
 
-  // Fermer le document offscreen : évite un double AudioContext au prochain démarrage
+async function closeOffscreen() {
   const has = await chrome.offscreen.hasDocument().catch(() => false);
   if (has) await chrome.offscreen.closeDocument().catch(() => {});
 }

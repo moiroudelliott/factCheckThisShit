@@ -20,6 +20,7 @@ sys.path.insert(0, ROOT)
 TMP = tempfile.mkdtemp(prefix="fct_smoke_")
 os.environ["FACTCHECK_CACHE_DB"] = os.path.join(TMP, "cache.db")
 os.environ["FACTCHECK_INDEX_DB"] = os.path.join(TMP, "index.db")
+os.environ["AN_VOTES"] = "0"  # pas de téléchargement de l'open data de l'Assemblée pendant les tests
 os.environ["MISTRAL_API_KEY"] = "test"  # load_dotenv n'écrase pas une variable déjà définie
 os.environ["BACKEND_TOKEN"] = ""
 
@@ -129,9 +130,17 @@ RSS = f"""<rss><channel><item><title>Le chômage a-t-il vraiment baissé de 2 po
 <pubDate>Mon, 21 Sep 2026 10:00:00 +0200</pubDate></item></channel></rss>"""
 
 
+EUROSTAT = {"id": ["geo", "time"], "size": [1, 2],
+            "dimension": {"geo": {"category": {"index": {"FR": 0}}},
+                          "time": {"category": {"index": {"2017": 0, "2024": 1}}}},
+            "value": {"0": 9.4, "1": 7.4}}
+
+
 def _fake_get(url, params=None, **k):
     if "checknews" in url:  # flux RSS d'une rédaction de fact-checking
         return _Resp({}, text=RSS)
+    if "eurostat" in url:
+        return _Resp(EUROSTAT)
     if "/search" in url and "archives-ouvertes" not in url:
         return _Resp({"results": [
             {"url": "https://www.facebook.com/page/posts/1", "title": "Post", "content": "…"},
@@ -204,6 +213,8 @@ def test_full_session():
     # fact-check déjà publié par une rédaction : en tête des preuves
     baisse = next(p for p in PROMPTS if "fact-checker" in p and "baissé de 2 points" in p)
     assert "FACT-CHECK DÉJÀ PUBLIÉ — CheckNews (Libération)" in baisse and CHECKNEWS in baisse
+    # série officielle Eurostat du chômage
+    assert "DONNÉE OFFICIELLE — Eurostat" in baisse and "2017 9,4 · 2024 7,4" in baisse
     assert "2024" in json.dumps(evidence, ensure_ascii=False)  # replay : année de la vidéo
 
     done = next(m["args"][0] for m in got if m["name"] == "session_done")

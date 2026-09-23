@@ -20,7 +20,7 @@ from server.config import (
     BACKEND_TOKEN, MISTRAL_API_KEY, FLUSH_INTERVAL, MIN_WORDS, MAX_BUFFER_WORDS, PROBE_MATCH_T,
     MIN_WORDS_ON_PAUSE, MIN_WORDS_ON_STOP, FINISH_TIMEOUT_S, CHUNK_OVERLAP_S, CHUNK_S,
 )
-from server import cache, known_factchecks
+from server import cache, known_factchecks, votes
 from server.dedup import dupe_index_add, is_duplicate_indexed
 from server.factcheck import call_mistral, call_mistral_api, fact_check_affirmation, VIDEO_ANALYSIS_PROMPT
 from server.notify import describe_error, warn_client
@@ -40,6 +40,7 @@ from server.voices import (
 
 cache.load()
 known_factchecks.start(socketio)
+votes.start(socketio, eventlet.tpool.execute)
 
 
 @app.route("/health")

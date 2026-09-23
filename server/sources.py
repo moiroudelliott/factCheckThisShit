@@ -113,7 +113,8 @@ def source_label(claimed: str, url: str, kind: str = "") -> str:
     return h or "source"
 
 
-def finalize_result(data: dict, results: list, academic: list, official: list, known: list = ()) -> dict:
+def finalize_result(data: dict, results: list, academic: list, official: list, known: list = (),
+                    structured: list = ()) -> dict:
     """Normalise la réponse Mistral : verdict connu, URL issue des résultats
     de recherche (jamais inventée ; http(s) uniquement — une URL javascript:
     serait un vecteur XSS), nom de source cohérent avec l'URL, confiance
@@ -125,6 +126,8 @@ def finalize_result(data: dict, results: list, academic: list, official: list, k
     kinds.update({r.get("href"): "academic" for r in academic})
     kinds.update({r.get("href"): "official" for r in official})
     outlets = {k.get("url"): k.get("outlet", "") for k in known}
+    # Données structurées (Eurostat, votes de l'Assemblée) : l'émetteur est connu
+    outlets.update({r.get("href"): r["title"].split(" — ")[0] for r in structured})
     kinds.update({u: "factcheck" for u in outlets})
     url = data.get("url", "")
     if not (isinstance(url, str) and url.startswith(("http://", "https://")) and url in kinds):

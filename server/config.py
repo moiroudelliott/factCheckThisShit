@@ -58,6 +58,15 @@ FACTCHECK_SECTIONS = (
     "tf1info.fr/politique/les-verificateurs", "tf1info.fr/societe/les-verificateurs",
 )
 
+# Votes à l'Assemblée nationale (server/votes.py) : open data officiel,
+# téléchargé dans AN_DATA_DIR (ignoré par git) et rafraîchi chaque semaine.
+# AN_VOTES=0 dans .env pour désactiver (~40 Mo au premier démarrage).
+AN_VOTES_ENABLED = os.environ.get("AN_VOTES", "1") != "0"
+AN_LEGISLATURES = (16, 17)
+AN_REFRESH_S = 7 * 86400
+AN_DATA_DIR = os.environ.get("AN_DATA_DIR") or os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "assemblee")
+
 # ── Buffer de transcription → analyse Mistral ─────────────────────────────
 FLUSH_INTERVAL = 22    # secondes max entre deux analyses Mistral
 MIN_WORDS = 30         # ne pas appeler Mistral avec moins de 30 mots (trop peu pour un talking point)

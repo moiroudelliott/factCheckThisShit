@@ -17,17 +17,16 @@ Usage:
 """
 
 import argparse
-import json
 import os
-import re
 import shutil
 import subprocess
 import sys
 import tempfile
 import time
-import unicodedata
 
 import numpy as np
+
+from server import voice_store
 
 # Console Windows en cp1252 : forcer l'UTF-8 pour ne pas planter sur ✔/─/↓
 for _stream in (sys.stdout, sys.stderr):
@@ -43,9 +42,6 @@ CROSS_T = 0.50       # seuil de correspondance de voix ENTRE vidéos
 MIN_SHARE = 0.12     # part de parole min pour qu'un cluster soit candidat
 AUDIO_START_S = 60   # on saute l'intro/jingle
 AUDIO_MAX_S = 420    # ~6 minutes d'audio analysées par vidéo
-
-BASE = os.path.dirname(os.path.abspath(__file__))
-VOICES = os.path.join(BASE, "voices")
 
 
 def safe(s: str) -> str:
@@ -180,32 +176,11 @@ def common_voice(per_video: list):
 
 
 def save_voice(name: str, emb):
-    os.makedirs(VOICES, exist_ok=True)
-    ascii_name = unicodedata.normalize("NFKD", name).encode("ascii", "ignore").decode().lower()
-    slug = re.sub(r"[^a-z0-9]+", "-", ascii_name).strip("-") or "voix"
-    np.save(os.path.join(VOICES, slug + ".npy"), emb)
-    idx_path = os.path.join(VOICES, "index.json")
-    index = {}
-    if os.path.exists(idx_path):
-        try:
-            with open(idx_path, encoding="utf-8") as f:
-                index = json.load(f)
-        except Exception:
-            pass
-    index[name] = {"file": slug + ".npy", "auto": True, "via": "harvest", "updated": time.time()}
-    with open(idx_path, "w", encoding="utf-8") as f:
-        json.dump(index, f, ensure_ascii=False, indent=2)
+    voice_store.save_embedding(name, emb, auto=True, via="harvest")
 
 
 def already_enrolled(name: str) -> bool:
-    idx_path = os.path.join(VOICES, "index.json")
-    if not os.path.exists(idx_path):
-        return False
-    try:
-        with open(idx_path, encoding="utf-8") as f:
-            return name in json.load(f)
-    except Exception:
-        return False
+    return name in voice_store.load_index()
 
 
 def harvest(name: str, n_videos: int, enc, torch) -> bool:

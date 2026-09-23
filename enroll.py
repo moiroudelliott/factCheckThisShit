@@ -14,10 +14,6 @@ Exemple:
 
 import sys
 import os
-import re
-import json
-import time
-import unicodedata
 
 if sys.stdout.encoding and sys.stdout.encoding.lower() != "utf-8":
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
@@ -68,26 +64,11 @@ def main():
             embs.append(e / (np.linalg.norm(e) + 1e-8))
     emb = np.mean(embs, axis=0)
 
-    voices = os.path.join(os.path.dirname(os.path.abspath(__file__)), "voices")
-    os.makedirs(voices, exist_ok=True)
-    ascii_name = unicodedata.normalize("NFKD", name).encode("ascii", "ignore").decode().lower()
-    slug = re.sub(r"[^a-z0-9]+", "-", ascii_name).strip("-") or "voix"
-    np.save(os.path.join(voices, slug + ".npy"), emb)
-
-    idx_path = os.path.join(voices, "index.json")
-    index = {}
-    if os.path.exists(idx_path):
-        try:
-            with open(idx_path, encoding="utf-8") as f:
-                index = json.load(f)
-        except Exception:
-            pass
-    index[name] = {"file": slug + ".npy", "auto": False, "updated": time.time()}
-    with open(idx_path, "w", encoding="utf-8") as f:
-        json.dump(index, f, ensure_ascii=False, indent=2)
+    from server import voice_store
+    voice_store.save_embedding(name, emb, auto=False)
 
     print(f"✔ Empreinte enregistrée: {name} ({len(embs)} tranche(s) de {SLICE_S} s)")
-    print("  Elle sera chargée au prochain démarrage du backend.")
+    print("  Prise en compte à la prochaine connexion de l'extension (inutile de redémarrer le backend).")
 
 
 if __name__ == "__main__":

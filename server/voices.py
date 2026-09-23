@@ -9,18 +9,18 @@ identifié de façon fiable."""
 
 import json
 import os
-import re
-import time
-import unicodedata
 
 import numpy as np
 
 from server.app import DIARIZATION, speaker_encoder, socketio
 from server.config import (
     DIARIZATION_THRESHOLD, MIN_NEW_SPEAKER_SEC, MAX_SPEAKERS, PROBE_MATCH_T,
-    VOICES_DIR, VOICE_MATCH_THRESHOLD, VOICE_MATCH_MARGIN, VOICE_ENROLL_MIN_SEGMENTS,
+    VOICES_DIR, VOICE_MATCH_THRESHOLD, VOICE_MATCH_MARGIN, VOICE_MATCH_SOLO_BONUS,
+    VOICE_ENROLL_MIN_SEGMENTS, VOICE_ENROLL_MIN_VOTES,
 )
+from server import voice_store
 from server.factcheck import call_mistral_api
+from server.names import canonical_name, matches_any
 from server.state import (
     session_speakers, session_contexts, session_speaker_map, session_voice_locked,
     session_bank_miss, session_excerpts, session_map_votes, session_map_state,
@@ -80,7 +80,7 @@ class SpeakerTracker:
             # (best_sim < PROBE_MATCH_T) : la première réplique courte d'un
             # nouveau venu ne doit jamais être happée par un cluster
             # simplement parce qu'il est, de peu, le moins dissemblable des
-            # existants (cas vécu : le "oui" de François Copé absorbé par le
+            # existants (cas vécu : le "oui" de Jean-François Copé absorbé par le
             # cluster de Sébastien Chenu, qui n'a ensuite plus jamais son
             # propre cluster). Dans ce cas on hérite du dernier locuteur actif
             # (self.last inchangé) plutôt que de coller un nom au hasard.
@@ -131,22 +131,12 @@ def probe_speaker(path: str, tracker) -> tuple:
 _voice_bank: dict = {}  # nom → embedding normalisé
 
 
-def _voice_slug(name: str) -> str:
-    ascii_name = unicodedata.normalize("NFKD", name).encode("ascii", "ignore").decode().lower()
-    return re.sub(r"[^a-z0-9]+", "-", ascii_name).strip("-") or "voix"
-
-
 def load_voice_bank(verbose: bool = True):
     _voice_bank.clear()
-    idx_path = os.path.join(VOICES_DIR, "index.json")
-    if not os.path.exists(idx_path):
-        return
     try:
-        with open(idx_path, encoding="utf-8") as f:
-            index = json.load(f)
-        for name, meta in index.items():
+        for name, meta in voice_store.load_index().items():
             p = os.path.join(VOICES_DIR, meta.get("file", ""))
-            if os.path.exists(p):
+            if meta.get("file") and os.path.exists(p):
                 v = np.load(p)
                 _voice_bank[name] = v / (np.linalg.norm(v) + 1e-8)
         if _voice_bank and verbose:
@@ -156,20 +146,7 @@ def load_voice_bank(verbose: bool = True):
 
 
 def save_voice(name: str, emb, auto: bool = False):
-    os.makedirs(VOICES_DIR, exist_ok=True)
-    fn = _voice_slug(name) + ".npy"
-    np.save(os.path.join(VOICES_DIR, fn), emb)
-    idx_path = os.path.join(VOICES_DIR, "index.json")
-    index = {}
-    if os.path.exists(idx_path):
-        try:
-            with open(idx_path, encoding="utf-8") as f:
-                index = json.load(f)
-        except Exception:
-            pass
-    index[name] = {"file": fn, "auto": auto, "updated": time.time()}
-    with open(idx_path, "w", encoding="utf-8") as f:
-        json.dump(index, f, ensure_ascii=False, indent=2)
+    voice_store.save_embedding(name, emb, auto=auto)
     _voice_bank[name] = emb / (np.linalg.norm(emb) + 1e-8)
     print(f"[Voix] empreinte {'auto-' if auto else ''}enregistrée: {name}")
 
@@ -183,47 +160,58 @@ def speaker_labels_list(tracker) -> list:
     return [SpeakerTracker.label_for(i) for i in range(len(tracker.sums))]
 
 
-def apply_speaker_map(sid: str, transcript: str) -> str:
+def apply_speaker_map(smap: dict, transcript: str) -> str:
     """Substitue les labels confirmés par les vrais noms dans un transcript annoté."""
-    for label, name in session_speaker_map.get(sid, {}).items():
+    for label, name in smap.items():
         transcript = transcript.replace(f"{label}:", f"{name}:")
     return transcript
 
 
+def _enrollable(sid: str, name: str, label: str) -> bool:
+    """Ce nom POURRA-t-il être enrôlé pendant cette session ? (invité déclaré,
+    pas déjà en banque, label pas identifié acoustiquement) — sinon
+    l'extension n'affiche pas d'indicateur « capture d'empreinte » qui ne
+    se terminerait jamais."""
+    guests = session_contexts.get(sid, {}).get("guests") or []
+    return (name not in _voice_bank and label not in session_voice_locked.get(sid, set())
+            and matches_any(name, guests))
+
+
 def _emit_speaker_map(sid: str, confirmed: dict):
     """Émission commune à match_clusters_to_bank et identify_speakers : inclut
-    quels noms sont déjà en banque, pour que l'extension sache si elle doit
-    afficher une capture d'empreinte en cours ou juste le nom (déjà enrôlé,
-    via un match acoustique ou un enrôlement précédent)."""
-    enrolled = [n for n in confirmed.values() if n in _voice_bank]
-    socketio.emit("speaker_map", {"map": confirmed, "enrolled": enrolled}, to=sid)
+    quels noms sont déjà en banque (enrolled) et lesquels peuvent l'être
+    pendant cette session (enrollable), pour que l'extension sache si elle
+    doit afficher une capture d'empreinte en cours ou juste le nom."""
+    enrolled = sorted({n for n in confirmed.values() if n in _voice_bank})
+    enrollable = sorted({n for label, n in confirmed.items() if _enrollable(sid, n, label)})
+    socketio.emit("speaker_map", {"map": confirmed, "enrolled": enrolled, "enrollable": enrollable}, to=sid)
 
 
 def match_clusters_to_bank(sid: str):
     """Attribution ACOUSTIQUE : compare les centroïdes de la session aux
-    empreintes de la banque. Une correspondance nette (seuil + marge sur la
-    2e meilleure) est définitive et prioritaire sur l'identification LLM.
+    empreintes de la banque. Une correspondance nette est définitive et
+    prioritaire sur l'identification LLM — elle doit donc être sûre :
 
-    La banque accumule des voix sur TOUS les débats passés — sans filtrage,
-    un présentateur (ou un invité non listé) peut hériter du nom de
-    quelqu'un d'un tout autre débat simplement parce que c'est, de peu,
-    l'empreinte la moins dissemblable de toute la banque (cas vécu : un
-    présentateur identifié comme "François Ruffin", absent de l'émission).
-    Si des intervenants ont été déclarés pour cette session, on restreint
-    donc les candidats à cette liste.
+    - la banque accumule des voix de TOUS les débats passés : seul un invité
+      déclaré pour cette session peut être retenu (sinon un présentateur
+      héritait du nom de quelqu'un d'un tout autre débat — cas vécu :
+      « François Ruffin », absent de l'émission) ;
+    - mais la comparaison se fait contre TOUTE la banque : l'invité doit
+      être la meilleure correspondance de toute la banque, avec une marge
+      sur la 2e. Restreindre aussi la comparaison aux invités supprimait la
+      marge dès qu'un seul invité était en banque (2e meilleure = aucune) :
+      n'importe quelle voix un peu proche était alors verrouillée à son nom.
 
     Un label comparé à la banque sans correspondance déclenche
-    voice_not_in_bank : l'extension peut afficher "Locuteur non identifié"
-    tout de suite (en attendant toujours le vote LLM) plutôt que d'attendre
-    un délai fixe côté frontend sans savoir si la recherche a seulement pas
-    encore abouti, ou si la voix n'est vraiment pas dans la banque."""
+    voice_not_in_bank : l'extension peut afficher « Locuteur non identifié »
+    tout de suite (le vote LLM continue en parallèle)."""
     if not DIARIZATION:
         return
     tracker = session_speakers.get(sid)
     if not tracker or not tracker.sums:
         return
     guests = session_contexts.get(sid, {}).get("guests") or []
-    candidates = {n: e for n, e in _voice_bank.items() if not guests or n in guests}
+    candidates = {n for n in _voice_bank if not guests or matches_any(n, guests)}
     confirmed = session_speaker_map.setdefault(sid, {})
     locked = session_voice_locked.setdefault(sid, set())
     bank_missed = session_bank_miss.setdefault(sid, set())
@@ -233,24 +221,25 @@ def match_clusters_to_bank(sid: str):
     for i, label in enumerate(labels):
         if label in locked or tracker.counts[i] < 3:
             continue  # déjà identifié par la voix, ou pas assez de matière
-        if not candidates:
-            if label not in bank_missed:
-                bank_missed.add(label)
-                newly_missed.append(label)
-            continue
-        centroid = tracker.sums[i] / tracker.counts[i]
-        centroid = centroid / (np.linalg.norm(centroid) + 1e-8)
-        sims = sorted(((float(np.dot(centroid, ref)), name)
-                       for name, ref in candidates.items()), reverse=True)
-        best, best_name = sims[0]
-        second = sims[1][0] if len(sims) > 1 else -1.0
-        if best >= VOICE_MATCH_THRESHOLD and (best - second) >= VOICE_MATCH_MARGIN:
-            locked.add(label)
-            if confirmed.get(label) != best_name:
-                confirmed[label] = best_name
-                changed = True
-                print(f"[Voix] {label} = {best_name} (cos {best:.2f})")
-        elif label not in bank_missed:
+        matched = False
+        if candidates:
+            centroid = tracker.sums[i] / tracker.counts[i]
+            centroid = centroid / (np.linalg.norm(centroid) + 1e-8)
+            sims = sorted(((float(np.dot(centroid, ref)), name)
+                           for name, ref in _voice_bank.items()), reverse=True)
+            best, best_name = sims[0]
+            if len(sims) > 1:
+                clear = best - sims[1][0] >= VOICE_MATCH_MARGIN
+            else:  # une seule voix en banque : pas de 2e pour mesurer la marge
+                clear = best >= VOICE_MATCH_THRESHOLD + VOICE_MATCH_SOLO_BONUS
+            if best_name in candidates and best >= VOICE_MATCH_THRESHOLD and clear:
+                matched = True
+                locked.add(label)
+                if confirmed.get(label) != best_name:
+                    confirmed[label] = best_name
+                    changed = True
+                    print(f"[Voix] {label} = {best_name} (cos {best:.2f})")
+        if not matched and label not in bank_missed:
             bank_missed.add(label)
             newly_missed.append(label)
     if changed:
@@ -262,33 +251,35 @@ def match_clusters_to_bank(sid: str):
 
 def auto_enroll_voices(sid: str):
     """Sauvegarde en banque les voix identifiées de façon fiable par les votes
-    LLM (invité connu, assez de matière, pas déjà en banque). Idempotente par
-    construction (name in _voice_bank bloque un doublon), donc sans risque à
-    rappeler souvent : appelée après chaque chunk transcrit (juste après
-    match_clusters_to_bank), à chaque nouvelle confirmation dans
-    identify_speakers, ET à la déconnexion. L'appel fréquent compte : un nom
-    confirmé avant d'avoir assez de segments (VOICE_ENROLL_MIN_SEGMENTS) doit
-    être retenté au fur et à mesure que `tracker.counts` grandit, pas
-    seulement au moment de la confirmation — sinon il n'était plus jamais
-    réessayé. Émet voice_enrolled dès qu'un nom passe le seuil, pour que
-    l'extension retire son indicateur "capture de l'empreinte…" (voir
-    content.js) — plutôt que perdu si le backend plante avant la fin propre
-    du débat. La banque s'enrichit toute seule : au prochain débat, la
-    reconnaissance est acoustique et immédiate."""
+    LLM. Idempotente (name in _voice_bank bloque un doublon), donc sans
+    risque à rappeler souvent : après chaque chunk transcrit, à chaque
+    nouvelle confirmation dans identify_speakers, et à la déconnexion. Un nom
+    confirmé avant d'avoir assez de segments est ainsi retenté au fur et à
+    mesure que `tracker.counts` grandit.
+
+    Une empreinte en banque est définitive (reconnaissance acoustique
+    verrouillée aux débats suivants) : on exige donc plus que la simple
+    confirmation d'affichage — VOICE_ENROLL_MIN_VOTES votes, tous pour ce
+    même nom, et un invité déclaré. Émet voice_enrolled pour que l'extension
+    retire son indicateur « capture de l'empreinte… »."""
     if not DIARIZATION:
         return
     tracker = session_speakers.get(sid)
     confirmed = session_speaker_map.get(sid, {})
     locked = session_voice_locked.get(sid, set())
+    votes = session_map_votes.get(sid, {})
     guests = (session_contexts.get(sid, {}).get("guests")) or []
     if not tracker or not confirmed:
         return
     labels = speaker_labels_list(tracker)
     for i, label in enumerate(labels):
         name = confirmed.get(label)
-        if (not name or label in locked or name in _voice_bank
-                or name not in guests or tracker.counts[i] < VOICE_ENROLL_MIN_SEGMENTS):
+        if (not name or label in locked or name in _voice_bank or not matches_any(name, guests)
+                or tracker.counts[i] < VOICE_ENROLL_MIN_SEGMENTS):
             continue
+        cand = votes.get(label, {})
+        if cand.get(name, 0) < VOICE_ENROLL_MIN_VOTES or len(cand) > 1:
+            continue  # vote pas encore assez sûr (ou contesté) pour une empreinte définitive
         centroid = tracker.sums[i] / tracker.counts[i]
         save_voice(name, centroid, auto=True)
         socketio.emit("voice_enrolled", {"name": name}, to=sid)
@@ -317,15 +308,19 @@ def identify_speakers(sid: str):
     MAJORITAIRE. Chaque appel Mistral = un vote par label ; un nom est confirmé
     à 2 votes concordants (et strictement devant les autres candidats). Un
     mapping confirmé reste corrigeable si les votes suivants le contredisent —
-    une identification isolée ne peut plus verrouiller une erreur."""
+    c'est pourquoi l'identification continue tant qu'un label n'est pas
+    verrouillé acoustiquement, même une fois tous les labels nommés.
+    Les noms votés sont ramenés à leur forme de référence (clé de la banque
+    ou invité déclaré) : « Bardella » et « Jordan Bardella » sont un seul
+    candidat."""
     state = session_map_state.get(sid)
     try:
         tracker = session_speakers.get(sid)
         excerpts = session_excerpts.get(sid, [])
         confirmed = session_speaker_map.get(sid, {})
+        locked = session_voice_locked.get(sid, set())
         labels = speaker_labels_list(tracker)
-        unmapped = [l for l in labels if l not in confirmed]
-        if not excerpts or not unmapped:
+        if not excerpts or not [l for l in labels if l not in locked]:
             return
         ctx = session_contexts.get(sid, {})
         guests = ctx.get("guests") or []
@@ -348,13 +343,12 @@ def identify_speakers(sid: str):
         for label, name in data.items():
             if (label in labels and isinstance(name, str) and name.strip()
                     and name.strip().lower() not in ("null", "none", "?")):
-                n = name.strip()[:48]
+                n = canonical_name(name.strip()[:48], guests, _voice_bank)
                 votes.setdefault(label, {})
                 votes[label][n] = votes[label].get(n, 0) + 1
 
         # Confirmation / correction à la majorité (jamais sur un label déjà
         # identifié acoustiquement — la voix prime sur l'inférence LLM)
-        locked = session_voice_locked.get(sid, set())
         changed = False
         for label, cand in votes.items():
             if label in locked:
@@ -372,9 +366,9 @@ def identify_speakers(sid: str):
             print(f"[SpeakerMap] confirmé: {confirmed}")
             # L'extension renomme rétroactivement tous les points déjà affichés
             _emit_speaker_map(sid, confirmed)
-            # Empreinte vocale sauvegardée dès que possible, pas seulement à la
-            # fin du débat — voir auto_enroll_voices.
-            auto_enroll_voices(sid)
+        # Empreinte vocale sauvegardée dès que possible, pas seulement à la
+        # fin du débat — voir auto_enroll_voices (qui exige plus de votes).
+        auto_enroll_voices(sid)
     except Exception as e:
         print(f"[SpeakerMap error] {type(e).__name__}: {e}")
     finally:

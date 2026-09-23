@@ -218,8 +218,10 @@ def handle_speaker_probe(data):
         label, sim = eventlet.tpool.execute(probe_speaker, tmp_path, tracker)
         if not label or sim < PROBE_MATCH_T:
             return
-        # Le "locuteur courant" sert aussi d'héritage aux segments trop courts
-        tracker.last = label
+        # Ne PAS toucher tracker.last ici : la sonde entend le locuteur de
+        # MAINTENANT, alors que les segments Whisper traités ensuite datent de
+        # 10-15 s plus tôt — les segments courts en début de chunk héritaient
+        # donc de la mauvaise personne (et depuis un autre thread).
         emit("speaker_live", {"speaker": label})
     except Exception as e:
         print(f"[Probe error] {type(e).__name__}: {e}")
@@ -304,32 +306,48 @@ def flush_to_mistral(sid: str, text: str, ts: float = None):
     if lock:
         lock.acquire()
     try:
-        # Substituer les labels déjà identifiés par les vrais noms
-        text = apply_speaker_map(sid, text)
+        # Substituer les labels déjà identifiés par les vrais noms (contexte
+        # utile à Mistral). Instantané de la correspondance utilisée : il sert
+        # plus bas à retrouver le label d'origine de chaque point.
+        smap_used = dict(session_speaker_map.get(sid, {}))
+        text = apply_speaker_map(smap_used, text)
         context = session_contexts.get(sid, {})
         all_points = session_points.get(sid, [])
         raw_points = call_mistral(text, context=context, recent_points=all_points, sid=sid)
         print(f"[Mistral] {len(raw_points)} talking point(s) reçus")
 
-        # Toutes les 2 analyses : tenter d'identifier les locuteurs encore anonymes
+        # Identification des locuteurs : toutes les 2 analyses tant qu'un label
+        # est anonyme, puis toutes les 4 tant qu'un nom (non verrouillé par la
+        # voix) peut encore être corrigé par les votes suivants — elle
+        # s'arrêtait dès que tous les labels avaient un nom, même faux.
         state = session_map_state.get(sid)
         if DIARIZATION and state is not None and not state["inflight"]:
             state["flushes"] += 1
             tracker = session_speakers.get(sid)
-            mapped = session_speaker_map.get(sid, {})
-            if state["flushes"] % 2 == 0 and tracker and len(tracker.sums) > len(mapped):
-                state["inflight"] = True
-                socketio.start_background_task(identify_speakers, sid)
+            if tracker:
+                mapped = session_speaker_map.get(sid, {})
+                locked = session_voice_locked.get(sid, set())
+                labels = [SpeakerTracker.label_for(i) for i in range(len(tracker.sums))]
+                every = 2 if any(l not in mapped for l in labels) else 4
+                if state["flushes"] % every == 0 and any(l not in locked for l in labels):
+                    state["inflight"] = True
+                    socketio.start_background_task(identify_speakers, sid)
 
         if not raw_points:
             return
-        # Conserver le label d'origine (pour la correction rétroactive côté
-        # extension), puis substituer par le nom confirmé si disponible
+        # Label d'origine de chaque point (pour la correction rétroactive côté
+        # extension), puis nom confirmé ACTUEL. Mistral a vu le transcript avec
+        # les noms substitués : son « qui » est souvent déjà un nom, qu'on
+        # ramène à son label via l'instantané — sinon un point attribué à un
+        # nom erroné ne pouvait plus jamais être corrigé.
+        label_of = {}
+        for label, name in smap_used.items():
+            label_of.setdefault(name, label)
         smap = session_speaker_map.get(sid, {})
         for p in raw_points:
-            p["qui_label"] = p.get("qui", "")
-            if p.get("qui") in smap:
-                p["qui"] = smap[p["qui"]]
+            qui = p.get("qui", "")
+            p["qui_label"] = qui if qui in smap_used else label_of.get(qui, qui)
+            p["qui"] = smap.get(p["qui_label"], qui)
         index = session_dupe_index.setdefault(sid, {})
         combined = list(all_points)
         unique: list = []

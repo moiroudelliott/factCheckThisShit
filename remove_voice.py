@@ -1,32 +1,24 @@
 """Retire une empreinte vocale de la banque (voices/) — utile pour retester
-l'identification (LLM, "non identifié") sur quelqu'un déjà enrôlé.
+l'identification (LLM, "non identifié") sur quelqu'un déjà enrôlé, ou pour
+effacer une empreinte enregistrée sous le mauvais nom.
 
 Usage:
     python remove_voice.py "Jordan Bardella"
     python remove_voice.py --list
 
 Le nom doit correspondre exactement à une clé de voices/index.json (voir
---list). Supprime l'entrée de l'index ET le fichier .npy associé. Effectif au
-prochain démarrage du backend.
+--list). Supprime l'entrée de l'index ET le fichier .npy associé. Pris en
+compte à la prochaine connexion de l'extension (la banque est rechargée à
+chaque connexion, inutile de redémarrer le backend).
 """
 
 import sys
-import os
-import json
 
 if sys.stdout.encoding and sys.stdout.encoding.lower() != "utf-8":
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 
-VOICES_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "voices")
-INDEX_PATH = os.path.join(VOICES_DIR, "index.json")
-
-
-def load_index() -> dict:
-    if not os.path.exists(INDEX_PATH):
-        return {}
-    with open(INDEX_PATH, encoding="utf-8") as f:
-        return json.load(f)
+from server import voice_store  # noqa: E402
 
 
 def main():
@@ -34,7 +26,7 @@ def main():
         print(__doc__)
         sys.exit(1)
 
-    index = load_index()
+    index = voice_store.load_index()
 
     if sys.argv[1] == "--list":
         if not index:
@@ -44,22 +36,14 @@ def main():
         return
 
     name = sys.argv[1].strip()
-    if name not in index:
+    if not voice_store.remove(name):
         print(f"✗ \"{name}\" n'est pas dans la banque. Noms disponibles (--list):")
         for n in sorted(index):
             print(f"  {n}")
         sys.exit(1)
 
-    meta = index.pop(name)
-    npy_path = os.path.join(VOICES_DIR, meta.get("file", ""))
-    if os.path.exists(npy_path):
-        os.remove(npy_path)
-
-    with open(INDEX_PATH, "w", encoding="utf-8") as f:
-        json.dump(index, f, ensure_ascii=False, indent=2)
-
-    print(f"✔ \"{name}\" retiré de la banque ({len(index)} restante(s)).")
-    print("  Effectif au prochain démarrage du backend.")
+    print(f"✔ \"{name}\" retiré de la banque ({len(index) - 1} restante(s)).")
+    print("  Pris en compte à la prochaine connexion de l'extension.")
 
 
 if __name__ == "__main__":

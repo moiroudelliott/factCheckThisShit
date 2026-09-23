@@ -8,14 +8,16 @@ Deux garde-fous contre un verdict resservi à tort :
 - chaque verdict est rangé sous l'ANNÉE de la vidéo vérifiée : un replay de
   2024 et un direct de 2026 ne partagent pas leurs verdicts, les chiffres
   ayant changé entre-temps.
-Seuls les verdicts sourcés (URL issue de la recherche) sont mis en cache."""
+Seuls les verdicts sourcés (URL issue de la recherche) sont mis en cache, et
+jamais ceux d'une affirmation datée par rapport au jour même (« ce soir »,
+« actuellement »). Nettoyage des verdicts déjà en base : purge_cache.py."""
 
 import sqlite3
 import threading
 import time
 
 from server.config import CACHE_DB, CACHE_TTL_DAYS, CACHE_MIN_CONF, CACHE_SIM_THRESHOLD
-from server.text_utils import claim_signature, claims_match
+from server.text_utils import claim_signature, claims_match, has_relative_time
 
 _cache_conn = sqlite3.connect(CACHE_DB, check_same_thread=False)
 _cache_conn.execute("""CREATE TABLE IF NOT EXISTS factchecks (
@@ -79,7 +81,8 @@ def lookup(claim: str, year: int):
 def store(claim: str, result: dict, year: int):
     conf = result.get("confiance")
     if (result.get("verdict") in (None, "", "non_verifiable") or not result.get("url")
-            or not isinstance(conf, int) or conf < CACHE_MIN_CONF):
+            or not isinstance(conf, int) or conf < CACHE_MIN_CONF
+            or has_relative_time(claim)):  # « ce soir », « actuellement »… : vrai un jour, pas le suivant
         return
     sig = claim_signature(claim)
     if len(sig.words) < 3:

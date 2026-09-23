@@ -84,6 +84,23 @@ def claims_match(a: ClaimSig, b: ClaimSig, threshold: float) -> bool:
     return len(a.words & b.words) / min(len(a.words), len(b.words)) >= threshold
 
 
+# Repères de temps plus fins que l'année : une affirmation qui en contient
+# (« ce soir », « actuellement », « il y a un an ») ne vaut que pour le jour
+# où elle est dite — son verdict ne doit pas être resservi par le cache,
+# même rangé sous la bonne année.
+_RELATIVE_TIME_RE = re.compile(
+    r"\b(?:aujourd['’]hui|ce soir|ce matin|cet après-midi|avant-hier|hier|demain"
+    r"|cette semaine|la semaine (?:dernière|prochaine)|ce mois-ci|le mois (?:dernier|prochain)"
+    r"|actuellement|en ce moment|à l['’]heure actuelle|à ce jour|à la date du débat"
+    r"|il y a (?:un|une|deux|trois|quelques|\d+) (?:jours?|semaines?|mois|ans?))\b",
+    re.IGNORECASE,
+)
+
+
+def has_relative_time(text: str) -> bool:
+    return bool(_RELATIVE_TIME_RE.search(str(text)))
+
+
 def strip_overlap(prev: str, text: str, min_words: int = 2, max_words: int = 15) -> str:
     """Retire du début de `text` les mots qui répètent la fin de `prev`.
     Deux chunks audio se chevauchent de 1,5 s (pour ne jamais couper un mot) :

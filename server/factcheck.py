@@ -91,6 +91,8 @@ RÈGLES DE RIGUEUR:
 - Une DONNÉE OFFICIELLE (Eurostat) donne la série exacte : compare-la au chiffre avancé en vérifiant l'année, le périmètre (France / UE) et la définition (dette au sens de Maastricht, chômage au sens du BIT, SMIC brut ou net…).
 - Un VOTE OFFICIEL (Assemblée nationale) prouve un vote s'il porte bien sur le texte dont parle l'affirmation (vérifie le titre et la date du scrutin) ; sinon ignore-le.
 - Une fiche de JEU DE DONNÉES (data.gouv.fr) prouve seulement qu'une donnée existe : elle ne confirme pas un chiffre à elle seule.
+- Une SOURCE PARTISANE (site d'un parti ou mouvement politique) prouve seulement ce que ce parti dit ou propose (programme, communiqué, candidat investi) — jamais un fait ou un chiffre, et elle ne compte pas comme source indépendante.
+- Une source de FIABILITÉ FAIBLE (site militant, conspirationniste ou agrégateur) ne suffit jamais seule et ne compte pas comme source indépendante : ne la choisis comme "url" que faute de mieux, avec confiance ≤ 50.
 - "url" doit être COPIÉE depuis un des résultats de recherche fournis — jamais inventée. Si aucun résultat n'appuie ton verdict, url vide ET confiance ≤ 50.
 - "source" = le nom du site de l'URL choisie (ex: "Le Monde" pour lemonde.fr), jamais une autorité que ce site se contente de citer.
 - L'affirmation vient d'une transcription automatique : si elle contient manifestement une erreur de transcription (nom déformé, mot incompréhensible), ne la juge pas "faux" pour autant — réponds "non_verifiable" en commençant l'explication par "Transcription douteuse :".
@@ -223,8 +225,9 @@ def web_search(query: str, max_results: int = 6) -> list:
     """Recherche web via l'instance SearxNG auto-hébergée (searxng/docker-compose.yml) —
     Brave + Mojeek uniquement (ni Google ni Bing, cf. searxng/config/settings.yml).
     Retourne [] si l'instance est injoignable, jamais d'appel direct à un moteur tiers.
-    Les domaines de EXCLUDED_SOURCE_DOMAINS (réseaux sociaux, désinformation
-    notoire) sont écartés avant d'atteindre le prompt."""
+    Les domaines de EXCLUDED_SOURCE_DOMAINS (réseaux sociaux, médias sous
+    sanctions de l'UE, satire… — voir config.py) sont écartés avant
+    d'atteindre le prompt."""
     try:
         r = requests.get(
             f"{SEARXNG_URL}/search",

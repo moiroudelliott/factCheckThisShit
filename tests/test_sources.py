@@ -4,10 +4,13 @@ relevés dans factcheck_cache.db.
 Lancer : python tests/test_sources.py   (ou python -m pytest tests)"""
 
 import os
+import re
 import sys
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, ROOT)
 
+from server.config import EXCLUDED_SOURCES, LOW_RELIABILITY_DOMAINS, PARTISAN_DOMAINS  # noqa: E402
 from server.sources import (  # noqa: E402
     finalize_result, is_excluded, normalize_verdict, source_label, source_tier, video_year,
 )
@@ -24,9 +27,44 @@ def test_tier_uses_hostname_not_substring():
 def test_excluded_domains():
     assert is_excluded("https://www.facebook.com/ZemmourTV/posts/1")
     assert is_excluded("https://fr.x.com/someone")
-    assert is_excluded("https://ripostelaique.com/article")
+    assert is_excluded("https://francais.rt.com/x")        # sanctions UE
+    assert is_excluded("https://www.legorafi.fr/2026/x")   # satire
     assert not is_excluded("https://www.lemonde.fr/x")
     assert not is_excluded("https://max.com/x")  # pas un sous-domaine de x.com
+    # un site militant n'est plus exclu pour sa ligne : il est annoté
+    assert not is_excluded("https://ripostelaique.com/article")
+
+
+def test_partisan_and_low_reliability_tiers():
+    assert source_tier("https://ripostelaique.com/article") == "FIABILITÉ FAIBLE"
+    assert source_tier("https://lundi.am/article") == "FIABILITÉ FAIBLE"
+    assert source_tier("https://rassemblementnational.fr/programme") == "SOURCE PARTISANE"
+    assert source_tier("https://lafranceinsoumise.fr/x") == "SOURCE PARTISANE"
+    assert source_tier("https://www.pcf.fr/x") == "SOURCE PARTISANE"
+    assert not set(LOW_RELIABILITY_DOMAINS) & set(PARTISAN_DOMAINS)
+
+
+def test_low_reliability_proof_never_settles_alone():
+    militant = [{"href": "https://www.fdesouche.com/x", "title": "t"}]
+    r = finalize_result({"verdict": "vrai", "confiance": 90, "source": "Fdesouche",
+                         "url": "https://www.fdesouche.com/x"}, militant, [], [])
+    assert r["url"] == "https://www.fdesouche.com/x" and r["confiance"] == 50
+    # un site de parti n'est pas plafonné : il prouve ce que le parti propose
+    party = [{"href": "https://parti-socialiste.fr/programme", "title": "t"}]
+    r = finalize_result({"verdict": "vrai", "confiance": 85, "source": "PS",
+                         "url": "https://parti-socialiste.fr/programme"}, party, [], [])
+    assert r["confiance"] == 85
+
+
+def test_published_policy_matches_the_code():
+    """La section « Sources » du site liste exactement les domaines du code."""
+    with open(os.path.join(ROOT, "site", "index.html"), encoding="utf-8") as f:
+        html = f.read()
+    published = {name: set(re.findall(r"<li>([^<]+)</li>", body))
+                 for name, body in re.findall(r'<ul class="domains" data-list="(\w+)">(.*?)</ul>', html, re.S)}
+    expected = {name: set(domains) for name, domains in EXCLUDED_SOURCES.items()}
+    expected.update(faible=set(LOW_RELIABILITY_DOMAINS), partisan=set(PARTISAN_DOMAINS))
+    assert published == expected
 
 
 def test_verdict_normalisation():

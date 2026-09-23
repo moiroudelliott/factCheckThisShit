@@ -105,6 +105,13 @@
       .js .reveal { opacity: 1; transform: none; transition: none; }
       .word { opacity: 1; transform: none; animation: none; }
     }
+    /* Politique des sources : critère, référence, liste complète des domaines */
+    .policy-group { padding: 22px 0; border-bottom: 1px solid rgba(242,241,238,0.12); }
+    .policy-group:last-child { border-bottom: 0; }
+    .policy-group h4 { font-family: 'Archivo', sans-serif; font-size: 15px; font-weight: 700; margin: 0 0 4px; }
+    .policy-group p { font-size: 13.5px; color: rgba(242,241,238,0.65); margin: 0 0 10px; max-width: 68ch; }
+    .domains { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 0; list-style: none; }
+    .domains li { font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: rgba(242,241,238,0.78); background: rgba(242,241,238,0.06); border: 1px solid rgba(242,241,238,0.1); padding: 2px 8px; }
     .legal { font-size: 12.5px; color: rgba(242,241,238,0.62); max-width: 68ch; }
     .legal h3 { font-size: 13px; color: rgba(242,241,238,0.85); margin: 18px 0 4px; }
     .legal p { margin: 0 0 4px; }
@@ -137,6 +144,7 @@
       </div>
       <nav class="nav-links" style="display:flex; align-items:center; gap:28px;">
         <a class="navlink" href="#methode" style="font-family:'IBM Plex Mono', monospace; font-size:12px; letter-spacing:0.04em; text-transform:uppercase;">Méthode</a>
+        <a class="navlink" href="#sources" style="font-family:'IBM Plex Mono', monospace; font-size:12px; letter-spacing:0.04em; text-transform:uppercase;">Sources</a>
         <a class="navlink" href="#demo" style="font-family:'IBM Plex Mono', monospace; font-size:12px; letter-spacing:0.04em; text-transform:uppercase;">Démonstration</a>
         <a class="navlink" href="#projet" style="font-family:'IBM Plex Mono', monospace; font-size:12px; letter-spacing:0.04em; text-transform:uppercase;">Le projet</a>
         <a class="btn-primary" href="#contact" style="font-family:'Archivo', sans-serif; font-weight:700; font-size:13px; color:#000; background:#e0324f; padding:9px 20px;">Nous contacter</a>
@@ -185,6 +193,62 @@
         <div><h3 style="font-family:'Archivo',sans-serif; font-size:16px; font-weight:700; margin:0 0 6px;">Registre consultable</h3><p style="font-size:13.5px; color:rgba(242,241,238,0.65); margin:0;">Tout ce qui a été dit et vérifié reste consultable et exportable à la fin de la session.</p></div>
       </div>
     </div>
+  </section>
+
+  <section id="sources" style="max-width:920px; margin:0 auto; padding:56px 28px;">
+    <p class="eyebrow">Sources</p>
+    <h2 style="font-family:'Archivo',sans-serif; font-weight:800; font-size:26px; margin:0 0 14px;">Ce qui fait foi, ce qui est écarté, et pourquoi</h2>
+    <p style="font-size:14.5px; color:rgba(242,241,238,0.65); max-width:62ch; margin:0 0 8px;">Les preuves passent dans cet ordre : les vérifications déjà publiées par les rédactions de fact-checking, les données officielles (Insee, Eurostat, Légifrance, votes de l'Assemblée nationale…), la presse établie et la recherche académique, puis le reste, annoté « fiabilité inconnue ». Un verdict tranché exige deux sources indépendantes concordantes ou une source officielle ; sans lien de preuve, la confiance affichée ne dépasse jamais 50 %.</p>
+    <p style="font-size:14.5px; color:rgba(242,241,238,0.65); max-width:62ch; margin:0 0 8px;">Une source n'est écartée que sur un critère vérifiable, jamais pour sa ligne politique. Les listes ci-dessous sont complètes et appliquées de la même façon quel que soit le bord.</p>
+
+    <div class="reveal" style="margin-top:12px;">
+      <h3 style="font-family:'Archivo',sans-serif; font-size:16px; font-weight:700; margin:24px 0 0; color:#f0435f;">Jamais retenues comme preuve</h3>
+      <div class="policy-group">
+        <h4>Réseaux sociaux et plateformes vidéo</h4>
+        <p>Ce ne sont pas des sources : la « preuve » y est souvent la déclaration même qu'on vérifie.</p>
+        <ul class="domains" data-list="plateformes">
+          <li>bsky.app</li><li>dailymotion.com</li><li>facebook.com</li><li>fb.com</li><li>instagram.com</li><li>linkedin.com</li><li>pinterest.com</li><li>pinterest.fr</li><li>reddit.com</li><li>t.me</li><li>telegram.me</li><li>threads.net</li><li>tiktok.com</li><li>twitter.com</li><li>x.com</li><li>youtu.be</li><li>youtube.com</li>
+        </ul>
+      </div>
+      <div class="policy-group">
+        <h4>Médias sous sanctions de l'Union européenne</h4>
+        <p>Diffusion interdite dans l'UE par le <a href="https://eur-lex.europa.eu/legal-content/FR/TXT/?uri=CELEX:32022R0350" rel="noopener">règlement (UE) 2022/350</a> du 1<sup>er</sup> mars 2022.</p>
+        <ul class="domains" data-list="sanctions_ue">
+          <li>rt.com</li><li>sputnikglobe.com</li><li>sputniknews.africa</li><li>sputniknews.com</li>
+        </ul>
+      </div>
+      <div class="policy-group">
+        <h4>Statut de presse refusé pour atteinte à la santé publique</h4>
+        <p>Statut de service de presse en ligne refusé par la commission paritaire des publications (CPPAP) en décembre 2022, puis de nouveau le 17 juillet 2024 après le réexamen ordonné par le Conseil d'État (<a href="https://www.franceinfo.fr/economie/medias/le-site-france-soir-perd-son-statut-de-service-de-presse-en-ligne_6736398.html" rel="noopener">franceinfo</a>).</p>
+        <ul class="domains" data-list="sante_publique">
+          <li>francesoir.fr</li>
+        </ul>
+      </div>
+      <div class="policy-group">
+        <h4>Satire revendiquée</h4>
+        <p>Des articles inventés par principe, qui se présentent comme tels.</p>
+        <ul class="domains" data-list="satire">
+          <li>legorafi.fr</li><li>nordpresse.be</li>
+        </ul>
+      </div>
+
+      <h3 style="font-family:'Archivo',sans-serif; font-size:16px; font-weight:700; margin:32px 0 0; color:#f0435f;">Gardées, mais jamais suffisantes seules</h3>
+      <div class="policy-group">
+        <h4>Fiabilité faible</h4>
+        <p>Sites militants (qui revendiquent une cause), conspirationnistes, ou agrégateurs sans rédaction, quel que soit leur bord. Ils peuvent compléter une preuve, pas en tenir lieu : un verdict qui ne s'appuie que sur l'un d'eux est affiché avec une confiance d'au plus 50 %.</p>
+        <ul class="domains" data-list="faible">
+          <li>bvoltaire.fr</li><li>contre-attaque.net</li><li>egaliteetreconciliation.fr</li><li>fdesouche.com</li><li>frustrationmagazine.fr</li><li>lesmoutonsenrages.fr</li><li>lundi.am</li><li>mondialisation.ca</li><li>reseauinternational.net</li><li>ripostelaique.com</li><li>voltairenet.org</li>
+        </ul>
+      </div>
+      <div class="policy-group">
+        <h4>Sources partisanes</h4>
+        <p>Sites des partis et mouvements politiques. Ils prouvent ce qu'un parti dit ou propose (programme, communiqué), jamais un fait ou un chiffre.</p>
+        <ul class="domains" data-list="partisan">
+          <li>debout-la-france.fr</li><li>eelv.fr</li><li>generation-s.fr</li><li>horizonsleparti.fr</li><li>lafranceinsoumise.fr</li><li>les-patriotes.fr</li><li>lesecologistes.fr</li><li>lutte-ouvriere.org</li><li>mouvementdemocrate.fr</li><li>npa-lanticapitaliste.org</li><li>parti-reconquete.fr</li><li>parti-renaissance.fr</li><li>parti-socialiste.fr</li><li>pcf.fr</li><li>place-publique.eu</li><li>rassemblementnational.fr</li><li>republicains.fr</li><li>revolutionpermanente.fr</li><li>upr.fr</li>
+        </ul>
+      </div>
+    </div>
+    <p style="font-size:13.5px; color:rgba(242,241,238,0.65); max-width:62ch; margin:18px 0 0;">Une classification vous semble injuste, ou un site manque ? <a href="mailto:contact@source.codeminds.fr?subject=Sourc%C3%A9%20%E2%80%94%20politique%20des%20sources">Écrivez-nous</a> : chaque demande est examinée avec les mêmes critères.</p>
   </section>
 
   <section id="demo" style="max-width:920px; margin:0 auto; padding:56px 28px;">

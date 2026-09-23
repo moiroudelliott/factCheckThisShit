@@ -211,7 +211,8 @@ bloc de preuves, dans cet ordre (factcheck.build_evidence_block) :
   FACT-CHECK DÉJÀ PUBLIÉ / DONNÉE OFFICIELLE — Eurostat / VOTE OFFICIEL — Assemblée nationale
   / JEU DE DONNÉES OFFICIEL (data.gouv.fr, « fiche de catalogue ») / SOURCE ACADÉMIQUE
   / résultats web annotés par domaine (sources.source_tier, sur le NOM D'HÔTE) :
-    FACT-CHECK PUBLIÉ (rubrique de fact-checking) / SOURCE OFFICIELLE / PRESSE ÉTABLIE / FIABILITÉ INCONNUE
+    FACT-CHECK PUBLIÉ (rubrique de fact-checking) / SOURCE OFFICIELLE / PRESSE ÉTABLIE
+    / SOURCE PARTISANE / FIABILITÉ FAIBLE / FIABILITÉ INCONNUE
         │
         ▼
 prompt Mistral (+ propos exact si citation validée, §7) → JSON {verdict, confiance, explication, source, url}
@@ -224,6 +225,7 @@ sources.finalize_result :
     plus au-dessus d'un lien vers un blog ; pour un fact-check publié, le nom de la rédaction ;
     pour une preuve structurée, « Eurostat » / « Assemblée nationale »
   - pas d'URL de preuve → confiance plafonnée à 50 %, source « non sourcé »
+  - preuve de FIABILITÉ FAIBLE → confiance plafonnée à 50 % (jamais mise en cache)
         │
         ▼
 cache.store (seulement si sourcé, confiance ≥ 60 et verdict ≠ non_verifiable)
@@ -241,7 +243,13 @@ cache.store (seulement si sourcé, confiance ≥ 60 et verdict ≠ non_verifiabl
 
 **Signalements** — le bouton ⚑ d'une carte ou du récap envoie `POST /report_verdict` (via le service worker : seule l'origine de l'extension est acceptée) avec un motif parmi `verdict_faux`, `mauvaise_source`, `pas_un_fait`, `transcription`, `locuteur`. Le signalement est ajouté à `data/reports.jsonl` et, sauf pour un mauvais locuteur, le verdict **sort du cache** (`cache.mark_reported`) : il n'est plus jamais resservi, et `purge_cache.py` le supprime.
 
-**Sources exclues** (`config.EXCLUDED_SOURCE_DOMAINS`) : réseaux sociaux et plateformes vidéo (ce ne sont pas des sources, et la « preuve » y est souvent la déclaration même qu'on vérifie), plus une courte liste de sites de désinformation notoires — liste éditoriale, à ajuster dans `config.py`.
+**Politique des sources** (`config.py`, publiée en entier sur le site, section « Sources » — `tests/test_sources.py` vérifie que la page et le code concordent). Principe : une source n'est **exclue** que sur un critère vérifiable, jamais pour sa ligne politique ; les sites militants, quel que soit leur bord, sont gardés mais annotés.
+
+- **Exclues** (`EXCLUDED_SOURCES`, filtrées avant le prompt), par critère : réseaux sociaux et plateformes vidéo (ce ne sont pas des sources, et la « preuve » y est souvent la déclaration même qu'on vérifie) ; médias d'État sous sanctions de l'UE (règlement (UE) 2022/350) ; statut de presse refusé par la CPPAP pour atteinte à la santé publique ; satire revendiquée.
+- **`FIABILITÉ FAIBLE`** (`LOW_RELIABILITY_DOMAINS`) : sites militants, conspirationnistes ou agrégateurs sans rédaction. Le prompt interdit de s'appuyer sur eux seuls, et `finalize_result` plafonne à 50 % la confiance d'un verdict dont ils sont la preuve.
+- **`SOURCE PARTISANE`** (`PARTISAN_DOMAINS`) : sites des partis et mouvements. Ils prouvent ce qu'un parti dit ou propose (programme, communiqué), jamais un fait ; pas de plafond, puisqu'ils sont la bonne preuve pour « tel parti propose X ».
+
+Pour ajouter ou reclasser un site : modifier `config.py` **et** la section « Sources » de `site/index.html` (le test échoue sinon), puis `purge_cache.py` pour retirer les verdicts qui s'appuyaient dessus.
 
 **Souveraineté de la recherche web** — `web_search()` n'appelle pas un moteur tiers directement : elle interroge une instance **SearxNG auto-hébergée** (`searxng/docker-compose.yml`, `127.0.0.1:8080`), configurée pour ne solliciter que Brave et Mojeek (`searxng/config/settings.yml`). `datagouv_search()` interroge en direct l'API publique de `data.gouv.fr`. Si SearxNG est injoignable, `web_search()` retourne `[]` (dégradé, jamais bloquant).
 

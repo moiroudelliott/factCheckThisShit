@@ -20,21 +20,52 @@ MISTRAL_RETRY_BASE_S = 2.0  # backoff exponentiel: 2s, 4s, 8s (sauf Retry-After 
 # tiers qui voit passer les claims.
 SEARXNG_URL = os.environ.get("SEARXNG_URL", "http://127.0.0.1:8080").rstrip("/")
 
-# Domaines jamais retenus comme preuve (filtrés des résultats AVANT le prompt).
-# Réseaux sociaux et plateformes vidéo : ce ne sont pas des sources, et la
-# « preuve » y est souvent la déclaration même qu'on vérifie. Sites de
-# désinformation notoires (cf. Décodex) : une liste courte, volontairement
-# éditoriale — à ajuster ici. Correspondance par nom de domaine exact ou
+# ── Politique des sources ─────────────────────────────────────────────────
+# Publiée en entier sur le site (site/index.html, section « Sources ») :
+# tests/test_sources.py vérifie que la page et ces listes concordent.
+# Principe : une source n'est EXCLUE que sur un critère vérifiable, jamais
+# pour sa ligne politique ; les sites militants, quel que soit leur bord,
+# sont gardés mais annotés. Correspondance par nom de domaine exact ou
 # sous-domaine (fr.x.com est couvert par x.com).
-EXCLUDED_SOURCE_DOMAINS = (
-    # réseaux sociaux / plateformes
-    "facebook.com", "fb.com", "x.com", "twitter.com", "instagram.com", "tiktok.com",
-    "youtube.com", "youtu.be", "dailymotion.com", "reddit.com", "linkedin.com",
-    "threads.net", "bsky.app", "t.me", "telegram.me", "pinterest.com", "pinterest.fr",
-    # désinformation notoire
-    "ripostelaique.com", "bvoltaire.fr", "fdesouche.com", "egaliteetreconciliation.fr",
-    "francesoir.fr", "reseauinternational.net", "lesmoutonsenrages.fr", "wikistrike.com",
-    "sputniknews.com", "rt.com",
+
+# Jamais retenus comme preuve (filtrés des résultats AVANT le prompt), par critère
+EXCLUDED_SOURCES = {
+    # Réseaux sociaux et plateformes vidéo : ce ne sont pas des sources, et la
+    # « preuve » y est souvent la déclaration même qu'on vérifie
+    "plateformes": (
+        "facebook.com", "fb.com", "x.com", "twitter.com", "instagram.com", "tiktok.com",
+        "youtube.com", "youtu.be", "dailymotion.com", "reddit.com", "linkedin.com",
+        "threads.net", "bsky.app", "t.me", "telegram.me", "pinterest.com", "pinterest.fr",
+    ),
+    # Médias d'État dont la diffusion est interdite dans l'Union européenne
+    # (règlement (UE) 2022/350 du 1er mars 2022)
+    "sanctions_ue": ("rt.com", "sputniknews.com", "sputnikglobe.com", "sputniknews.africa"),
+    # Statut de service de presse en ligne refusé par la CPPAP pour atteinte à
+    # la protection de la santé publique (décembre 2022, puis 17 juillet 2024
+    # après le réexamen ordonné par le Conseil d'État)
+    "sante_publique": ("francesoir.fr",),
+    # Satire revendiquée : les articles sont inventés par principe
+    "satire": ("legorafi.fr", "nordpresse.be"),
+}
+EXCLUDED_SOURCE_DOMAINS = tuple(d for group in EXCLUDED_SOURCES.values() for d in group)
+
+# Annotés « FIABILITÉ FAIBLE », jamais exclus : sites militants (qui
+# revendiquent une cause), conspirationnistes, ou agrégateurs sans rédaction,
+# quel que soit leur bord. Jamais suffisants seuls : un verdict dont la
+# preuve est l'un d'eux a sa confiance plafonnée (sources.finalize_result).
+LOW_RELIABILITY_DOMAINS = (
+    "bvoltaire.fr", "contre-attaque.net", "egaliteetreconciliation.fr", "fdesouche.com",
+    "frustrationmagazine.fr", "lesmoutonsenrages.fr", "lundi.am", "mondialisation.ca",
+    "reseauinternational.net", "ripostelaique.com", "voltairenet.org",
+)
+# Annotés « SOURCE PARTISANE » : sites des partis et mouvements politiques.
+# Ils prouvent ce qu'un parti dit ou propose (programme, communiqué), jamais un fait.
+PARTISAN_DOMAINS = (
+    "debout-la-france.fr", "eelv.fr", "generation-s.fr", "horizonsleparti.fr",
+    "lafranceinsoumise.fr", "les-patriotes.fr", "lesecologistes.fr", "lutte-ouvriere.org",
+    "mouvementdemocrate.fr", "npa-lanticapitaliste.org", "parti-reconquete.fr",
+    "parti-renaissance.fr", "parti-socialiste.fr", "pcf.fr", "place-publique.eu",
+    "rassemblementnational.fr", "republicains.fr", "revolutionpermanente.fr", "upr.fr",
 )
 
 # Rédactions de vérification françaises dont les fact-checks publiés sont

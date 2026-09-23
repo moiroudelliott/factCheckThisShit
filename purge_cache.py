@@ -14,7 +14,8 @@ Usage:
 Règles automatiques (celles qu'applique aujourd'hui le backend avant de
 mettre un verdict en cache — voir server/cache.py et server/sources.py) :
   - aucune URL de preuve (verdict « non sourcé »),
-  - URL sur un domaine exclu (réseaux sociaux, désinformation notoire),
+  - URL sur un domaine exclu (réseaux sociaux, médias sous sanctions de l'UE,
+    satire…) ou de fiabilité faible (listes dans server/config.py),
   - verdict inconnu ou « non_verifiable », confiance absente ou < CACHE_MIN_CONF,
   - affirmation datée par rapport au jour même (« ce soir », « actuellement »…),
   - verdict signalé par un utilisateur (bouton ⚑ de l'extension ; motifs dans
@@ -37,7 +38,7 @@ if sys.stdout.encoding and sys.stdout.encoding.lower() != "utf-8":
     sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 
 from server.config import CACHE_DB, CACHE_MIN_CONF  # noqa: E402
-from server.sources import VERDICTS, is_excluded  # noqa: E402
+from server.sources import VERDICTS, is_excluded, is_low_reliability  # noqa: E402
 from server.text_utils import has_relative_time  # noqa: E402
 
 
@@ -46,6 +47,8 @@ def auto_reason(verdict, conf, url, claim) -> str:
         return "non sourcé"
     if is_excluded(url):
         return "source exclue"
+    if is_low_reliability(url):
+        return "source de fiabilité faible"
     if verdict not in VERDICTS or verdict == "non_verifiable":
         return "verdict inutilisable"
     if not isinstance(conf, int) or conf < CACHE_MIN_CONF:

@@ -1,17 +1,21 @@
 """Règles sur les sources et les verdicts du fact-check — fonctions pures,
 sans modèle ni réseau (testables seules, cf. tests/).
 
-- quels domaines sont exclus, officiels, de presse établie ;
+- quels domaines sont exclus, officiels, de presse établie, partisans ou
+  de fiabilité faible (listes dans config.py, publiées sur le site) ;
 - normalisation du verdict renvoyé par Mistral ;
 - nom de source affiché, cohérent avec l'URL réellement liée ;
-- confiance plafonnée quand aucune preuve n'est liée."""
+- confiance plafonnée quand aucune preuve n'est liée, ou quand la seule
+  preuve est de fiabilité faible."""
 
 import re
 import time
 import unicodedata
 from urllib.parse import urlparse
 
-from server.config import EXCLUDED_SOURCE_DOMAINS, FACTCHECK_SECTIONS
+from server.config import (
+    EXCLUDED_SOURCE_DOMAINS, FACTCHECK_SECTIONS, LOW_RELIABILITY_DOMAINS, PARTISAN_DOMAINS,
+)
 
 # Hiérarchie de fiabilité des domaines — annotée dans le prompt pour que le
 # verdict pèse une source officielle plus lourd qu'un blog. Noms de domaine
@@ -34,6 +38,7 @@ _VERDICT_ALIASES = {
     "trompeuse": "trompeur", "non_verifie": "non_verifiable", "inverifiable": "non_verifiable",
 }
 UNSOURCED_MAX_CONF = 50  # plafond de confiance d'un verdict sans URL de preuve
+LOW_RELIABILITY_MAX_CONF = 50  # … ou dont la preuve est de fiabilité faible (jamais mis en cache)
 
 _SOURCE_STOP = {"les", "des", "via", "and", "the", "sur", "avec", "citant", "selon", "source", "sources", "site"}
 
@@ -58,6 +63,10 @@ def is_excluded(url: str) -> bool:
     return on_domain(host(url), EXCLUDED_SOURCE_DOMAINS)
 
 
+def is_low_reliability(url: str) -> bool:
+    return on_domain(host(url), LOW_RELIABILITY_DOMAINS)
+
+
 def is_factcheck_section(url: str) -> bool:
     """Article d'une rubrique de fact-checking (hôte + début du chemin)."""
     try:
@@ -76,6 +85,10 @@ def source_tier(url: str) -> str:
         return "SOURCE OFFICIELLE"
     if on_domain(h, TIER_PRESS):
         return "PRESSE ÉTABLIE"
+    if on_domain(h, PARTISAN_DOMAINS):
+        return "SOURCE PARTISANE"
+    if on_domain(h, LOW_RELIABILITY_DOMAINS):
+        return "FIABILITÉ FAIBLE"
     return "FIABILITÉ INCONNUE"
 
 
@@ -139,6 +152,9 @@ def finalize_result(data: dict, results: list, academic: list, official: list, k
     conf = max(0, min(100, int(conf))) if isinstance(conf, (int, float)) else None
     if not url and conf is not None:
         conf = min(conf, UNSOURCED_MAX_CONF)
+    # Un site militant ou conspirationniste ne suffit jamais seul à trancher
+    if is_low_reliability(url) and conf is not None:
+        conf = min(conf, LOW_RELIABILITY_MAX_CONF)
     out["confiance"] = conf
     return out
 

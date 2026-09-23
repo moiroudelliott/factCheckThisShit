@@ -20,6 +20,23 @@ MISTRAL_RETRY_BASE_S = 2.0  # backoff exponentiel: 2s, 4s, 8s (sauf Retry-After 
 # tiers qui voit passer les claims.
 SEARXNG_URL = os.environ.get("SEARXNG_URL", "http://127.0.0.1:8080").rstrip("/")
 
+# Domaines jamais retenus comme preuve (filtrés des résultats AVANT le prompt).
+# Réseaux sociaux et plateformes vidéo : ce ne sont pas des sources, et la
+# « preuve » y est souvent la déclaration même qu'on vérifie. Sites de
+# désinformation notoires (cf. Décodex) : une liste courte, volontairement
+# éditoriale — à ajuster ici. Correspondance par nom de domaine exact ou
+# sous-domaine (fr.x.com est couvert par x.com).
+EXCLUDED_SOURCE_DOMAINS = (
+    # réseaux sociaux / plateformes
+    "facebook.com", "fb.com", "x.com", "twitter.com", "instagram.com", "tiktok.com",
+    "youtube.com", "youtu.be", "dailymotion.com", "reddit.com", "linkedin.com",
+    "threads.net", "bsky.app", "t.me", "telegram.me", "pinterest.com", "pinterest.fr",
+    # désinformation notoire
+    "ripostelaique.com", "bvoltaire.fr", "fdesouche.com", "egaliteetreconciliation.fr",
+    "francesoir.fr", "reseauinternational.net", "lesmoutonsenrages.fr", "wikistrike.com",
+    "sputniknews.com", "rt.com",
+)
+
 # ── Buffer de transcription → analyse Mistral ─────────────────────────────
 FLUSH_INTERVAL = 22    # secondes max entre deux analyses Mistral
 MIN_WORDS = 30         # ne pas appeler Mistral avec moins de 30 mots (trop peu pour un talking point)

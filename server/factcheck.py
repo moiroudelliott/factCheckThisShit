@@ -16,6 +16,7 @@ from server.config import (
 )
 from server.text_utils import _STOPWORDS
 from server import cache
+from server.sources import finalize_result, is_excluded, source_tier, video_year
 from server.state import session_contexts
 
 # ── Prompts ────────────────────────────────────────────────────────────────
@@ -76,7 +77,9 @@ RÈGLES DE RIGUEUR:
 - Pour une affirmation CAUSALE ou sociologique ("X provoque Y", "X n'a pas d'effet sur Y"), les SOURCES ACADÉMIQUES (études évaluées par les pairs) pèsent plus lourd que la presse et que tes intuitions. Ne les utilise que si elles portent réellement sur le sujet de l'affirmation.
 - "confiance" (0-100) = ta certitude dans le verdict: ~90+ = sources officielles concordantes; ~70 = bien sourcé; ~50 = plausible mais mal sourcé; en dessous de 40, utilise plutôt "non_verifiable".
 - Quand les sources donnent un chiffre exact, cite-le dans "explication".
-- "url" doit être COPIÉE depuis un des résultats de recherche fournis — jamais inventée. Si aucun résultat n'appuie ton verdict, url vide.
+- Une fiche de JEU DE DONNÉES (data.gouv.fr) prouve seulement qu'une donnée existe : elle ne confirme pas un chiffre à elle seule.
+- "url" doit être COPIÉE depuis un des résultats de recherche fournis — jamais inventée. Si aucun résultat n'appuie ton verdict, url vide ET confiance ≤ 50.
+- "source" = le nom du site de l'URL choisie (ex: "Le Monde" pour lemonde.fr), jamais une autorité que ce site se contente de citer.
 - Sois honnête : en cas de doute réel, réponds "non_verifiable" plutôt que de deviner."""
 
 
@@ -205,7 +208,9 @@ def call_mistral(text: str, context: dict = None, recent_points: list = None, si
 def web_search(query: str, max_results: int = 6) -> list:
     """Recherche web via l'instance SearxNG auto-hébergée (searxng/docker-compose.yml) —
     Brave + Mojeek uniquement (ni Google ni Bing, cf. searxng/config/settings.yml).
-    Retourne [] si l'instance est injoignable, jamais d'appel direct à un moteur tiers."""
+    Retourne [] si l'instance est injoignable, jamais d'appel direct à un moteur tiers.
+    Les domaines de EXCLUDED_SOURCE_DOMAINS (réseaux sociaux, désinformation
+    notoire) sont écartés avant d'atteindre le prompt."""
     try:
         r = requests.get(
             f"{SEARXNG_URL}/search",
@@ -213,27 +218,18 @@ def web_search(query: str, max_results: int = 6) -> list:
             timeout=8,
         )
         r.raise_for_status()
-        results = r.json().get("results", [])[:max_results]
-        return [{"title": res.get("title", ""), "body": res.get("content", ""), "href": res.get("url", "")}
-                for res in results]
+        out = []
+        for res in r.json().get("results", []):
+            href = res.get("url", "")
+            if is_excluded(href):
+                continue
+            out.append({"title": res.get("title", ""), "body": res.get("content", ""), "href": href})
+            if len(out) >= max_results:
+                break
+        return out
     except Exception as e:
         print(f"[Search error] {type(e).__name__}: {e}")
         return []
-
-
-# Hiérarchie de fiabilité des domaines — annotée dans le prompt pour que le
-# verdict pèse une source officielle plus lourd qu'un blog
-_TIER_OFFICIAL = (
-    "insee.fr", "eurostat", "ec.europa.eu", "legifrance.gouv.fr", "vie-publique.fr",
-    "senat.fr", "assemblee-nationale.fr", ".gouv.fr", "banque-france.fr",
-    "oecd.org", "ocde.org", "ecb.europa.eu", "ined.fr", "ademe.fr", "conseil-constitutionnel.fr",
-)
-_TIER_PRESS = (
-    "afp.com", "lemonde.fr", "liberation.fr", "francetvinfo.fr", "radiofrance.fr",
-    "franceinfo.fr", "lefigaro.fr", "lesechos.fr", "publicsenat.fr", "lcp.fr",
-    "reuters.com", "latribune.fr", "ouest-france.fr", "bfmtv.com", "20minutes.fr",
-    "courrierinternational.com", "la-croix.com", "sudouest.fr",
-)
 
 
 def _scholar_query(claim: str) -> str:
@@ -247,10 +243,17 @@ def _scholar_query(claim: str) -> str:
 def scholar_search(claim: str, max_results: int = 4) -> list:
     """Études académiques pour ancrer les claims sociologiques/causaux.
     HAL (archive ouverte française, fort en sciences sociales FR) + OpenAlex
-    (index scientifique mondial). APIs publiques, gratuites, sans clé."""
+    (index scientifique mondial). APIs publiques, gratuites, sans clé.
+    Les deux APIs sont interrogées en parallèle (greenlets eventlet)."""
     query = _scholar_query(claim)
     if len(query.split()) < 2:
         return []
+    hal = eventlet.spawn(_hal_search, query)
+    openalex = eventlet.spawn(_openalex_search, query)
+    return (hal.wait() + openalex.wait())[:max_results]
+
+
+def _hal_search(query: str) -> list:
     out = []
     try:
         r = requests.get(
@@ -267,6 +270,11 @@ def scholar_search(claim: str, max_results: int = 4) -> list:
                 out.append({"title": f"{title} ({year}, HAL)", "body": abstract[:300], "href": uri})
     except Exception as e:
         print(f"[Scholar HAL] {type(e).__name__}: {e}")
+    return out
+
+
+def _openalex_search(query: str) -> list:
+    out = []
     try:
         r = requests.get(
             "https://api.openalex.org/works",
@@ -290,7 +298,7 @@ def scholar_search(claim: str, max_results: int = 4) -> list:
                 out.append({"title": f"{title} ({year}, OpenAlex)", "body": abstract, "href": url})
     except Exception as e:
         print(f"[Scholar OpenAlex] {type(e).__name__}: {e}")
-    return out[:max_results]
+    return out
 
 
 def datagouv_search(claim: str, max_results: int = 3) -> list:
@@ -321,15 +329,6 @@ def datagouv_search(claim: str, max_results: int = 3) -> list:
         return []
 
 
-def _source_tier(url: str) -> str:
-    u = (url or "").lower()
-    if any(d in u for d in _TIER_OFFICIAL):
-        return "SOURCE OFFICIELLE"
-    if any(d in u for d in _TIER_PRESS):
-        return "PRESSE ÉTABLIE"
-    return "FIABILITÉ INCONNUE"
-
-
 def build_evidence_block(results: list, academic: list = None, official: list = None) -> str:
     if not results and not academic and not official:
         return "Aucun résultat de recherche disponible — base-toi sur tes connaissances uniquement."
@@ -337,7 +336,8 @@ def build_evidence_block(results: list, academic: list = None, official: list = 
     i = 0
     for r in (official or []):
         i += 1
-        lines.append(f"[{i}] [SOURCE OFFICIELLE — DATA.GOUV.FR] {(r.get('title') or '').strip()} — "
+        lines.append(f"[{i}] [JEU DE DONNÉES OFFICIEL — fiche du catalogue data.gouv.fr, ne contient pas "
+                     f"forcément le chiffre] {(r.get('title') or '').strip()} — "
                      f"{(r.get('body') or '').strip()[:300]}\n    URL: {(r.get('href') or '').strip()}")
     for r in (academic or []):
         i += 1
@@ -348,18 +348,25 @@ def build_evidence_block(results: list, academic: list = None, official: list = 
         title = (r.get("title") or "").strip()
         body = (r.get("body") or "").strip()[:300]
         href = (r.get("href") or "").strip()
-        lines.append(f"[{i}] [{_source_tier(href)}] {title} — {body}\n    URL: {href}")
+        lines.append(f"[{i}] [{source_tier(href)}] {title} — {body}\n    URL: {href}")
     return "\n".join(lines)
 
 
 def call_mistral_factcheck(claim: str, context: dict = None, sid: str = None) -> dict:
-    results = web_search(claim)
-    academic = scholar_search(claim)
-    official = datagouv_search(claim)
+    context = context or {}
+    # Replay d'un débat passé : sans l'année, la recherche remonte les
+    # chiffres d'aujourd'hui pour juger des propos d'alors
+    year = video_year(context)
+    web_query = f"{claim} {year}" if year < time.localtime().tm_year and str(year) not in claim else claim
+    # Les trois recherches en parallèle (greenlets) : en série, leurs timeouts
+    # s'additionnaient (jusqu'à ~26 s avant même l'appel Mistral)
+    jobs = (eventlet.spawn(web_search, web_query), eventlet.spawn(scholar_search, claim),
+            eventlet.spawn(datagouv_search, claim))
+    results, academic, official = (j.wait() for j in jobs)
     print(f"[Search] {len(results)} web + {len(academic)} académique(s) + {len(official)} data.gouv.fr pour «{claim[:50]}»")
     prompt = FACTCHECK_PROMPT_TEMPLATE.format(
         today=time.strftime("%d/%m/%Y"),
-        context_block=build_context_block(context or {}),
+        context_block=build_context_block(context),
         claim=claim,
         evidence_block=build_evidence_block(results, academic, official),
     )
@@ -370,27 +377,11 @@ def call_mistral_factcheck(claim: str, context: dict = None, sid: str = None) ->
         if start != -1:
             data, _ = json.JSONDecoder().raw_decode(content, start)
             if isinstance(data, dict) and "verdict" in data:
-                data.setdefault("source", "")
-                # L'URL doit venir des résultats de recherche : jamais d'URL inventée,
-                # et uniquement http(s) (une URL javascript: serait un vecteur XSS)
-                url = data.get("url", "")
-                valid_hrefs = ({r.get("href") for r in results} | {r.get("href") for r in academic}
-                               | {r.get("href") for r in official})
-                if not (isinstance(url, str) and url.startswith(("http://", "https://")) and url in valid_hrefs):
-                    data["url"] = ""
-                conf = data.get("confiance")
-                data["confiance"] = max(0, min(100, int(conf))) if isinstance(conf, (int, float)) else None
-                return data
+                return finalize_result(data, results, academic, official)
     except (json.JSONDecodeError, ValueError):
         pass
-    return {"verdict": "non_verifiable", "confiance": None, "explication": "Impossible de vérifier.", "source": "", "url": ""}
-
-
-def video_year(context: dict) -> int:
-    """Année des propos vérifiés : celle de la publication de la vidéo si
-    connue (replay), sinon l'année en cours (direct)."""
-    date = str((context or {}).get("date") or "")
-    return int(date[:4]) if re.match(r"^(19|20)\d\d", date) else time.localtime().tm_year
+    return {"verdict": "non_verifiable", "confiance": None, "explication": "Réponse du modèle illisible.",
+            "source": "", "url": "", "indisponible": True}
 
 
 def fact_check_affirmation(sid: str, claim_id: str, claim_text: str):
@@ -411,10 +402,13 @@ def fact_check_affirmation(sid: str, claim_id: str, claim_text: str):
         print(f"[FactCheck error] {type(e).__name__}: {e}")
         # Toujours émettre un résultat, sinon la carte côté extension reste
         # bloquée en spinner et gèle toute la file d'affichage
+        # « indisponible » : l'extension l'affiche comme une panne, pas comme
+        # un verdict « non vérifiable » (qui est une conclusion de fond)
         socketio.emit("fact_check_result", {
             "id": claim_id,
             "verdict": "non_verifiable",
-            "explication": "Vérification indisponible.",
+            "indisponible": True,
+            "explication": "Vérification indisponible (erreur technique).",
             "source": "",
             "url": "",
         }, to=sid)

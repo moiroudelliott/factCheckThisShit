@@ -1,4 +1,4 @@
-# Setup Guide — vérif.live
+# Guide d'installation — SOURCÉ
 
 Ce guide installe le **backend** (Whisper + diarisation + Mistral). Le
 produit lui-même est l'extension Chrome dans [`extension/`](extension/),
@@ -55,12 +55,12 @@ cp .env.example .env
 
 ---
 
-## Étape 4 — Pré-télécharger le modèle Whisper (~1.5 Go)
+## Étape 4 — Pré-télécharger le modèle Whisper (~1,6 Go)
 
 Le modèle est téléchargé une seule fois et mis en cache:
 
 ```bash
-python -c "from faster_whisper import WhisperModel; WhisperModel('medium', device='cuda', compute_type='float16'); print('Modèle prêt')"
+python -c "from faster_whisper import WhisperModel; WhisperModel('large-v3-turbo', device='cuda', compute_type='float16'); print('Modèle prêt')"
 ```
 
 Cache: `%USERPROFILE%\.cache\huggingface\hub\`
@@ -103,7 +103,7 @@ Attendre: `Modèle prêt.` puis `Running on http://127.0.0.1:5000`
 
 **Extension:**
 1. Ouvrir une vidéo de débat sur YouTube
-2. Cliquer l'icône vérif.live dans la barre d'extensions
+2. Cliquer l'icône SOURCÉ (point rouge) dans la barre d'extensions
 3. Vérifier que l'émission/les intervenants sont bien détectés (ou les
    compléter à la main), puis *Démarrer l'analyse*
 4. Autoriser le partage d'onglet si Chrome le demande
@@ -115,10 +115,17 @@ Attendre: `Modèle prêt.` puis `Running on http://127.0.0.1:5000`
 1. Après quelques secondes de parole, un badge "qui parle" apparaît en haut
    à gauche de la vidéo
 2. Après ~20-30s de propos substantiel, les premières cartes de vérification
-   apparaissent en haut à droite
-3. Le bouton *Récap* (chip en haut à droite) liste tous les points extraits
-4. Vérifier que le GPU travaille pendant la transcription: `nvidia-smi`
+   apparaissent en haut à droite de la vidéo
+3. La puce SOURCÉ (en bas à droite de la vidéo, au-dessus des contrôles)
+   affiche l'état de l'analyse ; son bouton *Récap* liste tous les points
+   extraits et permet de les exporter en Markdown
+4. *■* arrête l'analyse : les derniers verdicts arrivent pendant la
+   « finalisation », le récap reste consultable et exportable, *✕* ferme
+5. Vérifier que le GPU travaille pendant la transcription: `nvidia-smi`
    (utilisation GPU doit monter)
+
+Tests (sans GPU, sans clé, sans réseau) : `python tests/test_backend_smoke.py`
+et les autres fichiers de `tests/` — voir `ARCHITECTURE.md` §12.
 
 ---
 
@@ -129,8 +136,11 @@ Attendre: `Modèle prêt.` puis `Running on http://127.0.0.1:5000`
 | `torch.cuda.is_available()` retourne False | Refaire l'étape 1 (PyTorch CUDA) |
 | `ffprobe: command not found` | Ajouter FFmpeg au PATH (étape 2) |
 | Popup affiche "backend éteint" | Le backend n'écoute que sur `127.0.0.1:5000` — vérifier qu'il tourne (`python backend.py`) et qu'aucun autre process n'occupe le port |
-| Chip affiche "jeton invalide" | `BACKEND_TOKEN` est défini dans `.env` mais ne correspond pas au champ "Jeton d'accès" (section Avancé de la popup) — ou vice-versa |
-| Pas de transcription mais pas d'erreur | Vérifier que l'onglet capturé joue bien du son (icône haut-parleur dans l'onglet Chrome) |
+| Puce affiche "jeton invalide" | `BACKEND_TOKEN` est défini dans `.env` mais ne correspond pas au champ "Jeton d'accès" (section Avancé de la popup) — ou vice-versa |
+| Pas de transcription mais pas d'erreur | Vérifier que l'onglet capturé joue bien du son (icône haut-parleur dans l'onglet Chrome) et que le son du lecteur YouTube n'est pas coupé (la puce l'indique) |
+| Puce affiche "clé Mistral invalide" / "crédit Mistral épuisé" | Vérifier `MISTRAL_API_KEY` dans `.env` et le crédit sur console.mistral.ai, puis relancer le backend |
+| Console backend : "repli sur small (CPU)" | Pas de GPU CUDA utilisable : refaire l'étape 1 — la transcription fonctionne mais lentement |
+| Puce affiche "arrêtée : vidéo changée" | Normal : l'analyse est liée à une vidéo ; relancer depuis la popup sur la nouvelle |
 | Latence de transcription élevée | Vérifier que CUDA est bien actif (`nvidia-smi` pendant l'analyse) |
 | Console backend affiche "SearxNG injoignable" | Docker Desktop n'est pas lancé, ou `cd searxng && docker compose up -d` n'a pas été fait (étape 5) — le fact-check continue de fonctionner mais sans preuve web |
 | Port 5000 déjà utilisé | Changer le port dans `backend.py` (`socketio.run(...)`) et dans `BACKEND_URL` (`extension/offscreen.js` et `extension/popup.js`) |

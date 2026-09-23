@@ -30,9 +30,13 @@ FFmpeg, dépendances). En résumé :
    la détection automatique remplir) l'émission/les intervenants, puis
    *Démarrer l'analyse*
 
-Le backend écoute en local uniquement (`127.0.0.1:5000`). Un jeton d'accès
-optionnel (`BACKEND_TOKEN`) peut être ajouté si plusieurs apps tournent dans
-le même navigateur — voir [`.env.example`](.env.example).
+Le backend écoute en local uniquement (`127.0.0.1:5000`) et n'accepte, côté
+navigateur, que l'extension Chrome. Un jeton d'accès optionnel
+(`BACKEND_TOKEN`) ajoute une barrière contre les autres extensions et
+applications locales — voir [`.env.example`](.env.example).
+
+Tests (aucun GPU, clé ni réseau nécessaires) : `python tests/test_backend_smoke.py`
+et les autres fichiers de [`tests/`](tests/) — voir [ARCHITECTURE.md](ARCHITECTURE.md#12-tests).
 
 ## Structure
 
@@ -40,7 +44,8 @@ le même navigateur — voir [`.env.example`](.env.example).
 |---|---|
 | `extension/` | Extension Chrome (MV3) — le produit réel |
 | `backend.py` | Point d'entrée du serveur (monkey-patch eventlet + lancement) |
-| `server/` | Logique du serveur : Whisper, diarisation, Mistral, cache — voir [ARCHITECTURE.md](ARCHITECTURE.md) |
+| `server/` | Logique du serveur : Whisper, diarisation, Mistral, sources, cache — voir [ARCHITECTURE.md](ARCHITECTURE.md) |
+| `tests/` | Tests unitaires et test de fumée du backend complet (sans GPU ni réseau) |
 | `searxng/` | Instance SearxNG auto-hébergée (recherche web sans dépendance à un moteur tiers) |
 | `site/` | Page vitrine statique du projet |
 | `enroll.py`, `harvest_voices.py`, `remove_voice.py` | Outils CLI pour peupler/retirer des voix dans `voices/` (banque d'empreintes vocales) |

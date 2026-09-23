@@ -602,6 +602,56 @@
   transition: color 0.5s ease;
 }
 
+/* Verdict + bouton ⚑ en bout de pied de carte / de récap */
+.fct-footer-end {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.fct-report {
+  background: none;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 5px;
+  color: rgba(255, 255, 255, 0.6);
+  font-family: 'FCT Archivo', system-ui, sans-serif;
+  font-size: 10.5px;
+  line-height: 1;
+  padding: 3px 6px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.fct-report:hover { background: rgba(255, 255, 255, 0.12); color: #fff; }
+.fct-report--done { cursor: default; border-color: transparent; color: rgba(255, 255, 255, 0.5); }
+
+/* Menu des motifs de signalement, sous le pied de carte */
+.fct-report-menu {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.09);
+}
+.fct-report-title {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.7);
+  margin-right: 2px;
+}
+.fct-report-menu button {
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 999px;
+  color: rgba(255, 255, 255, 0.85);
+  font-family: 'FCT Archivo', system-ui, sans-serif;
+  font-size: 10.5px;
+  padding: 3px 9px;
+  cursor: pointer;
+}
+.fct-report-menu button:hover { background: rgba(255, 255, 255, 0.16); color: #fff; }
+.fct-report-menu .fct-report-close { border-color: transparent; background: none; color: rgba(255, 255, 255, 0.55); }
+
 /* Rise-in animation for resolved content */
 .fct-risein {
   animation: fct-risein 0.4s ease both;

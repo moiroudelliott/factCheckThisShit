@@ -18,7 +18,7 @@ from faster_whisper.audio import decode_audio
 from server.app import app, socketio, model, model_lock, DIARIZATION
 from server.config import (
     BACKEND_TOKEN, MISTRAL_API_KEY, FLUSH_INTERVAL, MIN_WORDS, MAX_BUFFER_WORDS, PROBE_MATCH_T,
-    MIN_WORDS_ON_PAUSE, MIN_WORDS_ON_STOP, FINISH_TIMEOUT_S, CHUNK_OVERLAP_S, CHUNK_S,
+    MIN_WORDS_ON_PAUSE, MIN_WORDS_ON_STOP, FINISH_TIMEOUT_S, CHUNK_OVERLAP_S, CHUNK_S, REPORTS_FILE,
 )
 from server import cache, known_factchecks, votes
 from server.dedup import dupe_index_add, is_duplicate_indexed
@@ -77,6 +77,40 @@ def analyze_video():
     except Exception as e:
         print(f"[AnalyzeVideo error] {type(e).__name__}: {e}")
     return {"guests": []}
+
+
+# Motifs du bouton ⚑ de l'extension ; les quatre premiers invalident le
+# verdict (plus resservi par le cache), un mauvais locuteur non
+REPORT_REASONS = {
+    "verdict_faux": "verdict faux",
+    "mauvaise_source": "mauvaise source",
+    "pas_un_fait": "pas un fait vérifiable",
+    "transcription": "erreur de transcription",
+    "locuteur": "mauvais locuteur",
+}
+
+
+@app.route("/report_verdict", methods=["POST"])
+def report_verdict():
+    """Signalement d'un verdict depuis l'extension : ajouté à REPORTS_FILE
+    (à relire pour améliorer prompts et sources) et, sauf mauvais locuteur,
+    retiré du cache pour ne plus jamais être resservi."""
+    if BACKEND_TOKEN and request.headers.get("X-Backend-Token") != BACKEND_TOKEN:
+        return {"ok": False}, 401
+    data = request.get_json(silent=True) or {}
+    reason = str(data.get("reason", ""))
+    claim = str(data.get("claim", "")).strip()[:500]
+    if reason not in REPORT_REASONS or not claim:
+        return {"ok": False, "error": "signalement invalide"}, 400
+    entry = {"at": time.strftime("%Y-%m-%dT%H:%M:%S"), "reason": reason, "claim": claim,
+             **{k: str(data.get(k) or "")[:500] for k in ("verdict", "confiance", "explication", "source",
+                                                           "url", "citation", "qui", "video")}}
+    os.makedirs(os.path.dirname(REPORTS_FILE), exist_ok=True)
+    with open(REPORTS_FILE, "a", encoding="utf-8") as f:
+        f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+    removed = cache.mark_reported(claim) if reason != "locuteur" else 0
+    print(f"[Signalement] {REPORT_REASONS[reason]} : «{claim[:60]}» ({removed} verdict(s) retiré(s) du cache)")
+    return {"ok": True, "cache": removed}
 
 
 @socketio.on("connect")

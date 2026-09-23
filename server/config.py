@@ -67,6 +67,10 @@ AN_REFRESH_S = 7 * 86400
 AN_DATA_DIR = os.environ.get("AN_DATA_DIR") or os.path.join(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "assemblee")
 
+# Signalements de verdicts (bouton ⚑ de l'extension), une ligne JSON par signalement
+REPORTS_FILE = os.environ.get("REPORTS_FILE") or os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "reports.jsonl")
+
 # ── Buffer de transcription → analyse Mistral ─────────────────────────────
 FLUSH_INTERVAL = 22    # secondes max entre deux analyses Mistral
 MIN_WORDS = 30         # ne pas appeler Mistral avec moins de 30 mots (trop peu pour un talking point)

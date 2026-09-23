@@ -32,8 +32,13 @@ _cache_conn.execute("""CREATE TABLE IF NOT EXISTS factchecks (
 )""")
 # Migration : année de la vidéo vérifiée (NULL pour les lignes antérieures —
 # on retombe alors sur l'année de création, cf. _row_year)
-if "video_year" not in {row[1] for row in _cache_conn.execute("PRAGMA table_info(factchecks)")}:
+_columns = {row[1] for row in _cache_conn.execute("PRAGMA table_info(factchecks)")}
+if "video_year" not in _columns:
     _cache_conn.execute("ALTER TABLE factchecks ADD COLUMN video_year INTEGER")
+# Migration : verdict signalé par un utilisateur (bouton ⚑ de l'extension) —
+# plus jamais resservi, supprimé par purge_cache.py
+if "reported_at" not in _columns:
+    _cache_conn.execute("ALTER TABLE factchecks ADD COLUMN reported_at REAL")
 _cache_conn.commit()
 _cache_lock = threading.Lock()
 _cache_mem: list = []  # [(signature, année, created_at, résultat)] — copie mémoire pour le matching flou
@@ -50,7 +55,7 @@ def load():
         _cache_conn.commit()
         rows = _cache_conn.execute(
             "SELECT claim, verdict, confiance, explication, source, url, created_at, video_year "
-            "FROM factchecks").fetchall()
+            "FROM factchecks WHERE reported_at IS NULL").fetchall()
     skipped = 0
     for claim, verdict, conf, expl, src, url, created_at, video_year in rows:
         # Verdicts non sourcés (antérieurs à la règle « pas d'URL, pas de
@@ -65,6 +70,23 @@ def load():
                                 "source": src or "", "url": url or ""}))
     print(f"[Cache] {len(_cache_mem)} fact-check(s) en cache"
           + (f" ({skipped} non sourcé(s) ignoré(s))" if skipped else ""))
+
+
+def mark_reported(claim: str) -> int:
+    """Verdict signalé par un utilisateur : les entrées de cache qui
+    correspondent à cette affirmation ne sont plus resservies (marquées en
+    base, retirées de la mémoire). Retourne le nombre d'entrées touchées."""
+    sig = claim_signature(claim)
+    now = time.time()
+    with _cache_lock:
+        hits = [e for e in _cache_mem if claims_match(sig, e[0], CACHE_SIM_THRESHOLD)]
+        for e in hits:
+            _cache_mem.remove(e)
+        rows = _cache_conn.execute("SELECT id, claim FROM factchecks WHERE reported_at IS NULL").fetchall()
+        ids = [i for i, c in rows if c == claim or claims_match(sig, claim_signature(c), CACHE_SIM_THRESHOLD)]
+        _cache_conn.executemany("UPDATE factchecks SET reported_at = ? WHERE id = ?", [(now, i) for i in ids])
+        _cache_conn.commit()
+    return len(ids)
 
 
 def lookup(claim: str, year: int):

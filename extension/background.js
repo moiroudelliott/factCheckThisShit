@@ -4,6 +4,8 @@
 // tout vit dans chrome.storage.session. Chaque handler relit l'état.
 // ══════════════════════════════════════════════════════════════════════════════
 
+const BACKEND_URL = 'http://localhost:5000';
+
 function getState() {
   return chrome.storage.session.get({ tabId: null, capturing: false, videoId: null });
 }
@@ -53,6 +55,20 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         case 'adState':
           chrome.runtime.sendMessage({ action: 'setAdState', ad: Boolean(msg.ad) }).catch(() => {});
           break;
+
+        // Bouton ⚑ d'une carte : le content script (origine de la page) ne peut
+        // pas appeler le backend, qui n'accepte que l'origine de l'extension
+        case 'reportVerdict': {
+          const { fctToken } = await chrome.storage.local.get('fctToken');
+          const r = await fetch(`${BACKEND_URL}/report_verdict`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', ...(fctToken ? { 'X-Backend-Token': fctToken } : {}) },
+            body: JSON.stringify(msg.report || {}),
+            signal: AbortSignal.timeout(8000),
+          }).catch(() => null);
+          sendResponse({ ok: Boolean(r?.ok) });
+          break;
+        }
 
         // getUserMedia a échoué dans l'offscreen : ne pas rester « en direct »
         case 'captureFailed':

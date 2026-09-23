@@ -757,9 +757,100 @@ function injectSlot() {
   slot.addEventListener('click', (e) => {
     const btn = e.target.closest('.fct-card-ts');
     if (btn) seekTo(Number(btn.dataset.vt));
+    onReportClick(e, S.current?.id);
   });
   overlayRoot().appendChild(slot);
   return slot;
+}
+
+// ── Signalement d'un verdict (bouton ⚑) ───────────────────────────────────────
+// Le signalement part au backend (via le background) : il est consigné dans
+// data/reports.jsonl et, sauf mauvais locuteur, le verdict n'est plus
+// resservi par le cache.
+
+const REPORT_REASONS = [
+  ['verdict_faux', 'Verdict faux'],
+  ['mauvaise_source', 'Mauvaise source'],
+  ['pas_un_fait', "Pas un fait vérifiable"],
+  ['transcription', 'Erreur de transcription'],
+  ['locuteur', 'Mauvais locuteur'],
+];
+
+function reportButton(entry) {
+  const { point, fc } = entry;
+  if (point.type !== 'affirmation' || !fc || fc.pending || fc.indisponible) return '';
+  return point.reported
+    ? '<span class="fct-report fct-report--done" title="Verdict signalé">⚑ signalé</span>'
+    : '<button class="fct-report" type="button" title="Signaler ce verdict" aria-label="Signaler ce verdict">⚑</button>';
+}
+
+// Délégation de clic commune à la carte et au récap : ⚑ ouvre le menu des
+// motifs, un motif envoie le signalement, ✕ referme
+function onReportClick(e, pointId) {
+  const host = e.target.closest('[data-point-id]');
+  const id = host?.dataset.pointId || pointId;
+  if (!id) return;
+  if (e.target.closest('button.fct-report')) {
+    openReportMenu(e.target.closest('.fct-card-inner, .fct-recap-card-inner'), id);
+  } else if (e.target.closest('.fct-report-close')) {
+    closeReportMenu(e.target.closest('.fct-report-menu'));
+  } else {
+    const choice = e.target.closest('.fct-report-menu button[data-reason]');
+    if (choice) sendReport(id, choice.dataset.reason, choice.closest('.fct-report-menu'));
+  }
+}
+
+function openReportMenu(container, id) {
+  if (!container || container.querySelector('.fct-report-menu')) return;
+  // La carte ne doit pas sortir pendant qu'on choisit un motif
+  if (S.current?.id === id) {
+    clearTimeout(S.cardTimer);
+    S.cardTimer = null;
+  }
+  const menu = document.createElement('div');
+  menu.className = 'fct-report-menu';
+  menu.setAttribute('role', 'menu');
+  menu.innerHTML = `<span class="fct-report-title">Signaler :</span>`
+    + REPORT_REASONS.map(([k, label]) => `<button type="button" role="menuitem" data-reason="${k}">${label}</button>`).join('')
+    + '<button type="button" class="fct-report-close" aria-label="Annuler">✕</button>';
+  container.appendChild(menu);
+}
+
+function closeReportMenu(menu) {
+  if (!menu) return;
+  const onCard = Boolean(menu.closest('.fct-card'));
+  menu.remove();
+  // Reprendre le décompte de la carte interrompue
+  if (onCard && S.current && !S.recapOpen && S.cardPending && !S.cardTimer) {
+    setCardTimer(S.cardPending.fn, S.cardPending.ms);
+  }
+}
+
+async function sendReport(id, reason, menu) {
+  const entry = S.points.get(id);
+  if (!entry) return;
+  const { point, fc } = entry;
+  const report = {
+    reason, claim: point.texte, citation: point.citation || '', qui: exportName(point.qui),
+    verdict: fc?.verdict || '', confiance: fc?.confiance ?? '', explication: fc?.explication || '',
+    source: fc?.source || '', url: fc?.url || '', video: S.videoId || location.href,
+  };
+  if (menu) menu.innerHTML = '<span class="fct-report-title">Envoi…</span>';
+  let ok = false;
+  try { ok = Boolean((await chrome.runtime.sendMessage({ action: 'reportVerdict', report }))?.ok); } catch (_) {}
+  if (ok) {
+    point.reported = reason;
+    scheduleSave();
+  }
+  if (menu) {
+    menu.innerHTML = `<span class="fct-report-title">${ok ? 'Merci, verdict signalé.' : 'Backend injoignable — signalement non envoyé.'}</span>`;
+    later(() => {
+      closeReportMenu(menu);
+      if (ok) document.querySelectorAll(`[data-point-id="${id}"] button.fct-report`)
+        .forEach(b => { b.outerHTML = reportButton(entry); });
+    }, 1600);
+  }
+  if (S.recapOpen) later(renderRecap, 1700);
 }
 
 // ── Store ──────────────────────────────────────────────────────────────────────
@@ -991,7 +1082,7 @@ function showCard(id, entry) {
   el.innerHTML = `
     <div class="fct-bar"><div class="fct-bar-fill"></div><div class="fct-bar-shimmer"></div></div>
     <div class="fct-inner-glow"></div>
-    <div class="fct-card-inner">
+    <div class="fct-card-inner" data-point-id="${esc(id)}">
       <div class="fct-card-head">
         <span class="fct-brand">
           <span class="fct-brand-diamond">◆</span>SOURC<span class="fct-brand-dot">É</span>
@@ -1014,7 +1105,7 @@ function showCard(id, entry) {
       <p class="fct-body" style="display:none"></p>
       <div class="fct-footer" style="display:none">
         <span class="fct-source"></span>
-        <span class="fct-footer-right"></span>
+        <span class="fct-footer-end"><span class="fct-footer-right"></span><span class="fct-report-slot"></span></span>
       </div>
     </div>
   `;
@@ -1081,6 +1172,8 @@ function resolveCurrent() {
     const right = footer.querySelector('.fct-footer-right');
     right.textContent = fc.confiance != null ? `${cfg.footerRight} · ${fc.confiance}%` : cfg.footerRight;
     right.style.color = cfg.footerColor;
+    const reportSlot = footer.querySelector('.fct-report-slot');
+    if (reportSlot) reportSlot.innerHTML = reportButton(S.points.get(id));
   }
   // D'autres cartes attendent : maintien raccourci, sinon le retard sur le
   // direct s'accumule (jusqu'à ~2 min avec une file pleine)
@@ -1245,6 +1338,7 @@ function openRecap() {
   panel.querySelector('#fct-recap-body').addEventListener('click', (e) => {
     const btn = e.target.closest('.fct-recap-ts');
     if (btn) seekTo(Number(btn.dataset.vt));
+    onReportClick(e);
   });
 
   const segButtons = panel.querySelectorAll('.fct-seg button');
@@ -1321,7 +1415,7 @@ function renderRecap() {
       return `
       <div class="fct-recap-card" style="--accent:${accent}">
         <div class="fct-recap-bar"></div>
-        <div class="fct-recap-card-inner">
+        <div class="fct-recap-card-inner" data-point-id="${esc(p.id)}">
           <div class="fct-recap-row">
             <span class="fct-recap-badge">${esc(vcfg && !waiting ? vcfg.tag : tcfg.tag)}</span>
             ${p.qui ? `<span class="fct-recap-speaker">${displayNameHtml(p.qui)}</span>` : ''}
@@ -1331,7 +1425,7 @@ function renderRecap() {
           <p class="fct-recap-claim">« ${esc(p.texte)} »</p>
           ${quoteHtml('fct-recap-quote', p)}
           ${fc?.explication && !waiting ? `<p class="fct-recap-explanation">${esc(fc.explication)}</p>` : ''}
-          ${vcfg && !waiting ? `<div class="fct-recap-footer">${srcHtml}<span class="fct-recap-footer-right" style="color:${vcfg.footerColor}">${vcfg.footerRight}${fc?.confiance != null ? ` · ${fc.confiance}%` : ''}</span></div>` : ''}
+          ${vcfg && !waiting ? `<div class="fct-recap-footer">${srcHtml}<span class="fct-footer-end"><span class="fct-recap-footer-right" style="color:${vcfg.footerColor}">${vcfg.footerRight}${fc?.confiance != null ? ` · ${fc.confiance}%` : ''}</span>${reportButton({ point: p, fc })}</span></div>` : ''}
         </div>
       </div>`;
     } catch (e) {

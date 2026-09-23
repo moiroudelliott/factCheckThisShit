@@ -21,6 +21,7 @@ TMP = tempfile.mkdtemp(prefix="fct_smoke_")
 os.environ["FACTCHECK_CACHE_DB"] = os.path.join(TMP, "cache.db")
 os.environ["FACTCHECK_INDEX_DB"] = os.path.join(TMP, "index.db")
 os.environ["AN_VOTES"] = "0"  # pas de téléchargement de l'open data de l'Assemblée pendant les tests
+os.environ["REPORTS_FILE"] = os.path.join(TMP, "reports.jsonl")
 os.environ["MISTRAL_API_KEY"] = "test"  # load_dotenv n'écrase pas une variable déjà définie
 os.environ["BACKEND_TOKEN"] = ""
 
@@ -222,6 +223,21 @@ def test_full_session():
     client.disconnect()
 
 
+def test_reported_verdict_leaves_the_cache():
+    from server import cache
+    claim = "Le taux de chômage des jeunes a été divisé par deux depuis 2017"
+    cache.store(claim, {"verdict": "vrai", "confiance": 90, "explication": "x", "source": "Le Monde",
+                        "url": "https://www.lemonde.fr/x"}, 2026)
+    assert cache.lookup(claim, 2026) is not None
+    http = app.test_client()
+    r = http.post("/report_verdict", json={"reason": "verdict_faux", "claim": claim, "verdict": "vrai"})
+    assert r.status_code == 200 and r.get_json() == {"ok": True, "cache": 1}
+    assert cache.lookup(claim, 2026) is None                       # plus jamais resservi
+    with open(os.environ["REPORTS_FILE"], encoding="utf-8") as f:
+        assert json.loads(f.readlines()[-1])["reason"] == "verdict_faux"
+    assert http.post("/report_verdict", json={"reason": "n'importe", "claim": claim}).status_code == 400
+
+
 def test_only_the_extension_origin_is_accepted():
     http = app.test_client()
     ext = "chrome-extension://" + "a" * 32
@@ -243,3 +259,5 @@ if __name__ == "__main__":
     print("ok  test_full_session")
     test_only_the_extension_origin_is_accepted()
     print("ok  test_only_the_extension_origin_is_accepted")
+    test_reported_verdict_leaves_the_cache()
+    print("ok  test_reported_verdict_leaves_the_cache")

@@ -16,7 +16,9 @@ mettre un verdict en cache — voir server/cache.py et server/sources.py) :
   - aucune URL de preuve (verdict « non sourcé »),
   - URL sur un domaine exclu (réseaux sociaux, désinformation notoire),
   - verdict inconnu ou « non_verifiable », confiance absente ou < CACHE_MIN_CONF,
-  - affirmation datée par rapport au jour même (« ce soir », « actuellement »…).
+  - affirmation datée par rapport au jour même (« ce soir », « actuellement »…),
+  - verdict signalé par un utilisateur (bouton ⚑ de l'extension ; motifs dans
+    data/reports.jsonl).
 
 Une copie de sauvegarde horodatée de la base est créée avant toute
 suppression (factcheck_cache.backup-AAAAMMJJ-HHMMSS.db, ignorée par git).
@@ -67,11 +69,13 @@ def main():
         print(f"✗ Pas de cache à {CACHE_DB}")
         sys.exit(1)
     conn = sqlite3.connect(CACHE_DB)
-    rows = conn.execute("SELECT id, claim, verdict, confiance, url FROM factchecks ORDER BY id").fetchall()
+    cols = {r[1] for r in conn.execute("PRAGMA table_info(factchecks)")}
+    reported_col = "reported_at" if "reported_at" in cols else "NULL"
+    rows = conn.execute(f"SELECT id, claim, verdict, confiance, url, {reported_col} FROM factchecks ORDER BY id").fetchall()
 
     if args.list:
-        for i, claim, verdict, conf, url in rows:
-            print(f"#{i:<4} {verdict:<19} {conf!s:>4}  {claim[:110]}")
+        for i, claim, verdict, conf, url, reported in rows:
+            print(f"#{i:<4} {verdict:<19} {conf!s:>4}  {'⚑ ' if reported else ''}{claim[:110]}")
         return
 
     manual = {}  # id → raison
@@ -85,8 +89,9 @@ def main():
         print(f"⚠ identifiant(s) absent(s) du cache, ignoré(s) : {sorted(unknown)}")
 
     to_purge = []
-    for i, claim, verdict, conf, url in rows:
-        reason = auto_reason(verdict, conf, url, claim) or manual.get(i, "")
+    for i, claim, verdict, conf, url, reported in rows:
+        reason = "signalé par un utilisateur" if reported else auto_reason(verdict, conf, url, claim)
+        reason = reason or manual.get(i, "")
         if reason:
             to_purge.append((i, reason, verdict, conf, claim))
 

@@ -5,15 +5,78 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>SOURCÉ — vérification factuelle des débats politiques</title>
   <meta name="description" content="Prototype étudiant de vérification factuelle en temps réel pour les débats politiques : transcription en direct, identification des intervenants, verdict sourcé.">
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400;1,6..72,500&family=Archivo:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500&display=swap">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:ital,wght@1,500&family=Archivo:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500&display=swap">
   <style>
     * { box-sizing: border-box; }
-    body { margin: 0; background: #0d0f13; color: #f2f1ee; font-family: 'Archivo', system-ui, sans-serif; line-height: 1.6; }
+    html { --mx: 50vw; --my: 12vh; }
+    body { margin: 0; color: #f2f1ee; font-family: 'Archivo', system-ui, sans-serif; line-height: 1.6; background: #0d0f13; }
+
+    /* ── Décor de fond : figé, derrière tout le contenu (z-index explicite,
+       pas d'ambiguïté d'empilement) ── */
+    .scene { position: fixed; inset: 0; z-index: 0; overflow: hidden; }
+    .scene-aurora {
+      position: absolute; inset: -10%;
+      background:
+        radial-gradient(640px circle at var(--mx) var(--my), rgba(224,50,79,0.20), transparent 62%),
+        radial-gradient(46rem 40rem at 12% -8%, rgba(224,50,79,0.16), transparent 60%),
+        radial-gradient(38rem 34rem at 92% 28%, rgba(255,138,92,0.10), transparent 62%);
+      animation: aurora-drift 30s ease-in-out infinite alternate;
+    }
+    @keyframes aurora-drift {
+      from { transform: translate3d(0,0,0) scale(1); }
+      to   { transform: translate3d(-2%, 2.5%, 0) scale(1.04); }
+    }
+    /* Grille de points : une trame discrète toujours visible, une seconde
+       trame plus vive révélée uniquement dans un halo autour du curseur
+       (masque radial) — l'effet "spotlight" plutôt qu'un simple flou. */
+    .scene-grid, .scene-grid-hot {
+      position: absolute; inset: 0;
+      background-image: radial-gradient(rgba(242,241,238,0.85) 1px, transparent 1px);
+      background-size: 25px 25px;
+    }
+    .scene-grid { opacity: 0.05; -webkit-mask-image: linear-gradient(to bottom, black, transparent 85%); mask-image: linear-gradient(to bottom, black, transparent 85%); }
+    .scene-grid-hot {
+      background-image: radial-gradient(rgba(224,50,79,0.95) 1px, transparent 1px);
+      -webkit-mask-image: radial-gradient(210px circle at var(--mx) var(--my), black, transparent 72%);
+      mask-image: radial-gradient(210px circle at var(--mx) var(--my), black, transparent 72%);
+    }
+    .scene-noise {
+      position: absolute; inset: 0; opacity: 0.05; mix-blend-mode: overlay;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    }
+    .page { position: relative; z-index: 1; }
+    @media (prefers-reduced-motion: reduce) {
+      .scene-aurora { animation: none; }
+    }
+
     a { color: #e0324f; text-decoration: none; }
-    .navlink { color: #f2f1ee !important; }
+    .navlink { color: #f2f1ee !important; transition: color 0.2s ease; }
     .navlink:hover { color: #e0324f !important; }
+    .btn-primary, .btn-ghost {
+      display: inline-block; transition: transform 0.18s ease, box-shadow 0.18s ease, background 0.18s ease, border-color 0.18s ease;
+    }
+    .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 10px 26px -8px rgba(224,50,79,0.55); }
+    .btn-ghost:hover { transform: translateY(-2px); border-color: rgba(242,241,238,0.5) !important; }
     .video-frame { border: 1px solid rgba(242,241,238,0.14); background: #000; box-shadow: 0 32px 70px -28px rgba(224,50,79,0.28), 0 12px 40px -16px rgba(0,0,0,0.55); }
     .video-frame video { width: 100%; display: block; }
+    section[id] { scroll-margin-top: 76px; }
+    .reveal { opacity: 0; transform: translateY(16px); transition: opacity 0.7s ease, transform 0.7s ease; }
+    .reveal.in { opacity: 1; transform: none; }
+
+    /* ── Titre héros : révélation mot par mot, deuxième ligne en dégradé,
+       dernier mot en serif italique — un seul contraste de police, assumé ── */
+    .hero-h1 { font-family:'Archivo',sans-serif; font-weight:800; font-size:40px; line-height:1.14; letter-spacing:-0.01em; margin:0 0 18px; }
+    .word { display: inline-block; opacity: 0; transform: translateY(16px); animation: word-rise 0.62s cubic-bezier(0.16,1,0.3,1) forwards; animation-delay: var(--d, 0s); }
+    @keyframes word-rise { to { opacity: 1; transform: none; } }
+    .word-accent {
+      background: linear-gradient(95deg, #ff7a63, #e0324f 55%);
+      -webkit-background-clip: text; background-clip: text; color: transparent;
+    }
+    .word-serif { font-family: 'Newsreader', serif; font-style: italic; font-weight: 500; }
+    @media (prefers-reduced-motion: reduce) {
+      .reveal { opacity: 1; transform: none; transition: none; }
+      .word { opacity: 1; transform: none; animation: none; }
+    }
     @media (max-width: 720px) {
       .nav-links { display: none !important; }
       .hero-eyebrow, .hero-lede { padding-left: 8px; padding-right: 8px; }
@@ -21,6 +84,15 @@
   </style>
 </head>
 <body>
+
+  <div class="scene" aria-hidden="true">
+    <div class="scene-aurora"></div>
+    <div class="scene-grid"></div>
+    <div class="scene-grid-hot"></div>
+    <div class="scene-noise"></div>
+  </div>
+
+  <div class="page">
 
   <header style="border-bottom: 1px solid rgba(242,241,238,0.12); position: sticky; top: 0; background: rgba(13,15,19,0.92); backdrop-filter: blur(8px); z-index: 10;">
     <div style="max-width:920px; margin:0 auto; padding:20px 28px; display:flex; align-items:center; justify-content:space-between; gap:20px; flex-wrap:wrap;">
@@ -30,32 +102,28 @@
       </div>
       <nav class="nav-links" style="display:flex; align-items:center; gap:28px;">
         <a class="navlink" href="#methode" style="font-family:'IBM Plex Mono', monospace; font-size:12px; letter-spacing:0.04em; text-transform:uppercase;">Méthode</a>
+        <a class="navlink" href="#demo" style="font-family:'IBM Plex Mono', monospace; font-size:12px; letter-spacing:0.04em; text-transform:uppercase;">Démonstration</a>
         <a class="navlink" href="#projet" style="font-family:'IBM Plex Mono', monospace; font-size:12px; letter-spacing:0.04em; text-transform:uppercase;">Le projet</a>
-        <a href="#contact" style="font-family:'Archivo', sans-serif; font-weight:700; font-size:13px; color:#0d0f13; background:#e0324f; padding:9px 20px;">Nous contacter</a>
+        <a class="btn-primary" href="#contact" style="font-family:'Archivo', sans-serif; font-weight:700; font-size:13px; color:#0d0f13; background:#e0324f; padding:9px 20px;">Nous contacter</a>
       </nav>
     </div>
   </header>
 
-  <section style="max-width:1160px; margin:0 auto; padding:56px 28px 64px;">
+  <section style="max-width:920px; margin:0 auto; padding:72px 28px 64px;">
     <div style="max-width:640px; margin:0 auto; text-align:center;">
-      <p class="hero-eyebrow" style="font-family:'IBM Plex Mono', monospace; font-size:11px; letter-spacing:0.08em; text-transform:uppercase; color:#e0324f; margin:0 0 16px;">Démonstration — débat réel</p>
-      <h1 style="font-family:'Archivo',sans-serif; font-weight:800; font-size:40px; line-height:1.14; letter-spacing:-0.01em; margin:0 0 18px;">Vérifier ce qui est dit,<br>pendant qu'il est dit.</h1>
-      <p class="hero-lede" style="font-size:16px; color:rgba(242,241,238,0.7); margin:0 auto 32px; max-width:52ch;">
+      <p class="hero-eyebrow word" style="--d:0s; font-family:'IBM Plex Mono', monospace; font-size:11px; letter-spacing:0.08em; text-transform:uppercase; color:#e0324f; margin:0 0 16px;">Prototype étudiant</p>
+      <h1 class="hero-h1">
+        <span class="word" style="--d:.08s">Vérifier</span> <span class="word" style="--d:.13s">ce</span> <span class="word" style="--d:.18s">qui</span> <span class="word" style="--d:.23s">est</span> <span class="word" style="--d:.28s">dit,</span><br>
+        <span class="word word-accent word-serift" style="--d:.36s">pendant</span> <span class="word word-accent word-serif" style="--d:.41s">que</span> <span class="word word-accent word-serif" style="--d:.46s">c'est</span> <span class="word word-accent word-serif" style="--d:.52s">dit.</span>
+      </h1>
+      <p class="hero-lede word" style="--d:.62s; font-size:16px; color:rgba(242,241,238,0.7); margin:0 auto 32px; max-width:52ch;">
         Transcription en direct, identification des intervenants et vérification automatique
         des affirmations chiffrées, avec un verdict et sa source en quelques dizaines de secondes.
       </p>
-    </div>
-
-    <div class="video-frame">
-      <video controls preload="metadata" poster="videos/poster.jpg">
-        <source src="videos/demo-2.mp4" type="video/mp4">
-      </video>
-    </div>
-    <p style="font-family:'IBM Plex Mono', monospace; font-size:11.5px; color:rgba(242,241,238,0.4); text-align:center; margin:14px 0 0;">Capture d'écran réelle — débat des législatives, France 2, 27 juin 2024. Aucun montage du contenu des vérifications.</p>
-
-    <div style="display:flex; gap:14px; flex-wrap:wrap; justify-content:center; margin-top:32px;">
-      <a href="#contact" style="font-family:'Archivo',sans-serif; font-weight:700; font-size:14px; color:#0d0f13; background:#e0324f; padding:13px 26px;">Nous contacter</a>
-      <a href="#methode" style="font-family:'Archivo',sans-serif; font-weight:700; font-size:14px; color:#f2f1ee; padding:13px 26px; border:1.5px solid rgba(242,241,238,0.25);">Voir la méthode</a>
+      <div class="word" style="--d:.7s; display:flex; gap:14px; flex-wrap:wrap; justify-content:center;">
+        <a class="btn-primary" href="#demo" style="font-family:'Archivo',sans-serif; font-weight:700; font-size:14px; color:#0d0f13; background:#e0324f; padding:13px 26px;">Voir la démonstration</a>
+        <a class="btn-ghost" href="#methode" style="font-family:'Archivo',sans-serif; font-weight:700; font-size:14px; color:#f2f1ee; padding:13px 26px; border:1.5px solid rgba(242,241,238,0.25);">Voir la méthode</a>
+      </div>
     </div>
   </section>
 
@@ -65,46 +133,95 @@
     <p style="font-size:14.5px; color:rgba(242,241,238,0.65); max-width:62ch; margin:0 0 8px;">Seules les affirmations vérifiables donnent lieu à un verdict. Le reste (opinions, joutes, questions) reste consultable, sans jamais encombrer l'écran.</p>
 
     <div style="margin-top:12px;">
-      <div style="display:flex; gap:24px; padding:26px 0; border-bottom:1px solid rgba(242,241,238,0.12); align-items:baseline;">
-        <span style="font-family:'Newsreader',serif; font-style:italic; font-size:34px; color:#e0324f; width:56px; flex-shrink:0;">01</span>
+      <div class="reveal" style="display:flex; gap:24px; padding:26px 0; border-bottom:1px solid rgba(242,241,238,0.12); align-items:baseline;">
+        <span style="font-family:'Archivo',sans-serif; font-weight:800; font-size:28px; color:#e0324f; width:56px; flex-shrink:0;">01</span>
         <div><h3 style="font-family:'Archivo',sans-serif; font-size:16px; font-weight:700; margin:0 0 6px;">Transcription en direct</h3><p style="font-size:13.5px; color:rgba(242,241,238,0.65); margin:0;">Le son du débat est transcrit en continu, avec quelques secondes de latence.</p></div>
       </div>
-      <div style="display:flex; gap:24px; padding:26px 0; border-bottom:1px solid rgba(242,241,238,0.12); align-items:baseline;">
-        <span style="font-family:'Newsreader',serif; font-style:italic; font-size:34px; color:#e0324f; width:56px; flex-shrink:0;">02</span>
+      <div class="reveal" style="display:flex; gap:24px; padding:26px 0; border-bottom:1px solid rgba(242,241,238,0.12); align-items:baseline;">
+        <span style="font-family:'Archivo',sans-serif; font-weight:800; font-size:28px; color:#e0324f; width:56px; flex-shrink:0;">02</span>
         <div><h3 style="font-family:'Archivo',sans-serif; font-size:16px; font-weight:700; margin:0 0 6px;">Identification des intervenants</h3><p style="font-size:13.5px; color:rgba(242,241,238,0.65); margin:0;">Les voix sont distinguées automatiquement et, quand c'est possible, associées à un nom.</p></div>
       </div>
-      <div style="display:flex; gap:24px; padding:26px 0; border-bottom:1px solid rgba(242,241,238,0.12); align-items:baseline;">
-        <span style="font-family:'Newsreader',serif; font-style:italic; font-size:34px; color:#e0324f; width:56px; flex-shrink:0;">03</span>
+      <div class="reveal" style="display:flex; gap:24px; padding:26px 0; border-bottom:1px solid rgba(242,241,238,0.12); align-items:baseline;">
+        <span style="font-family:'Archivo',sans-serif; font-weight:800; font-size:28px; color:#e0324f; width:56px; flex-shrink:0;">03</span>
         <div><h3 style="font-family:'Archivo',sans-serif; font-size:16px; font-weight:700; margin:0 0 6px;">Vérification sourcée</h3><p style="font-size:13.5px; color:rgba(242,241,238,0.65); margin:0;">Chaque affirmation chiffrée est confrontée à la presse, aux sources officielles et à la recherche académique.</p></div>
       </div>
-      <div style="display:flex; gap:24px; padding:26px 0; align-items:baseline;">
-        <span style="font-family:'Newsreader',serif; font-style:italic; font-size:34px; color:#e0324f; width:56px; flex-shrink:0;">04</span>
+      <div class="reveal" style="display:flex; gap:24px; padding:26px 0; align-items:baseline;">
+        <span style="font-family:'Archivo',sans-serif; font-weight:800; font-size:28px; color:#e0324f; width:56px; flex-shrink:0;">04</span>
         <div><h3 style="font-family:'Archivo',sans-serif; font-size:16px; font-weight:700; margin:0 0 6px;">Registre consultable</h3><p style="font-size:13.5px; color:rgba(242,241,238,0.65); margin:0;">Tout ce qui a été dit et vérifié reste consultable et exportable à la fin de la session.</p></div>
       </div>
     </div>
   </section>
 
+  <section id="demo" style="max-width:920px; margin:0 auto; padding:56px 28px;">
+    <p style="font-family:'IBM Plex Mono', monospace; font-size:11px; letter-spacing:0.08em; text-transform:uppercase; color:#e0324f; margin:0 0 16px;">Démonstration</p>
+    <h2 style="font-family:'Archivo',sans-serif; font-weight:800; font-size:26px; margin:0 0 24px;">Le pipeline sur un vrai débat</h2>
+
+    <div class="video-frame reveal">
+      <video controls preload="metadata" poster="videos/poster.jpg">
+        <source src="videos/demo-1.mp4" type="video/mp4">
+      </video>
+    </div>
+    <p style="font-family:'Archivo',sans-serif; font-size:13px; color:rgba(242,241,238,0.4); text-align:center; margin:14px 0 0;">Capture d'écran réelle du débat des législatives, France 2, 27 juin 2024. Aucun montage du contenu des vérifications.</p>
+  </section>
+
   <section id="projet" style="max-width:920px; margin:0 auto; padding:56px 28px;">
     <p style="font-family:'IBM Plex Mono', monospace; font-size:11px; letter-spacing:0.08em; text-transform:uppercase; color:#e0324f; margin:0 0 16px;">Le projet</p>
     <h2 style="font-family:'Archivo',sans-serif; font-weight:800; font-size:26px; margin:0 0 24px;">Ce que c'est, et ce que ce n'est pas encore</h2>
-    <div style="background:#17191f; padding:32px 36px;">
-      <p style="font-family:'Newsreader',serif; font-style:italic; font-size:19px; line-height:1.5; color:#f2f1ee; margin:0 0 18px;">« Ce projet est mené par Elliott Moiroud, étudiant à l'Université Savoie Mont Blanc. Ce n'est pas un produit commercial, et il n'est pas présenté comme tel. »</p>
-      <p style="font-family:'Archivo',sans-serif; font-size:14px; color:rgba(242,241,238,0.65); margin:0;">Il fonctionne aujourd'hui sous forme d'extension de navigateur, testée sur des débats politiques diffusés sur YouTube. Rien n'est figé dans son architecture : selon les besoins identifiés, il pourrait aussi bien devenir une application autonome que s'intégrer à un outil existant.</p>
+    <div class="reveal" style="background:#17191f; padding:32px 36px;">
+      <p style="font-family:'Archivo',sans-serif; font-weight:700; font-size:19px; line-height:1.45; color:#f2f1ee; margin:0 0 18px;">Ce projet est mené par Elliott Moiroud, étudiant à l'Université Savoie Mont Blanc. Ce n'est pas un produit commercial, et il n'est pas présenté comme tel.</p>
+      <p style="font-family:'Archivo',sans-serif; font-size:14px; color:rgba(242,241,238,0.65); margin:0;">Il fonctionne aujourd'hui sous forme de prototype testé sur des débats politiques diffusés sur YouTube. Rien n'est figé dans son architecture : selon les besoins identifiés, il pourrait aussi bien devenir une extension de navigateur aboutie, une application autonome, que s'intégrer à un outil existant.</p>
     </div>
   </section>
 
   <section id="contact" style="max-width:920px; margin:0 auto; padding:0 28px 64px;">
-    <div style="background:#e0324f; padding:48px 44px;">
+    <div class="reveal" style="background:#e0324f; padding:48px 44px;">
       <p style="font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:0.08em; text-transform:uppercase; color:rgba(13,15,19,0.6); margin:0 0 16px;">Contact</p>
       <h2 style="font-family:'Archivo',sans-serif; font-weight:800; font-size:26px; color:#0d0f13; margin:0 0 12px;">Une question, une remarque, une idée de collaboration ?</h2>
       <p style="font-family:'Archivo',sans-serif; font-size:14.5px; color:rgba(13,15,19,0.72); max-width:56ch; margin:0 0 26px;">Le projet continue d'évoluer. Vos retours nous aident à savoir dans quelle direction le faire avancer.</p>
-      <a href="mailto:contact@source.codeminds.fr?subject=Sourc%C3%A9%20contact" style="display:inline-block; font-family:'Archivo',sans-serif; font-weight:700; font-size:14px; color:#e0324f; background:#0d0f13; padding:13px 26px;">Nous écrire</a>
+      <a class="btn-primary" href="mailto:contact@source.codeminds.fr?subject=Sourc%C3%A9%20contact" style="display:inline-block; font-family:'Archivo',sans-serif; font-weight:700; font-size:14px; color:#e0324f; background:#0d0f13; padding:13px 26px;">Nous écrire</a>
     </div>
   </section>
 
   <footer style="max-width:920px; margin:0 auto; padding:0 28px 40px;">
-    <p style="font-family:'IBM Plex Mono',monospace; font-size:11px; color:rgba(242,241,238,0.4); margin:0;">SOURCÉ, un projet mené par Elliott Moiroud, étudiant à l'Université Savoie Mont Blanc. Aucune donnée n'est collectée par cette page.</p>
+    <p style="font-family:'Archivo',sans-serif; font-size:12px; color:rgba(242,241,238,0.4); margin:0;">SOURCÉ, un projet mené par Elliott Moiroud, étudiant à l'Université Savoie Mont Blanc. Aucune donnée n'est collectée par cette page.</p>
   </footer>
+
+  </div>
+
+  <script>
+    // Halo qui suit le curseur (composé avec le dégradé ambiant animé en CSS
+    // sur body). Throttlé par requestAnimationFrame pour rester fluide.
+    (function () {
+      if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+      let mx = window.innerWidth / 2, my = window.innerHeight * 0.1, raf = null;
+      const root = document.body.style;
+      window.addEventListener('pointermove', (e) => {
+        mx = e.clientX; my = e.clientY;
+        if (raf) return;
+        raf = requestAnimationFrame(() => {
+          root.setProperty('--mx', mx + 'px');
+          root.setProperty('--my', my + 'px');
+          raf = null;
+        });
+      }, { passive: true });
+    })();
+
+    // Apparition douce des blocs au scroll.
+    (function () {
+      const els = document.querySelectorAll('.reveal');
+      if (!els.length) return;
+      if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+        els.forEach((el) => el.classList.add('in'));
+        return;
+      }
+      const io = new IntersectionObserver((entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting) { entry.target.classList.add('in'); io.unobserve(entry.target); }
+        }
+      }, { threshold: 0.15 });
+      els.forEach((el) => io.observe(el));
+    })();
+  </script>
 
 </body>
 </html>

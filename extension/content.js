@@ -465,17 +465,45 @@ function teardown() {
     recapOpen: false, showAll: true, lastStatus: 'connected', flash: null, flashTimer: null, notes: {},
     samples: [], samplerTimer: null, lastAd: false, saveTimer: null,
   });
-  ['fct-chip', 'fct-card-slot', 'fct-recap', 'fct-speaker-badge'].forEach(id => document.getElementById(id)?.remove());
+  ['fct-layer', 'fct-chip', 'fct-card-slot', 'fct-recap', 'fct-speaker-badge'].forEach(id => document.getElementById(id)?.remove());
 }
 
-// Polices chargées seulement au démarrage d'une analyse (pas sur chaque
-// page YouTube visitée)
+// Polices embarquées dans l'extension (plus d'appel à Google Fonts depuis
+// les pages YouTube), déclarées seulement au démarrage d'une analyse. Noms
+// préfixés « FCT » : aucun risque de remplacer une police de la page.
 function injectFonts() {
   if (document.getElementById('fct-fonts')) return;
-  const l = document.createElement('link');
-  l.id = 'fct-fonts'; l.rel = 'stylesheet';
-  l.href = 'https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400;1,6..72,500&family=Archivo:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500&display=swap';
-  document.head.appendChild(l);
+  const url = (f) => chrome.runtime.getURL(`fonts/${f}`);
+  const face = (family, style, weight, file) =>
+    `@font-face{font-family:'${family}';font-style:${style};font-weight:${weight};font-display:swap;src:url('${url(file)}') format('woff2')}`;
+  const st = document.createElement('style');
+  st.id = 'fct-fonts';
+  st.textContent = [
+    face('FCT Archivo', 'normal', '400 800', 'archivo-latin.woff2'),
+    face('FCT Newsreader', 'normal', '400 500', 'newsreader-latin.woff2'),
+    face('FCT Newsreader', 'italic', '400 500', 'newsreader-italic-latin.woff2'),
+    face('FCT Plex Mono', 'normal', '400', 'ibm-plex-mono-400-latin.woff2'),
+    face('FCT Plex Mono', 'normal', '500', 'ibm-plex-mono-500-latin.woff2'),
+  ].join('\n');
+  document.head.appendChild(st);
+}
+
+// Calque de l'overlay, DANS le lecteur vidéo (#movie_player) : la puce, le
+// badge et les cartes sont posés sur la vidéo, suivent le mode cinéma et le
+// plein écran, et ne recouvrent plus le masthead ni la colonne de droite.
+// Repli sur la page si aucun lecteur n'est trouvé. Rappelé régulièrement :
+// si YouTube recrée le lecteur, le calque y est replacé.
+function overlayRoot() {
+  const player = document.querySelector('#movie_player');
+  let layer = document.getElementById('fct-layer');
+  if (!layer) {
+    layer = document.createElement('div');
+    layer.id = 'fct-layer';
+  }
+  const host = player || document.body;
+  if (layer.parentElement !== host) host.appendChild(layer);
+  layer.classList.toggle('fct-layer--page', !player);
+  return layer;
 }
 
 // ── Échantillonnage vidéo (horodatages, pubs, son coupé) ─────────────────────
@@ -493,6 +521,7 @@ function startSampler() {
 
 function sampleVideo() {
   if (!S.active) return;
+  overlayRoot(); // lecteur recréé par YouTube → y replacer le calque
   const video = mainVideo();
   const ad = isAdShowing();
   if (ad !== S.lastAd) {
@@ -556,7 +585,7 @@ function injectChip() {
       teardown();
     }
   });
-  document.body.appendChild(chip);
+  overlayRoot().appendChild(chip);
   updateChipControls();
   renderStatus();
 }
@@ -693,7 +722,7 @@ function injectBadge() {
     <span class="fct-eq"><span></span><span></span><span></span></span>
     <span class="fct-badge-name"></span>
   `;
-  document.body.appendChild(badge);
+  overlayRoot().appendChild(badge);
   return badge;
 }
 
@@ -726,7 +755,7 @@ function injectSlot() {
     const btn = e.target.closest('.fct-card-ts');
     if (btn) seekTo(Number(btn.dataset.vt));
   });
-  document.body.appendChild(slot);
+  overlayRoot().appendChild(slot);
   return slot;
 }
 
@@ -977,7 +1006,10 @@ function showCard(id, entry) {
   slot.innerHTML = '';
   slot.appendChild(el);
   S.current = { id, el };
-  requestAnimationFrame(() => el.classList.add('fct-card--in'));
+  // Reflow forcé plutôt que requestAnimationFrame : l'état initial est posé,
+  // la transition part tout de suite — même dans un onglet où rAF est gelé
+  void el.offsetWidth;
+  el.classList.add('fct-card--in');
 
   if (fc) {
     // Résultat déjà connu : résoudre après une courte animation de spinner
@@ -1172,8 +1204,11 @@ function openRecap() {
     <div class="fct-recap-header">
       <span class="fct-recap-title">◆ SOURC<span style="color:#e0324f">É</span> — Récapitulatif</span>
       <div style="display:flex;gap:6px">
+        <span class="fct-seg" role="group" aria-label="Filtrer le récapitulatif">
+          <button type="button" data-filter="all">Tout</button>
+          <button type="button" data-filter="aff">Affirmations</button>
+        </span>
         <button class="fct-recap-filter" id="fct-recap-export" title="Exporter en Markdown" aria-label="Exporter en Markdown">⬇</button>
-        <button class="fct-recap-filter" id="fct-recap-filter"></button>
         <button class="fct-recap-close" id="fct-recap-close" aria-label="Fermer le récapitulatif">✕</button>
       </div>
     </div>
@@ -1181,7 +1216,8 @@ function openRecap() {
     <div class="fct-recap-body" id="fct-recap-body"></div>
   `;
   document.body.appendChild(panel);
-  requestAnimationFrame(() => panel.classList.add('fct-recap--in'));
+  void panel.offsetWidth; // voir showCard
+  panel.classList.add('fct-recap--in');
 
   panel.querySelector('#fct-recap-close').addEventListener('click', closeRecap);
   panel.querySelector('#fct-recap-export').addEventListener('click', exportRecap);
@@ -1193,13 +1229,14 @@ function openRecap() {
     if (btn) seekTo(Number(btn.dataset.vt));
   });
 
-  const filterBtn = panel.querySelector('#fct-recap-filter');
-  filterBtn.textContent = S.showAll ? 'Affirmations' : 'Tout voir';
-  filterBtn.addEventListener('click', () => {
-    S.showAll = !S.showAll;
-    filterBtn.textContent = S.showAll ? 'Affirmations' : 'Tout voir';
+  const segButtons = panel.querySelectorAll('.fct-seg button');
+  const syncFilter = () => segButtons.forEach(b => b.setAttribute('aria-pressed', String((b.dataset.filter === 'all') === S.showAll)));
+  segButtons.forEach(b => b.addEventListener('click', () => {
+    S.showAll = b.dataset.filter === 'all';
+    syncFilter();
     renderRecap();
-  });
+  }));
+  syncFilter();
 
   renderRecap();
 }

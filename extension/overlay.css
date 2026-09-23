@@ -20,6 +20,10 @@
   color: #fff;
   text-align: left;
   letter-spacing: normal;
+  /* Placement : tout est en haut du lecteur — le bas droit appartient à
+     YouTube (paramètres, logo de la chaîne, boutons rapides du plein écran) */
+  --fct-edge: 12px;   /* marge au bord du lecteur */
+  --fct-chip-h: 38px; /* hauteur de la puce : les cartes se posent dessous */
 }
 /* Hors YouTube : calque fixe recalé sur le rectangle du lecteur (inline
    left/top/width/height, voir overlayRoot), ou plein écran d'un conteneur */
@@ -44,11 +48,12 @@
 
 #fct-chip {
   position: absolute;
-  right: 12px;
-  bottom: 68px; /* au-dessus de la barre de contrôle (59 px) */
-  z-index: 2; /* jamais recouverte par une carte sur un lecteur bas */
+  top: var(--fct-edge);
+  right: var(--fct-edge);
+  box-sizing: border-box;
+  height: var(--fct-chip-h);
+  z-index: 2; /* jamais recouverte par une carte */
   pointer-events: auto;
-  transition: bottom 0.25s ease;
   display: flex;
   align-items: center;
   gap: 9px;
@@ -92,11 +97,6 @@
 /* Analyse terminée : plus de pulsation, point gris */
 .fct-chip--ended .fct-ping-core { background: rgba(255, 255, 255, 0.45); }
 .fct-chip--ended .fct-ping-ring { display: none; }
-
-/* Contrôles du lecteur masqués (lecture, souris immobile) : la puce descend
-   à leur place ; plein écran : barre de contrôle plus haute */
-#movie_player.ytp-autohide #fct-chip { bottom: 12px; }
-#movie_player.ytp-big-mode:not(.ytp-autohide) #fct-chip { bottom: 88px; }
 
 .fct-chip-brand {
   font-family: 'FCT Newsreader', serif;
@@ -156,8 +156,8 @@
 
 #fct-speaker-badge {
   position: absolute;
-  top: 12px;
-  left: 12px;
+  top: var(--fct-edge);
+  left: var(--fct-edge);
   display: flex;
   align-items: flex-end; /* le texte reste calé sur le bas de l'équaliseur */
   gap: 9px;
@@ -316,15 +316,17 @@
 
 #fct-card-slot {
   position: absolute;
-  top: 12px;
-  right: 12px;
+  top: calc(var(--fct-edge) + var(--fct-chip-h) + 8px); /* sous la puce */
+  right: var(--fct-edge);
   width: min(400px, 44cqw);
   pointer-events: none;
 }
 
-/* Plein écran : laisser la place au titre du lecteur, en haut */
-#movie_player.ytp-fullscreen #fct-speaker-badge,
-#movie_player.ytp-fullscreen #fct-card-slot { top: 64px; }
+/* Plein écran, contrôles affichés : YouTube pose le titre de la vidéo en
+   haut à gauche (.ytp-fullscreen-metadata, au-dessus du calque). Le badge
+   s'efface le temps qu'ils sont visibles au lieu de laisser, en permanence,
+   une bande vide en haut de l'écran. */
+#movie_player.ytp-fullscreen:not(.ytp-autohide) #fct-speaker-badge { opacity: 0; }
 
 
 
@@ -974,9 +976,8 @@ a.fct-recap-src:hover { color: #fff; }
 @container fct (max-width: 480px) {
   #fct-card-slot, #fct-speaker-badge { display: none; }
   .fct-chip-brand, .fct-chip-sub { display: none; }
-  #fct-chip { bottom: 12px; }
 }
-/* Lecteur bas : cartes plus courtes pour ne pas descendre jusqu'à la puce */
+/* Lecteur bas : cartes plus courtes pour ne pas descendre jusqu'à la barre de contrôle */
 @container fct (max-height: 460px) {
   .fct-claim { -webkit-line-clamp: 3; }
   .fct-body[style*="block"] { -webkit-line-clamp: 3; }

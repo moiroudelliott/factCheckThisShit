@@ -259,9 +259,16 @@ def main():
     from server.app import socketio, app
     from server.config import BACKEND_TOKEN
 
-    if not factcheck.search_available() and not args.sans_recherche:
-        print(f"✗ {factcheck.SEARCH_DOWN_MESSAGE}.\n  Relance ensuite, ou ajoute --sans-recherche.")
-        sys.exit(1)
+    if not args.sans_recherche:
+        if not factcheck.search_available():
+            print(f"✗ {factcheck.SEARCH_DOWN_MESSAGE}.\n  Relance ensuite, ou ajoute --sans-recherche.")
+            sys.exit(1)
+        # SearxNG peut répondre alors que son moteur est suspendu (« trop de
+        # requêtes ») : une démo sans aucune source ne vaut pas d'être générée
+        if not factcheck.web_search("Assemblée nationale vote loi"):
+            print("✗ La recherche web ne renvoie rien (moteur suspendu après trop de requêtes ?).\n"
+                  "  Réessaie dans quelques minutes, ou ajoute --sans-recherche.")
+            sys.exit(1)
 
     clock = VideoClock()
     routes.time = _TimeShim(clock)

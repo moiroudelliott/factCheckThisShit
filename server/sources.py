@@ -8,6 +8,7 @@ sans modèle ni réseau (testables seules, cf. tests/).
 - confiance plafonnée quand aucune preuve n'est liée, ou quand la seule
   preuve est de fiabilité faible."""
 
+import math
 import re
 import time
 import unicodedata
@@ -16,6 +17,7 @@ from urllib.parse import urlparse
 from server.config import (
     EXCLUDED_SOURCE_DOMAINS, FACTCHECK_SECTIONS, LOW_RELIABILITY_DOMAINS, PARTISAN_DOMAINS,
 )
+from server.text_utils import key_words
 
 # Hiérarchie de fiabilité des domaines — annotée dans le prompt pour que le
 # verdict pèse une source officielle plus lourd qu'un blog. Noms de domaine
@@ -65,6 +67,22 @@ def is_excluded(url: str) -> bool:
 
 def is_low_reliability(url: str) -> bool:
     return on_domain(host(url), LOW_RELIABILITY_DOMAINS)
+
+
+def academic_relevant(claim: str, result: dict) -> bool:
+    """Un résultat académique ne passe au prompt que s'il porte vraiment sur
+    l'affirmation : au moins 2 mots-clés communs (titre + résumé), et 30 %
+    de ceux de l'affirmation. Cas vécus : la fiche d'un catalogue de
+    bibliothèque allemand citée comme preuve qu'« Attal a été Premier
+    ministre », une étude voisine qui a fait conclure « faux » à tort."""
+    words = key_words(claim)
+    if not words:
+        return False
+    common = words & key_words(f"{result.get('title', '')} {result.get('body', '')}")
+    # Des noms propres en commun (« Gabriel Attal ») ne disent rien du sujet :
+    # il faut au moins un mot commun qui n'en soit pas un
+    names = key_words(" ".join(re.findall(r"\b[A-ZÀÂÇÉÈÊËÎÏÔÙÛÜ][\w'’-]*", claim)))
+    return len(common) >= max(2, math.ceil(0.3 * len(words))) and bool(common - names)
 
 
 def is_factcheck_section(url: str) -> bool:
@@ -135,6 +153,11 @@ def finalize_result(data: dict, results: list, academic: list, official: list, k
     n'est qu'une consigne ; ici elle est appliquée."""
     out = {"verdict": normalize_verdict(data.get("verdict")),
            "explication": str(data.get("explication") or "").strip()}
+    # « vrai » alors que le modèle a lui-même relevé un élément contredit par
+    # ses sources (cas vécu : « première baisse depuis 15-20 ans », VRAI à
+    # 95 %, l'explication citant une baisse en 2020) : au mieux partiel
+    if out["verdict"] == "vrai" and str(data.get("inexact") or "").strip():
+        out["verdict"] = "partiellement_vrai"
     kinds = {r.get("href"): "web" for r in results}
     kinds.update({r.get("href"): "academic" for r in academic})
     kinds.update({r.get("href"): "official" for r in official})

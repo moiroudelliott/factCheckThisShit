@@ -7,7 +7,9 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from server.points import apply_checkworthiness, citation_time, validate_citation, verifiable_score  # noqa: E402
+from server.points import (  # noqa: E402
+    apply_checkworthiness, citation_time, speaker_named_in_citation, validate_citation, verifiable_score,
+)
 
 
 def test_vague_affirmations_are_not_checked():
@@ -53,6 +55,17 @@ def test_citation_dates_the_statement():
     assert citation_time("l'immigration coûte 40 milliards par an", ENTRIES) == 1012.5
     assert citation_time("le chômage a baissé de deux points", ENTRIES) == 1000.0
     assert citation_time("absent de la transcription", ENTRIES) is None
+
+
+def test_speaker_named_in_own_quote_is_not_the_speaker():
+    """Cas vécus (débat Attal / Maréchal) : interpellation et présentateur."""
+    assert speaker_named_in_citation("Marion Maréchal-Le Pen", "La réponse est non, Marion Maréchal, c'est un sujet central.")
+    assert speaker_named_in_citation("Gabriel Attal", "Gabriel Attal fait référence à ce protocole d'accord signé")
+    # l'adversaire nommé, ou personne : attribution gardée
+    assert not speaker_named_in_citation("Gabriel Attal", "Mais contrairement à vous, Marion Maréchal, je ne considère pas")
+    assert not speaker_named_in_citation("Marion Maréchal-Le Pen", "Monsieur Attal sous son ministère, c'est 1,9 million")
+    assert not speaker_named_in_citation("Intervenant A", "Intervenant A a dit")
+    assert not speaker_named_in_citation("Gabriel Attal", "")
 
 
 if __name__ == "__main__":

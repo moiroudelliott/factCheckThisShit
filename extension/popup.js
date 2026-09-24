@@ -108,11 +108,14 @@ async function init() {
 // rejouable via « réessaie » si le backend était éteint
 async function prepare(draft = null) {
   setStatus('connexion au backend…');
-  const ok = await fetch(`${BACKEND_URL}/health`, { signal: AbortSignal.timeout(2500) })
-    .then(r => r.ok)
-    .catch(() => false);
+  const health = await fetch(`${BACKEND_URL}/health`, { signal: AbortSignal.timeout(4000) })
+    .then(r => (r.ok ? r.json() : null))
+    .catch(() => null);
   if (capturing) return;
-  if (!ok) {
+  // Recherche web (SearxNG) éteinte : l'analyse marche, mais presque aucun
+  // verdict n'aura de source — à savoir AVANT de lancer
+  $('search-warn').style.display = health && health.web_search === false ? 'block' : 'none';
+  if (!health) {
     $('warn').style.display = 'block';
     $('btn-start').disabled = true;
     setStatus('backend éteint');

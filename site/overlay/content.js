@@ -85,6 +85,13 @@ const STATE_CFG = {
   indisponible: { tag: 'INDISPONIBLE', accent: 'oklch(0.58 0.03 255)', footerRight: '⚠ erreur technique',     footerColor: 'oklch(0.66 0.03 255)' },
 };
 
+// Confiance affichée seulement pour un vrai verdict : « non vérifié · 30 % »
+// ne voulait rien dire (30 % de quoi ?), et une panne n'a pas de confiance
+function confText(fc, sep) {
+  return fc && fc.confiance != null && !fc.pending && !fc.indisponible && fc.verdict !== 'non_verifiable'
+    ? `${sep}${fc.confiance}%` : '';
+}
+
 function verdictCfg(fc) {
   if (!fc) return null;
   if (fc.pending) return STATE_CFG.attente;
@@ -1306,7 +1313,7 @@ function resolveCurrent() {
       srcEl.textContent = fc.pending || fc.indisponible ? '' : (fc.source || 'analyse IA');
     }
     const right = footer.querySelector('.fct-footer-right');
-    right.textContent = fc.confiance != null ? `${cfg.footerRight} · ${fc.confiance}%` : cfg.footerRight;
+    right.textContent = cfg.footerRight + confText(fc, ' · ');
     right.style.color = cfg.footerColor;
     const reportSlot = footer.querySelector('.fct-report-slot');
     if (reportSlot) reportSlot.innerHTML = reportButton(S.points.get(id));
@@ -1403,11 +1410,11 @@ function exportRecap() {
     lines.push('## Affirmations vérifiées', '');
     for (const { point: p, fc } of affs) {
       const cfg = verdictCfg(fc);
-      const verdict = cfg ? cfg.tag + (fc.confiance != null ? ` ${fc.confiance}%` : '') : 'EN ATTENTE';
+      const verdict = cfg ? cfg.tag + confText(fc, ' ') : 'EN ATTENTE';
       let line = `- **[${verdict}]**${p.qui ? ` ${exportName(p.qui)} —` : ''} « ${p.texte} »`;
       if (fc?.explication) line += ` — ${fc.explication}`;
       if (fc?.source && !fc.pending && !fc.indisponible) {
-        line += fc.url ? ` *(source : [${fc.source}](${fc.url}))*` : ` *(source : ${fc.source})*`;
+        line += fc.url ? ` *(source : [${fc.source}](${fc.url}))*` : ' *(sans source)*';
       }
       const l = link(p);
       if (l) line += ` — [▶ ${fmtTime(p.vt)}](${l})`;
@@ -1623,7 +1630,7 @@ function renderRecap() {
           <p class="fct-recap-claim">« ${esc(p.texte)} »</p>
           ${quoteHtml('fct-recap-quote', p)}
           ${fc?.explication && !waiting ? `<p class="fct-recap-explanation">${esc(fc.explication)}</p>` : ''}
-          ${vcfg && !waiting ? `<div class="fct-recap-footer">${srcHtml}<span class="fct-footer-end"><span class="fct-recap-footer-right" style="color:${vcfg.footerColor}">${vcfg.footerRight}${fc?.confiance != null ? ` · ${fc.confiance}%` : ''}</span>${reportButton({ point: p, fc })}</span></div>` : ''}
+          ${vcfg && !waiting ? `<div class="fct-recap-footer">${srcHtml}<span class="fct-footer-end"><span class="fct-recap-footer-right" style="color:${vcfg.footerColor}">${vcfg.footerRight}${confText(fc, ' · ')}</span>${reportButton({ point: p, fc })}</span></div>` : ''}
         </div>
       </div>`;
     } catch (e) {

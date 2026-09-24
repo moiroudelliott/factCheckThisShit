@@ -11,6 +11,9 @@ visible au récap comme telle."""
 import re
 
 from server.config import CHECKWORTHY_MIN
+from server.names import norm_name
+
+_RAW_LABEL_RE = re.compile(r"^Intervenant ([A-Z]|\d+)$")
 
 
 def verifiable_score(point: dict) -> int:
@@ -39,6 +42,21 @@ def apply_checkworthiness(point: dict) -> dict:
 
 def norm_words(text: str) -> list:
     return re.findall(r"\w+", str(text or "").lower().replace("’", "'"))
+
+
+def speaker_named_in_citation(qui: str, citation: str) -> bool:
+    """La citation contient le nom de famille de la personne à qui on
+    l'attribue : elle ne peut presque jamais être d'elle. Soit on
+    l'interpelle (« La réponse est non, Marion Maréchal, c'est un sujet
+    central »), soit on parle d'elle (« Gabriel Attal fait référence à… »,
+    le présentateur). Cas vécus : la reconnaissance des voix se trompe dans
+    les échanges rapides, et Mistral recopie l'annotation malgré la consigne."""
+    if not qui or not citation or _RAW_LABEL_RE.match(qui):
+        return False
+    parts = norm_name(qui).split()
+    surnames = [w for w in parts[1:] if len(w) >= 4] or [w for w in parts if len(w) >= 4]
+    said = f" {norm_name(citation)} "
+    return any(f" {w} " in said for w in surnames)
 
 
 def validate_citation(citation, transcript: str) -> str:

@@ -12,7 +12,7 @@ sys.path.insert(0, ROOT)
 
 from server.config import EXCLUDED_SOURCES, LOW_RELIABILITY_DOMAINS, PARTISAN_DOMAINS  # noqa: E402
 from server.sources import (  # noqa: E402
-    finalize_result, is_excluded, normalize_verdict, source_label, source_tier, video_year,
+    academic_relevant, finalize_result, is_excluded, normalize_verdict, source_label, source_tier, video_year,
 )
 
 
@@ -115,6 +115,23 @@ def test_video_year():
     assert video_year({"date": "2024-06-27"}) == 2024
     assert video_year({"date": ""}) >= 2025
     assert video_year({}) >= 2025
+
+
+def test_academic_results_must_be_about_the_claim():
+    claim = "Gabriel Attal a interdit le port de l'abaya et du qamis dans les établissements scolaires"
+    on_topic = {"title": "L'interdiction de l'abaya dans les établissements scolaires (2024, HAL)",
+                "body": "Analyse de la note de service interdisant le port de l'abaya et du qamis à l'école."}
+    off_topic = {"title": "Gabriel Attal (2024, OpenAlex)", "body": "Notice de catalogue."}
+    assert academic_relevant(claim, on_topic)
+    assert not academic_relevant(claim, off_topic)
+
+
+def test_true_verdict_with_a_contradicted_element_is_partial():
+    """Cas vécu : VRAI 95 % alors que l'explication citait une baisse en 2020."""
+    data = {"verdict": "vrai", "confiance": 95, "explication": "Baisse en 2024, mais aussi en 2020.",
+            "inexact": "une première depuis 15 ou 20 ans", "url": ""}
+    assert finalize_result(data, [], [], [])["verdict"] == "partiellement_vrai"
+    assert finalize_result({**data, "inexact": ""}, [], [], [])["verdict"] == "vrai"
 
 
 if __name__ == "__main__":

@@ -17,7 +17,7 @@ from server.config import (
 from server.text_utils import _STOPWORDS
 from server import cache, indicators, known_factchecks, votes
 from server.notify import describe_error, warn_client
-from server.sources import finalize_result, is_excluded, source_tier, video_year
+from server.sources import academic_relevant, finalize_result, is_excluded, source_tier, video_year
 from server.state import session_contexts
 
 # ── Prompts ────────────────────────────────────────────────────────────────
@@ -41,7 +41,10 @@ Types:
   Ex: "L'Union européenne impose la fin du moteur thermique en 2035"
   Ne sont PAS des affirmations (→ "subjectif"): généralités vagues ("Il existe des fractures en France"),
   définitions ou thèses ("L'islam est à la fois une civilisation et une religion"),
-  évidences sans contenu ("L'accord de Paris a été signé à une époque antérieure").
+  évidences sans contenu ("L'accord de Paris a été signé à une époque antérieure"),
+  appartenance, mérite ou intention ("France Inter appartient à tous les Français",
+  "J'ai empêché le RN d'avoir la majorité"), rappel banal de l'orateur sur lui-même
+  ("L'année où j'étais Premier ministre").
 - "argument" = raisonnement cause-effet ou proposition concrète.
   Ex: "Les fermetures d'usines s'expliquent d'abord par le niveau des charges sociales"
 - "subjectif" = opinion, jugement de valeur, promesse vague — non vérifiable.
@@ -62,7 +65,12 @@ RÈGLES:
 2. Ignore la pure gestion de plateau ("laissez-le parler", interruptions) — MAIS les attaques et accusations politiques entre débatteurs sont des points valides (type "remarque").
 3. Ne répète pas un point déjà dans l'historique, même reformulé. Les points NOUVEAUX doivent toujours être extraits.
 4. PRIORITÉ ABSOLUE aux faits vérifiables: si le passage contient un chiffre, une date ou un fait précis, il DOIT devenir un point de type "affirmation".
-5. La transcription est automatique et contient parfois des erreurs phonétiques sur les noms propres et les sigles (ex: "Mereaux" pour "maires ruraux", "Baïa" pour "abaya") : quand la forme correcte est évidente d'après le contexte, écris-la correctement dans le point ; sinon garde le mot tel quel."""
+5. La transcription est automatique et contient parfois des erreurs phonétiques sur les noms propres et les sigles (ex: "Mereaux" pour "maires ruraux", "Baïa" pour "abaya") : quand la forme correcte est évidente d'après le contexte, écris-la correctement dans le point ; sinon garde le mot tel quel.
+6. N'ajoute JAMAIS au point un élément qui n'a pas été prononcé : ni date, ni chiffre, ni lieu, ni nom.
+7. Une affirmation doit se comprendre seule : si elle renvoie à un contexte absent (« le candidat en question », « cette loi »), complète-le d'après le passage ou l'historique ; sinon note "verifiable" ≤ 3.
+8. Un nom prononcé pour interpeller (« Monsieur Attal, vous… ») désigne la personne À QUI l'on parle, jamais celle qui parle (voir règle 1).
+9. Ignore les relances et résumés du présentateur, qui parle des débatteurs à la 3e personne : ce ne sont pas des points.
+10. Dans une "remarque", garde le sens de l'accusation : c'est "qui" qui accuse, jamais l'inverse."""
 
 
 FACTCHECK_PROMPT_TEMPLATE = """Tu es un fact-checker expert sur les données françaises et européennes. Nous sommes le {today}.
@@ -73,7 +81,7 @@ Affirmation à vérifier: "{claim}"
 
 Évalue la véracité en te basant PRIORITAIREMENT sur les résultats de recherche ci-dessus (leur fiabilité est annotée), complétés par tes connaissances.
 Réponds UNIQUEMENT avec un objet JSON valide, sans markdown:
-{{"verdict": "VERDICT", "confiance": 85, "explication": "une phrase courte et précise", "source": "nom de la source (ex: INSEE, Eurostat, Le Monde)", "url": "URL du résultat de recherche utilisé, ou chaîne vide"}}
+{{"verdict": "VERDICT", "confiance": 85, "explication": "une phrase courte et précise", "inexact": "l'élément de l'affirmation que les sources contredisent (chiffre, date, période, superlatif, attribution), ou chaîne vide", "source": "nom de la source (ex: INSEE, Eurostat, Le Monde)", "url": "URL du résultat de recherche utilisé, ou chaîne vide"}}
 
 Verdicts disponibles:
 - "vrai": affirmation exacte et vérifiable
@@ -84,6 +92,10 @@ Verdicts disponibles:
 
 RÈGLES DE RIGUEUR:
 - Un verdict tranché ("vrai", "faux", "trompeur") exige AU MOINS deux sources indépendantes concordantes, OU une SOURCE OFFICIELLE (INSEE, Eurostat, Légifrance, parlement…). Sinon: "partiellement_vrai" ou "non_verifiable".
+- "faux" exige qu'une source FOURNIE contredise explicitement l'affirmation (chiffre, date ou fait différent, que tu cites dans l'explication). Tes seules connaissances ne suffisent JAMAIS pour "faux" : sans source contraire, réponds "non_verifiable" (ou "partiellement_vrai" si une partie est confirmée).
+- Vérifie CHAQUE élément : chiffre, date, période, superlatif (« record », « première fois depuis 20 ans », « jamais »), et à qui l'action est attribuée. Recopie dans "inexact" tout élément que tes sources contredisent — ex : « une première depuis 15 ou 20 ans » alors que la série montre une baisse en 2020. Si "inexact" n'est pas vide, le verdict NE PEUT PAS être "vrai" : "partiellement_vrai" (élément secondaire), "trompeur" ou "faux" (élément central).
+- Une mesure décidée ou annoncée par un ministre dans son domaine lui est attribuable (« X a interdit… » est vrai si X, ministre compétent, l'a décidée), même si le gouvernement est dirigé par un autre.
+- Une SOURCE ACADÉMIQUE ne prouve un fait d'actualité (qui a fait quoi, quand) que si son résumé le dit explicitement.
 - Pour une affirmation CAUSALE ou sociologique ("X provoque Y", "X n'a pas d'effet sur Y"), les SOURCES ACADÉMIQUES (études évaluées par les pairs) pèsent plus lourd que la presse et que tes intuitions. Ne les utilise que si elles portent réellement sur le sujet de l'affirmation.
 - "confiance" (0-100) = ta certitude dans le verdict: ~90+ = sources officielles concordantes; ~70 = bien sourcé; ~50 = plausible mais mal sourcé; en dessous de 40, utilise plutôt "non_verifiable".
 - Quand les sources donnent un chiffre exact, cite-le dans "explication".
@@ -95,7 +107,7 @@ RÈGLES DE RIGUEUR:
 - Une source de FIABILITÉ FAIBLE (site militant, conspirationniste ou agrégateur) ne suffit jamais seule et ne compte pas comme source indépendante : ne la choisis comme "url" que faute de mieux, avec confiance ≤ 50.
 - "url" doit être COPIÉE depuis un des résultats de recherche fournis — jamais inventée. Si aucun résultat n'appuie ton verdict, url vide ET confiance ≤ 50.
 - "source" = le nom du site de l'URL choisie (ex: "Le Monde" pour lemonde.fr), jamais une autorité que ce site se contente de citer.
-- L'affirmation vient d'une transcription automatique : si elle contient manifestement une erreur de transcription (nom déformé, mot incompréhensible), ne la juge pas "faux" pour autant — réponds "non_verifiable" en commençant l'explication par "Transcription douteuse :".
+- L'affirmation vient d'une transcription automatique : si elle contient manifestement une erreur de transcription (nom déformé, mot incompréhensible), ne la juge pas "faux" pour autant — réponds "non_verifiable" en commençant l'explication par "Transcription douteuse :". Ne l'utilise pas pour une affirmation simplement incomplète ou sortie de son contexte.
 - Sois honnête : en cas de doute réel, réponds "non_verifiable" plutôt que de deviner."""
 
 
@@ -115,7 +127,13 @@ ATTRIBUTION_RULE_DIAR = (
     'La transcription est annotée par locuteur ("Intervenant A"… ou un nom réel une fois '
     'le locuteur identifié). Recopie EXACTEMENT cette annotation dans le champ "qui" — '
     "ne devine JAMAIS un nom toi-même. Les personnalités CITÉES dans le propos "
-    "(Poutine, Orban…) peuvent apparaître dans le texte du point."
+    "(Poutine, Orban…) peuvent apparaître dans le texte du point. "
+    "DEUX EXCEPTIONS, où l'annotation est fausse (la reconnaissance des voix se trompe "
+    "dans les échanges rapides) : (a) la réplique interpelle par son nom la personne "
+    "annotée (« Marion Maréchal, c'est un sujet central » dans une réplique annotée "
+    'Marion Maréchal) → "qui" vide ; (b) la réplique parle de la personne annotée à la '
+    "3e personne (« Gabriel Attal fait référence à… » dans une réplique annotée Gabriel "
+    "Attal) → c'est le présentateur qui résume : n'en fais AUCUN point."
 )
 ATTRIBUTION_RULE_NODIAR = (
     'Impossible de savoir qui parle: laisse le champ "qui" vide et formule le point sans '
@@ -221,6 +239,20 @@ def call_mistral(text: str, context: dict = None, recent_points: list = None, si
 
 # ── Recherche : web (SearxNG), académique (HAL/OpenAlex), officielle (data.gouv.fr) ─
 
+SEARCH_DOWN_MESSAGE = ("Recherche web éteinte (SearxNG) : les verdicts seront rarement sourcés — "
+                       "lance Docker puis « docker compose up -d » dans searxng/")
+
+
+def search_available() -> bool:
+    """SearxNG répond-il ? Sans lui, presque aucun verdict n'a de source :
+    cas vécu, une session entière à « non vérifié, non sourcé » sans que rien
+    ne le signale ailleurs que dans le terminal au démarrage."""
+    try:
+        return requests.get(f"{SEARXNG_URL}/healthz", timeout=1.5).ok
+    except Exception:
+        return False
+
+
 def web_search(query: str, max_results: int = 6) -> list:
     """Recherche web via l'instance SearxNG auto-hébergée (searxng/docker-compose.yml) —
     Brave + Mojeek uniquement (ni Google ni Bing, cf. searxng/config/settings.yml).
@@ -267,7 +299,8 @@ def scholar_search(claim: str, max_results: int = 4) -> list:
         return []
     hal = eventlet.spawn(_hal_search, query)
     openalex = eventlet.spawn(_openalex_search, query)
-    return (hal.wait() + openalex.wait())[:max_results]
+    found = hal.wait() + openalex.wait()
+    return [r for r in found if academic_relevant(claim, r)][:max_results]
 
 
 def _hal_search(query: str) -> list:
@@ -295,7 +328,10 @@ def _openalex_search(query: str) -> list:
     try:
         r = requests.get(
             "https://api.openalex.org/works",
-            params={"search": query, "per-page": 2},
+            # Articles et chapitres avec résumé seulement : sans ce filtre,
+            # des fiches de catalogue de bibliothèque sortaient comme « études »
+            params={"search": query, "per-page": 3,
+                    "filter": "has_abstract:true,type:article|review|preprint|book-chapter"},
             timeout=6,
         )
         for w in r.json().get("results", []):

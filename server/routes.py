@@ -22,9 +22,12 @@ from server.config import (
 )
 from server import cache, indicators, known_factchecks, votes
 from server.dedup import dupe_index_add, is_duplicate_indexed
-from server.factcheck import call_mistral, call_mistral_api, fact_check_affirmation, VIDEO_ANALYSIS_PROMPT
+from server.factcheck import (
+    SEARCH_DOWN_MESSAGE, call_mistral, call_mistral_api, fact_check_affirmation, search_available,
+    VIDEO_ANALYSIS_PROMPT,
+)
 from server.notify import describe_error, warn_client
-from server.points import apply_checkworthiness, citation_time, validate_citation
+from server.points import apply_checkworthiness, citation_time, speaker_named_in_citation, validate_citation
 from server.state import (
     session_history, session_starts, session_buffers, session_contexts, session_points,
     session_dupe_index, session_flush_locks, session_chunk_locks, session_speakers,
@@ -46,7 +49,8 @@ votes.start(socketio, eventlet.tpool.execute)
 
 @app.route("/health")
 def health():
-    return {"status": "ok"}
+    # web_search : la popup prévient AVANT le lancement si SearxNG est éteint
+    return {"status": "ok", "web_search": search_available()}
 
 
 @app.route("/analyze_video", methods=["POST"])
@@ -202,6 +206,8 @@ def _refresh_hotwords(sid: str):
 @socketio.on("start_transcription")
 def on_start():
     session_starts[request.sid] = time.time()
+    if not search_available():
+        warn_client(request.sid, SEARCH_DOWN_MESSAGE)
     emit("ready", {"status": "listening"})
     if not MISTRAL_API_KEY:
         warn_client(request.sid, "MISTRAL_API_KEY absente — transcription seule, aucune analyse")
@@ -408,6 +414,11 @@ def flush_to_mistral(sid: str, text: str, ts: float = None, entries: list = ()):
             qui = p.get("qui", "")
             p["qui_label"] = qui if qui in smap_used else label_of.get(qui, qui)
             p["qui"] = smap.get(p["qui_label"], qui)
+            # Propos où l'orateur supposé est nommé (interpellé ou cité à la 3e
+            # personne) : attribution fausse — plutôt aucun nom qu'un faux
+            if speaker_named_in_citation(p["qui"], p["citation"]):
+                print(f"[Attribution] « {p['citation'][:60]} » ne peut pas être de {p['qui']} — retirée")
+                p["qui"] = p["qui_label"] = ""
         index = session_dupe_index.setdefault(sid, {})
         combined = list(all_points)
         unique: list = []

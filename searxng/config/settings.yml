@@ -24,3 +24,9 @@ search:
   formats:
     - html
     - json
+  # Un moteur qui répond « trop de requêtes » est suspendu : 1 h par défaut,
+  # soit, après une seule rafale (plusieurs affirmations vérifiées d'un coup),
+  # la fin du débat sans aucune recherche web. Brave redevient vite
+  # disponible : on réessaie au bout d'une minute.
+  suspended_times:
+    SearxEngineTooManyRequests: 60

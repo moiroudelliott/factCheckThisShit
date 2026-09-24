@@ -49,10 +49,20 @@ def safe(s: str) -> str:
     return str(s).encode("ascii", "replace").decode()
 
 
+# YouTube exige de résoudre des défis JavaScript (paquet yt-dlp-ejs + un
+# moteur JS, Deno ou Node.js) : sans eux, téléchargement refusé (HTTP 403)
+_YTDLP_BASE = ["--js-runtimes", "deno", "--js-runtimes", "node"]
+_force_ipv4 = None
+
+
 def ytdlp(*args, timeout=180):
+    global _force_ipv4
+    if _force_ipv4 is None:  # IPv6 annoncé mais cassé : 8 à 40 s perdues par connexion (server/network.py)
+        from server.network import ipv6_works
+        _force_ipv4 = ipv6_works() is False
     try:
         return subprocess.run(
-            [sys.executable, "-m", "yt_dlp", *args],
+            [sys.executable, "-m", "yt_dlp", *_YTDLP_BASE, *(["-4"] if _force_ipv4 else []), *args],
             capture_output=True, text=True, encoding="utf-8", errors="replace",
             timeout=timeout,
         )

@@ -156,7 +156,8 @@ DIARIZATION_DEVICE = os.environ.get("DIARIZATION_DEVICE", "cpu")
 # construit donc la nôtre : empreintes ECAPA locales dans voices/, alimentées
 # manuellement (enroll.py) ou automatiquement quand un locuteur a été
 # identifié de façon fiable (vote LLM ou match acoustique).
-VOICES_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "voices")
+VOICES_DIR = os.environ.get("VOICES_DIR") or os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "voices")
 VOICE_MATCH_THRESHOLD = 0.45   # cos min entre centroïde de session et empreinte en banque
 VOICE_MATCH_MARGIN = 0.08      # écart min avec la 2e meilleure empreinte de TOUTE la banque (anti-confusion)
 VOICE_MATCH_SOLO_BONUS = 0.10  # une seule voix en banque (pas de 2e pour la marge) : seuil relevé d'autant

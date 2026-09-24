@@ -6,7 +6,7 @@ faster-whisper==1.1.1
 python-dotenv==1.0.1
 requests==2.32.3
 speechbrain>=1.0.0
-yt-dlp>=2025.1.1
+yt-dlp[default]>=2026.8.19  # [default] = yt-dlp-ejs ; YouTube exige aussi Node.js ou Deno installé
 Flask==3.1.0
 Flask-Cors==5.0.0
 flask-socketio==5.5.1

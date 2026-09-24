@@ -14,6 +14,7 @@ from flask_cors import CORS
 from flask_socketio import SocketIO
 
 from faster_whisper import WhisperModel
+from faster_whisper.utils import download_model
 
 from server import network
 from server.config import (
@@ -37,6 +38,25 @@ app = Flask(__name__)
 CORS(app, origins=[_EXTENSION_ORIGIN, *ALLOWED_ORIGINS])
 socketio = SocketIO(app, cors_allowed_origins=origin_allowed, async_mode="eventlet", max_http_buffer_size=50 * 1024 * 1024)
 
+# Avant toute requête sortante — y compris le téléchargement éventuel des
+# modèles et les tâches de fond : repli IPv4 si l'IPv6 du réseau ne passe
+# pas (voir server/network.py)
+if network.configure(FORCE_IPV4) == "ipv4":
+    print("⚠️  IPv6 inutilisable sur ce réseau : connexions sortantes forcées en IPv4 "
+          "(sinon 8 à 40 s perdues à chaque appel Mistral). FORCE_IPV4=0 dans .env pour désactiver.")
+
+
+def _whisper_source(name: str) -> str:
+    """Dossier du modèle s'il est déjà sur le disque — aucun appel réseau —,
+    sinon son nom (téléchargement). Par défaut, faster-whisper interroge
+    Hugging Face à chaque démarrage pour chercher une nouvelle version : cas
+    vécu, 169 s de chargement avec une IPv6 cassée, 0,01 s depuis le disque."""
+    try:
+        return download_model(name, local_files_only=True)
+    except Exception:
+        return name
+
+
 # ── Whisper (transcription) ────────────────────────────────────────────────
 # Chargement au démarrage du serveur (pas au premier chunk).
 # Repli en cascade : le modèle demandé sur GPU, puis medium sur GPU (VRAM
@@ -48,7 +68,7 @@ model = None
 for _name, _device, _compute in dict.fromkeys(_WHISPER_ATTEMPTS):
     print(f"Chargement du modèle Whisper {_name} ({_device.upper()})…")
     try:
-        model = WhisperModel(_name, device=_device, compute_type=_compute)
+        model = WhisperModel(_whisper_source(_name), device=_device, compute_type=_compute)
         break
     except Exception as e:
         print(f"⚠️  Échec du chargement de {_name} sur {_device} ({type(e).__name__}: {e})")
@@ -61,12 +81,6 @@ print("Modèle prêt.")
 
 import threading
 model_lock = threading.Lock()
-
-# Avant toute requête sortante (tâches de fond comprises) : repli IPv4 si
-# l'IPv6 du réseau ne passe pas (voir server/network.py)
-if network.configure(FORCE_IPV4) == "ipv4":
-    print("⚠️  IPv6 inutilisable sur ce réseau : connexions sortantes forcées en IPv4 "
-          "(sinon 8 à 40 s perdues à chaque appel Mistral). FORCE_IPV4=0 dans .env pour désactiver.")
 
 try:
     requests.get(f"{SEARXNG_URL}/healthz", timeout=2)
@@ -96,10 +110,25 @@ try:
     import torch
     from speechbrain.inference.speaker import EncoderClassifier
     print(f"Chargement du modèle de diarisation (ECAPA-TDNN, {DIARIZATION_DEVICE})…")
-    speaker_encoder = EncoderClassifier.from_hparams(
-        source="speechbrain/spkrec-ecapa-voxceleb",
-        run_opts={"device": DIARIZATION_DEVICE},
-    )
+    # Depuis le disque d'abord (sans vérifier une nouvelle version en ligne,
+    # comme pour Whisper) ; téléchargement seulement s'il n'y est pas encore
+    try:
+        from speechbrain.utils.fetching import FetchConfig
+        _offline = {"fetch_config": FetchConfig(allow_network=False)}
+    except ImportError:  # speechbrain < 1.0
+        _offline = None
+    speaker_encoder = None
+    if _offline:
+        try:
+            speaker_encoder = EncoderClassifier.from_hparams(
+                source="speechbrain/spkrec-ecapa-voxceleb", run_opts={"device": DIARIZATION_DEVICE}, **_offline)
+        except Exception:
+            speaker_encoder = None
+    if speaker_encoder is None:
+        speaker_encoder = EncoderClassifier.from_hparams(
+            source="speechbrain/spkrec-ecapa-voxceleb",
+            run_opts={"device": DIARIZATION_DEVICE},
+        )
     DIARIZATION = True
     print("Diarisation prête.")
 except Exception as e:

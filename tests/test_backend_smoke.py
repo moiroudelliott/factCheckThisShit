@@ -64,8 +64,12 @@ fw_audio = types.ModuleType("faster_whisper.audio")
 fw.WhisperModel = _FakeWhisper
 fw_audio.decode_audio = lambda path: (np.random.RandomState(1).randn(16000 * 10) * 0.1).astype(np.float32)
 fw.audio = fw_audio
+fw_utils = types.ModuleType("faster_whisper.utils")
+fw_utils.download_model = lambda name, **k: name  # « modèle en cache » : aucun téléchargement
+fw.utils = fw_utils
 sys.modules["faster_whisper"] = fw
 sys.modules["faster_whisper.audio"] = fw_audio
+sys.modules["faster_whisper.utils"] = fw_utils
 
 # ── ECAPA simulé : une seule voix ─────────────────────────────────────────
 import torch  # noqa: E402

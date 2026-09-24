@@ -159,9 +159,9 @@
   top: var(--fct-edge);
   left: var(--fct-edge);
   display: flex;
-  align-items: flex-end; /* le texte reste calé sur le bas de l'équaliseur */
+  align-items: flex-end; /* le texte repose sur le bas de l'équaliseur (voir .fct-badge-name) */
   gap: 9px;
-  padding: 7px 14px 7px 12px;
+  padding: 9.5px 14px 9.5px 12px;
   border-radius: 999px;
   background: rgba(16, 18, 22, 0.65);
   backdrop-filter: blur(14px) saturate(1.2);
@@ -203,6 +203,14 @@
   color: rgba(255, 255, 255, 0.92);
   white-space: nowrap;
   transition: color 0.4s ease; /* le texte grise EXACTEMENT comme l'équaliseur */
+}
+/* Une seule ligne : boîte de texte rognée aux capitales en haut et à la
+   ligne de base en bas. Sans ça, calée par le bas, la boîte gardait sous les
+   lettres la place des jambages (≈ 4,4 px) : le texte flottait au-dessus des
+   barres de l'équaliseur, collé vers le haut du badge. */
+#fct-speaker-badge:not(.fct-badge--enrolling) .fct-badge-name {
+  display: block;
+  text-box: trim-both cap alphabetic;
 }
 /* Le gap n'existe qu'en état 2 lignes : sinon il laisse un blanc fantôme
    sous le texte (la ligne d'empreinte repliée compte pour 0px mais le gap

@@ -15,6 +15,9 @@
     @font-face { font-family: 'IBM Plex Mono'; font-style: normal; font-weight: 400; font-display: swap; src: url('fonts/ibm-plex-mono-400-latin.woff2') format('woff2'); }
 
     * { box-sizing: border-box; }
+    /* L'attribut hidden doit gagner sur les display: flex ci-dessous : sans
+       ça, l'écran d'accueil restait par-dessus la vidéo (le son, pas l'image) */
+    [hidden] { display: none !important; }
     body { margin: 0; color: #f2f1ee; font-family: 'Archivo', system-ui, sans-serif; line-height: 1.6; background: #0d0f13; }
     a { color: #f0435f; text-decoration: none; }
     :focus-visible { outline: 2px solid #f0435f; outline-offset: 3px; }

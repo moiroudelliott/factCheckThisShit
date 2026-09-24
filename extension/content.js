@@ -144,6 +144,7 @@ const S = {
   lastAd: false,
   saveTimer: null,
   tape: [],          // [{ t, m }] — messages du backend et position vidéo à leur arrivée (relecture)
+  tapeStart: null,   // position vidéo au démarrage de l'analyse (l'overlay apparaît là en relecture)
 };
 
 // Timer lié à la génération courante : ne fait rien si un teardown est passé entre-temps
@@ -179,13 +180,18 @@ function largestVisible(selector, minW, minH, accept = () => true) {
   return best;
 }
 
+// Page de relecture du site : la vidéo est dans l'iframe du lecteur YouTube,
+// la page expose un objet équivalent (currentTime, paused…). Jamais visible
+// depuis l'extension (monde isolé) ; un élément id=__fctVideo d'une page
+// (DOM clobbering) est écarté.
+function replayVideo() {
+  const v = window.__fctVideo;
+  return v && !(v instanceof Node) && typeof v.currentTime === 'number' ? v : null;
+}
+
 function mainVideo() {
-  // Page de relecture du site : la vidéo est dans l'iframe du lecteur
-  // YouTube, la page expose un objet équivalent (currentTime, paused…).
-  // Jamais visible depuis l'extension (monde isolé) ; un élément id=__fctVideo
-  // d'une page (DOM clobbering) est écarté.
-  const replay = window.__fctVideo;
-  if (replay && !(replay instanceof Node) && typeof replay.currentTime === 'number') return replay;
+  const replay = replayVideo();
+  if (replay) return replay;
   if (IS_YOUTUBE) {
     return document.querySelector('#movie_player video.html5-main-video')
       || document.querySelector('#movie_player video')
@@ -442,7 +448,7 @@ function rememberShown(sig) {
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   if (msg.action === 'ping') { sendResponse({ pong: true }); return; }
   try {
-    const snapshot = TAPE_TYPES.has(msg.type) ? JSON.parse(JSON.stringify(msg)) : null;
+    const snapshot = TAPE_TYPES.has(msg.type || msg.action) ? JSON.parse(JSON.stringify(msg)) : null;
     if (msg.action === 'showOverlay')     startOverlay();
     if (msg.action === 'captureEnded')    onCaptureEnded(msg.reason);
     // backlog : points déjà passés (relecture après un saut) — au récap, sans carte
@@ -491,6 +497,7 @@ function startOverlay({ restore = false } = {}) {
   injectBadge();
   startSampler();
   followPlayer(true);
+  if (!restore) S.tapeStart = videoTimeAt(Date.now() / 1000);
   if (restore) {
     restoreRecap();
     flashStatus('page rechargée — analyse toujours en cours', 'warn', 5000);
@@ -513,7 +520,7 @@ function teardown() {
     enrolledNames: new Set(), enrollableNames: new Set(), nameFirstSeen: {}, enrollDisplayed: new Set(),
     pendingEnrollSuccess: new Set(), enrollShownAt: null, badgeTimer: null, lastProbeAt: 0,
     recapOpen: false, showAll: true, lastStatus: 'connected', flash: null, flashTimer: null, notes: {},
-    samples: [], samplerTimer: null, lastAd: false, saveTimer: null, tape: [],
+    samples: [], samplerTimer: null, lastAd: false, saveTimer: null, tape: [], tapeStart: null,
   });
   ['fct-layer', 'fct-chip', 'fct-card-slot', 'fct-recap', 'fct-speaker-badge', 'fct-markers'].forEach(id => document.getElementById(id)?.remove());
 }
@@ -738,7 +745,6 @@ const STATUS_CFG = {
   backend_down:  { cls: 'error', label: 'backend injoignable' },
   capture_error: { cls: 'error', label: 'erreur de capture' },
   unauthorized:  { cls: 'error', label: 'jeton invalide — vérifie la popup' },
-  replay:        { cls: '',      label: "relecture d'une analyse en direct" },
 };
 
 const END_LABELS = {
@@ -1353,6 +1359,7 @@ function saveRecap() {
     speakerMap: S.speakerMap,
     points: [...S.points.values()].map(({ point, fc }) => ({ point, fc })),
     tape: S.tape,
+    tapeStart: S.tapeStart,
   };
   try { chrome.storage.local.set({ [RECAP_KEY]: data }).catch(() => {}); } catch (_) {}
 }
@@ -1367,6 +1374,7 @@ async function restoreRecap() {
   S.speakerMap = { ...(data.speakerMap || {}), ...S.speakerMap };
   S.epoch = Math.max(S.epoch, data.epoch || 0);
   if (Array.isArray(data.tape)) S.tape = [...data.tape, ...S.tape];
+  if (Number.isFinite(data.tapeStart)) S.tapeStart = data.tapeStart;
   updateCount();
   if (S.recapOpen) renderRecap();
 }
@@ -1442,15 +1450,18 @@ function downloadFile(content, type, prefix, ext) {
 // telle qu'elle s'est déroulée en direct, délais compris : rien n'est
 // recalculé. Publication : python publish_session.py <fichier exporté>.
 
+// Tout ce qui change l'affichage : points, verdicts, voix, messages de la
+// puce, arrêt et fin de l'analyse (les verdicts de la finalisation compris)
 const TAPE_TYPES = new Set([
   'talking_points', 'fact_check_result', 'speaker_map', 'speaker_live', 'transcript_segment',
-  'voice_enrolled', 'voice_not_in_bank', 'session_reset',
+  'voice_enrolled', 'voice_not_in_bank', 'session_reset', 'connection_status', 'server_warning',
+  'mistral_rate_limited', 'captureEnded', 'finalizing', 'session_done',
 ]);
 const MAX_TAPE = 20000; // ~3 h de débat (une sonde « qui parle » toutes les 2,5 s)
 
 // msg : copie du message PRISE AVANT traitement (addPoint modifie les points)
 function record(msg) {
-  if (!S.active || S.phase !== 'live' || S.lastStatus === 'replay' || S.tape.length >= MAX_TAPE) return;
+  if (!S.active || replayVideo() || S.tape.length >= MAX_TAPE) return;
   const t = videoTimeAt(Date.now() / 1000);
   if (t == null) return;
   if (msg.type === 'talking_points') {
@@ -1471,6 +1482,7 @@ function exportSession() {
     video: IS_YOUTUBE ? { youtube: vid, title: exportTitle() } : { url: vid, title: exportTitle() },
     exported: new Date().toISOString().slice(0, 10),
     offset: 0, // secondes ajoutées à chaque position (recalage d'un direct sur sa rediffusion)
+    started: S.tapeStart ?? 0,
     events: S.tape,
   };
   downloadFile(JSON.stringify(data), 'application/json', 'source-session', 'json');

@@ -39,12 +39,13 @@
   const ID_RE = /^[\w-]{11}$/;
 
   const $ = (id) => document.getElementById(id);
-  let session = null;     // { video, events }
+  let session = null;     // { video, started, events }
   let events = [];        // messages hors « qui parle », triés par position
   let speakers = [];      // messages « qui parle », triés par position
   let claims = [];        // [{ id, vt, texte, verdict, at }] — pour la frise
   let player = null;
-  let idx = 0, spkIdx = 0, lastCur = 0, ended = false, tickTimer = null;
+  let idx = 0, spkIdx = 0, lastCur = 0, ended = false, overlayOn = false, tickTimer = null;
+  let recordedEnd = false; // la session contient l'arrêt réel de l'analyse
 
   document.addEventListener('DOMContentLoaded', init);
 
@@ -104,7 +105,7 @@
   }
 
   function prepare(s) {
-    const all = (s.events || []).filter((e) => Number.isFinite(e.t) && e.m && e.m.type);
+    const all = (s.events || []).filter((e) => Number.isFinite(e.t) && e.m && (e.m.type || e.m.action));
     events = all.filter((e) => !SPEAKER_TYPES.has(e.m.type));
     speakers = all.filter((e) => SPEAKER_TYPES.has(e.m.type));
     const byId = new Map();
@@ -120,6 +121,7 @@
       }
     }
     claims = [...byId.values()];
+    recordedEnd = events.some((e) => e.m.type === 'session_done');
   }
 
   // ── Lecteur YouTube : chargé seulement au clic (aucun service tiers avant) ──
@@ -170,8 +172,12 @@
     if (e.data === YT.PlayerState.ENDED && !ended) {
       tick();
       ended = true;
-      send({ type: 'finalizing' });
-      send({ type: 'session_done', complete: true });
+      // Analyse menée jusqu'au bout de la vidéo sans arrêt enregistré : la
+      // clore comme l'aurait fait le backend
+      if (!recordedEnd && overlayOn) {
+        send({ type: 'finalizing' });
+        send({ type: 'session_done', complete: true });
+      }
     }
   }
 
@@ -183,8 +189,9 @@
     lastCur = 0;
     ended = false;
     shown = -1;
-    send({ action: 'showOverlay' });
-    send({ type: 'connection_status', status: 'replay' });
+    overlayOn = false;
+    // L'overlay n'existe qu'à partir du moment où l'analyse a été lancée
+    if (typeof teardown === 'function') teardown();
     clearInterval(tickTimer);
     tickTimer = setInterval(tick, TICK_MS);
     renderTimeline(0);
@@ -208,6 +215,17 @@
   function tick() {
     if (!player || typeof player.getCurrentTime !== 'function') return;
     const cur = player.getCurrentTime() || 0;
+    // Avant la position où l'analyse a démarré : pas encore d'overlay
+    if (!overlayOn) {
+      if (cur + 0.05 < (session.started || 0)) {
+        lastCur = cur;
+        renderTimeline(cur);
+        return;
+      }
+      send({ action: 'showOverlay' });
+      send({ type: 'connection_status', status: 'connected' });
+      overlayOn = true;
+    }
     const jumped = cur < lastCur - 0.5 || cur > lastCur + JUMP_S;
     // « Qui parle » : seulement en lecture continue (y compris en revoyant un
     // passage) — après un saut, on reprend à la nouvelle position

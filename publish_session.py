@@ -63,7 +63,14 @@ _FIELDS = {
     "voice_enrolled": {"name": _STR},
     "voice_not_in_bank": {"labels": (list,)},
     "session_reset": {},
+    "connection_status": {"status": _STR},
+    "server_warning": {"message": _STR},
+    "mistral_rate_limited": {"attempt": (int, float), "max": (int, float), "wait": (int, float)},
+    "finalizing": {},
+    "session_done": {"complete": (bool,)},
 }
+# Messages envoyés par le service worker (clé « action » et non « type »)
+_ACTIONS = {"captureEnded": {"reason": _STR}}
 
 
 def _keep(obj: dict, fields: dict) -> dict:
@@ -81,6 +88,9 @@ def clean_message(m: dict):
         return {"type": kind, "points": points} if points else None
     if kind in _FIELDS:
         return {"type": kind, **_keep(m, _FIELDS[kind])}
+    action = m.get("action") if kind is None else None
+    if action in _ACTIONS:
+        return {"action": action, **_keep(m, _ACTIONS[action])}
     return None
 
 
@@ -100,26 +110,29 @@ def validate(data: dict, offset: float = 0.0) -> dict:
         m = clean_message(e.get("m")) if isinstance(t, (int, float)) else None
         if m is None:
             continue
-        if m["type"] == "talking_points":
+        if m.get("type") == "talking_points":
             for p in m["points"]:
                 if isinstance(p.get("vt"), (int, float)):
                     p["vt"] = round(max(0.0, p["vt"] + shift), 1)
         events.append({"t": round(max(0.0, t + shift), 1), "m": m})
     events.sort(key=lambda e: e["t"])  # tri stable : l'ordre d'arrivée est gardé à position égale
-    if not any(e["m"]["type"] == "talking_points" for e in events):
+    if not any(e["m"].get("type") == "talking_points" for e in events):
         raise ValueError("aucun point enregistré dans cette session")
     return {
         "format": "source-session",
         "version": 1,
         "video": {"youtube": vid, "title": str(video.get("title") or "")[:200]},
         "exported": str(data.get("exported") or "")[:10],
+        # position où l'analyse a démarré : l'overlay apparaît là, comme en direct
+        "started": round(max(0.0, float(data["started"]) + shift), 1)
+        if isinstance(data.get("started"), (int, float)) else 0.0,
         "events": events,
     }
 
 
 def stats(session: dict) -> dict:
-    points = [p for e in session["events"] if e["m"]["type"] == "talking_points" for p in e["m"]["points"]]
-    verdicts = {e["m"]["id"] for e in session["events"] if e["m"]["type"] == "fact_check_result"
+    points = [p for e in session["events"] if e["m"].get("type") == "talking_points" for p in e["m"]["points"]]
+    verdicts = {e["m"]["id"] for e in session["events"] if e["m"].get("type") == "fact_check_result"
                 and not e["m"].get("indisponible")}
     return {"points": len(points),
             "affirmations": sum(p.get("type") == "affirmation" for p in points),

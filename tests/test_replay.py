@@ -36,7 +36,7 @@ def test_session_is_cleaned_and_sorted():
         {"t": 55.0, "m": {"type": "fact_check_result", "id": "a1", "verdict": "vrai", "confiance": 80,
                           "explication": "e", "source": "Insee", "url": "https://www.insee.fr/", "extra": "x"}},
         {"t": 50.0, "m": {"type": "talking_points", "points": [POINT]}},
-        {"t": 51.0, "m": {"type": "connection_status", "status": "connected"}},   # pas rejoué
+        {"t": 51.0, "m": {"type": "ping"}},                                        # inconnu : retiré
         {"t": 52.0, "m": {"type": "speaker_live", "speaker": "Intervenant A", "text": "…"}},
         {"t": None, "m": {"type": "speaker_live", "speaker": "Intervenant B"}},  # position inconnue
     ]))
@@ -48,10 +48,29 @@ def test_session_is_cleaned_and_sorted():
     assert "extra" not in s["events"][2]["m"]
 
 
+def test_everything_the_live_overlay_showed_is_kept():
+    """Messages de la puce, arrêt et fin réels, verdicts de la finalisation."""
+    s = ps.validate(_export([
+        {"t": 50.0, "m": {"type": "talking_points", "points": [POINT]}},
+        {"t": 60.0, "m": {"type": "mistral_rate_limited", "attempt": 1, "max": 3, "wait": 2}},
+        {"t": 61.0, "m": {"type": "server_warning", "message": "Recherche web indisponible"}},
+        {"t": 62.0, "m": {"type": "connection_status", "status": "reconnecting"}},
+        {"t": 90.0, "m": {"action": "captureEnded", "reason": "user"}},
+        {"t": 95.0, "m": {"type": "fact_check_result", "id": "a1", "verdict": "faux", "confiance": 70}},
+        {"t": 99.0, "m": {"type": "session_done", "complete": True}},
+    ]))
+    kinds = [e["m"].get("type") or e["m"].get("action") for e in s["events"]]
+    assert kinds == ["talking_points", "mistral_rate_limited", "server_warning", "connection_status",
+                     "captureEnded", "fact_check_result", "session_done"]
+    assert s["events"][4]["m"] == {"action": "captureEnded", "reason": "user"}
+
+
 def test_offset_shifts_positions_and_statements():
-    s = ps.validate(_export([{"t": 50.0, "m": {"type": "talking_points", "points": [POINT]}}], ), offset=12.5)
+    s = ps.validate(dict(_export([{"t": 50.0, "m": {"type": "talking_points", "points": [POINT]}}]), started=30.0),
+                    offset=12.5)
     assert s["events"][0]["t"] == 62.5
     assert s["events"][0]["m"]["points"][0]["vt"] == 52.5
+    assert s["started"] == 42.5  # l'overlay apparaît là où l'analyse a démarré
 
 
 def test_invalid_exports_are_refused():

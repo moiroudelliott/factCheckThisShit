@@ -20,6 +20,10 @@ MISTRAL_RETRY_BASE_S = 2.0  # backoff exponentiel: 2s, 4s, 8s (sauf Retry-After 
 # tiers qui voit passer les claims.
 SEARXNG_URL = os.environ.get("SEARXNG_URL", "http://127.0.0.1:8080").rstrip("/")
 
+# IPv6 annoncé mais inutilisable (box) : chaque connexion sortante perdait 8
+# à 40 s avant le repli IPv4 — voir server/network.py. auto | 1 | 0
+FORCE_IPV4 = os.environ.get("FORCE_IPV4", "auto")
+
 # ── Politique des sources ─────────────────────────────────────────────────
 # Publiée en entier sur le site (site/index.html, section « Sources ») :
 # tests/test_sources.py vérifie que la page et ces listes concordent.
@@ -88,6 +92,12 @@ FACTCHECK_SECTIONS = (
     "francetvinfo.fr/vrai-ou-fake", "20minutes.fr/fake-off", "lessurligneurs.eu",
     "tf1info.fr/politique/les-verificateurs", "tf1info.fr/societe/les-verificateurs",
 )
+
+# Séries Eurostat (server/indicators.py) : téléchargées en tâche de fond au
+# démarrage puis chaque jour, gardées sur disque — un fact-check ne les
+# attend jamais
+EUROSTAT_CACHE_FILE = os.environ.get("EUROSTAT_CACHE_FILE") or os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "eurostat.json")
 
 # Votes à l'Assemblée nationale (server/votes.py) : open data officiel,
 # téléchargé dans AN_DATA_DIR (ignoré par git) et rafraîchi chaque semaine.

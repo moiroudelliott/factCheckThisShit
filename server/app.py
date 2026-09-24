@@ -15,8 +15,9 @@ from flask_socketio import SocketIO
 
 from faster_whisper import WhisperModel
 
+from server import network
 from server.config import (
-    SEARXNG_URL, MISTRAL_API_KEY, BACKEND_TOKEN, WHISPER_MODEL, DIARIZATION_DEVICE, ALLOWED_ORIGINS,
+    SEARXNG_URL, MISTRAL_API_KEY, BACKEND_TOKEN, WHISPER_MODEL, DIARIZATION_DEVICE, ALLOWED_ORIGINS, FORCE_IPV4,
 )
 
 # Origines autorisées : l'extension Chrome (popup + document offscreen,
@@ -60,6 +61,12 @@ print("Modèle prêt.")
 
 import threading
 model_lock = threading.Lock()
+
+# Avant toute requête sortante (tâches de fond comprises) : repli IPv4 si
+# l'IPv6 du réseau ne passe pas (voir server/network.py)
+if network.configure(FORCE_IPV4) == "ipv4":
+    print("⚠️  IPv6 inutilisable sur ce réseau : connexions sortantes forcées en IPv4 "
+          "(sinon 8 à 40 s perdues à chaque appel Mistral). FORCE_IPV4=0 dans .env pour désactiver.")
 
 try:
     requests.get(f"{SEARXNG_URL}/healthz", timeout=2)

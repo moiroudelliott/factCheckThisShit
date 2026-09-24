@@ -89,6 +89,32 @@ def test_vote_search():
     assert votes.search("Jordan Bardella a voté contre la loi immigration", state) == []  # pas député
 
 
+
+def test_eurostat_evidence_never_waits_for_the_network():
+    """Un fact-check lit le cache seulement : série absente = pas de preuve,
+    jamais d'appel à l'API (qui ajoutait 16 à 33 s par affirmation)."""
+    import tempfile
+    saved = dict(indicators._cache)
+    real_fetch = indicators._fetch
+    try:
+        indicators._cache.clear()
+        indicators._fetch = lambda ind: (_ for _ in ()).throw(AssertionError("appel réseau pendant un fact-check"))
+        assert indicators.evidence("Le chômage a baissé depuis 2017") == []
+        # la tâche de fond remplit le cache, sauvegardé sur disque et relu au démarrage
+        indicators._fetch = lambda ind: indicators.decode_jsonstat(JSONSTAT)
+        path = os.path.join(tempfile.mkdtemp(), "eurostat.json")
+        indicators.refresh(path=path)  # jamais le vrai cache data/eurostat.json
+        indicators._fetch = lambda ind: (_ for _ in ()).throw(AssertionError("appel réseau pendant un fact-check"))
+        assert indicators.evidence("Le chômage a baissé depuis 2017")[0]["title"].startswith("Eurostat — ")
+        indicators._cache.clear()
+        indicators.load(path)
+        assert indicators.evidence("Le chômage a baissé depuis 2017")
+    finally:
+        indicators._fetch = real_fetch
+        indicators._cache.clear()
+        indicators._cache.update(saved)
+
+
 if __name__ == "__main__":
     for name, fn in list(globals().items()):
         if name.startswith("test_") and callable(fn):

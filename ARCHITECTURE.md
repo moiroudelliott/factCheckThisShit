@@ -174,7 +174,7 @@ Le texte accumulé passe par `build_transcript()` qui fusionne les tours de paro
 `call_mistral()` renvoie une liste de `{"type", "texte", "qui", "verifiable", "citation"}` :
 
 - **`verifiable`** (0-10) — à quel point l'affirmation est vérifiable par des faits (chiffre, date, vote, fait daté). Une affirmation notée sous `CHECKWORTHY_MIN=6` devient `type: "vague"` (`points.apply_checkworthiness`) : affichée « TROP VAGUE », jamais envoyée au fact-check. Le prompt donne des contre-exemples (« il existe des fractures en France », « nous avons un projet »…). Note absente → l'affirmation est vérifiée, comme avant.
-- **`citation`** — les mots exacts prononcés, recopiés de la transcription (le champ `texte` est une reformulation). `points.validate_citation` ne la garde que si elle y figure vraiment, mot pour mot à la normalisation près (casse, accents, ponctuation) ; sinon elle est vidée. Gardée, elle **date le propos** : `points.citation_time` retrouve le segment qui la contient et en prend le `said_at` (plus fin que le début du buffer). Elle est affichée « Mot pour mot » sous la reformulation et passée au fact-check (§8).
+- **`citation`** — les mots exacts prononcés, recopiés de la transcription (le champ `texte` est une reformulation). `points.validate_citation` ne la garde que si elle y figure vraiment, mot pour mot à la normalisation près (casse, accents, ponctuation) ; sinon elle est vidée. Gardée, elle **date le propos** : `points.citation_time` retrouve le segment qui la contient et en prend le `said_at` (plus fin que le début du buffer). Elle est affichée « Mot pour mot » au récap et à l'export (pas sur la carte) et passée au fact-check (§8).
 
 Deux couches de dédup, **jamais une seule**, qui partagent la même règle de comparaison (`text_utils.claim_signature` / `claims_match`, portée à l'identique dans `content.js`) :
 
@@ -201,9 +201,9 @@ EN PARALLÈLE (greenlets) :
   web_search (SearxNG, 6 résultats, + année si replay, domaines exclus filtrés)
   scholar_search (HAL + OpenAlex, eux-mêmes en parallèle)
   datagouv_search (catalogue data.gouv.fr)
-  indicators.evidence (séries Eurostat, si l'affirmation parle chômage, dette, inflation…)
-ET EN LOCAL (index en mémoire, instantané) :
+ET EN LOCAL (en mémoire, instantané — jamais d'appel réseau) :
   known_factchecks.search (articles déjà publiés par les rédactions de fact-checking)
+  indicators.evidence (séries Eurostat préchargées, si l'affirmation parle chômage, dette, inflation…)
   votes.search (scrutins de l'Assemblée nationale, si l'affirmation parle d'un vote)
         │
         ▼
@@ -233,9 +233,11 @@ cache.store (seulement si sourcé, confiance ≥ 60 et verdict ≠ non_verifiabl
 
 **Recherches en parallèle** : en série, leurs timeouts s'additionnaient (jusqu'à ~26 s avant même l'appel Mistral) et dépassaient le délai d'attente de l'extension.
 
+**Repli IPv4** (`network.py`) : une box peut annoncer l'IPv6 (adresse et passerelle attribuées) sans que rien ne sorte. Navigateurs et curl essaient l'IPv4 en parallèle ; Python attend l'échec de chaque adresse IPv6 : 8 à 40 s perdues à chaque connexion vers Mistral, OpenAlex, Eurostat… `network.configure` teste l'IPv6 une fois au démarrage (1,5 s au plus, vers api.mistral.ai) et, s'il ne passe pas, force l'IPv4 pour toutes les requêtes (`urllib3.util.connection.allowed_gai_family`). `FORCE_IPV4` : `auto` (défaut), `1`, `0`. Cas vécu : Mistral 16-40 s → 0,5 s, OpenAlex 12 s → 0,7 s.
+
 **Fact-checks déjà publiés** (`known_factchecks.py`) — un article des Décodeurs, de CheckNews, de « Vrai ou fake » (franceinfo), de Fake off (20 Minutes) ou des Surligneurs qui porte sur la même affirmation passe **en tête** des preuves : c'est un travail de vérification humain, sourcé. Les flux RSS (`config.FACTCHECK_FEEDS`) sont relus toutes les heures (`FACTCHECK_FEEDS_REFRESH_S`) par une tâche de fond et indexés dans `factchecks_index.db` (SQLite, gardé entre redémarrages). Correspondance : au moins 3 mots-clés communs couvrant 40 % de ceux de l'affirmation, nombres communs en bonus ; 2 articles au plus. Côté web, un résultat dans une rubrique de fact-checking (`config.FACTCHECK_SECTIONS` : hôte + début de chemin) est annoté `FACT-CHECK PUBLIÉ`. Le prompt demande de reprendre sa conclusion s'il porte sur la même affirmation (même chiffre, même période), et de l'ignorer s'il porte sur un sujet voisin.
 
-**Séries officielles Eurostat** (`indicators.py`) — 16 indicateurs pour la France (chômage, chômage des jeunes, inflation, dette en % du PIB et en euros, déficit, dépense publique, prélèvements obligatoires, emploi des seniors, PIB par habitant, croissance, pauvreté, immigration, demandes d'asile, salaire minimum brut, émissions de gaz à effet de serre), chacun déclenché par une expression régulière sur l'affirmation (3 au plus). L'API JSON-stat d'Eurostat renvoie la série depuis 2015 (`decode_jsonstat` → `format_series` : « 2017 9,4 · 2024 7,4 »), gardée 24 h en mémoire. Le lien de preuve est la page du jeu de données. Le prompt demande de comparer le chiffre avancé à la série en vérifiant l'année, le périmètre (France / UE) et la définition (dette au sens de Maastricht, chômage au sens du BIT, SMIC brut ou net).
+**Séries officielles Eurostat** (`indicators.py`) — 16 indicateurs pour la France (chômage, chômage des jeunes, inflation, dette en % du PIB et en euros, déficit, dépense publique, prélèvements obligatoires, emploi des seniors, PIB par habitant, croissance, pauvreté, immigration, demandes d'asile, salaire minimum brut, émissions de gaz à effet de serre), chacun déclenché par une expression régulière sur l'affirmation (3 au plus). L'API JSON-stat d'Eurostat renvoie la série depuis 2015 (`decode_jsonstat` → `format_series` : « 2017 9,4 · 2024 7,4 »). Les 16 séries sont **téléchargées en tâche de fond** au démarrage puis chaque jour (`start` → `refresh`, ~7 s en tout) et gardées sur disque (`data/eurostat.json`, relu au démarrage) : `evidence` ne lit que ce cache. Appelée pendant le fact-check, l'API ajoutait 16 à 33 s à chaque affirmation concernée. Le lien de preuve est la page du jeu de données. Le prompt demande de comparer le chiffre avancé à la série en vérifiant l'année, le périmètre (France / UE) et la définition (dette au sens de Maastricht, chômage au sens du BIT, SMIC brut ou net).
 
 **Votes de l'Assemblée nationale** (`votes.py`) — l'open data de l'Assemblée (tous les scrutins publics des législatures 16 et 17, ~12 500, et les députés) est téléchargé au démarrage dans `data/assemblee/` puis rafraîchi chaque semaine (`AN_REFRESH_S`) ; l'index est gardé en pickle (rechargement ~0,2 s). Une affirmation qui parle de vote (« a voté contre », « s'est abstenu »…) et nomme un député (nom complet, ou nom de famille s'il est unique) ou un groupe (`GROUP_ALIASES` : « le RN », « les Insoumis », « LR »…) est comparée aux titres des scrutins (racines des mots, synonymes, années et mois cités, bonus au vote sur l'ensemble d'un texte). La preuve donne la position du député ou le décompte du groupe, avec le lien du scrutin ; le prompt ne la retient que si le scrutin porte bien sur le texte dont parle l'affirmation (titre et date). Les groupes de la 16e législature, absents du fichier des députés actuels, sont déduits de leurs membres. `AN_VOTES=0` désactive le tout (tests).
 
@@ -295,7 +297,7 @@ Un seul objet `S` porte tout l'état : `points` (Map id→{point, fc}, ordre d'i
 
 **Hors YouTube** (`IS_YOUTUBE` faux) : le calque est posé en `position: fixed` sur le rectangle du **plus grand lecteur visible** (`playerTarget` : balise `<video>`, sinon iframe d'un lecteur externe comme Dailymotion — proportions de vidéo exigées, iframes reCAPTCHA/pubs écartées), recalé au défilement, au redimensionnement et chaque seconde (`followPlayer`, `sampleVideo`). En plein écran d'un conteneur, le calque passe dans l'élément plein écran ; si c'est la vidéo ou l'iframe elle-même, rien ne peut s'afficher par-dessus. Sans lecteur trouvé, repli en calque de page. Pas de pubs ni de repères de barre de progression ; horodatages et bouton ▶ seulement si la vidéo est une balise `<video>` de la page (inaccessible dans une iframe) ; liens horodatés de l'export réservés à YouTube. La popup lit titre, chaîne, description et date dans les balises Open Graph. Les sites déclarés dans le manifest (france.tv, francetvinfo.fr, lcp.fr, publicsenat.fr, twitch.tv, dailymotion.com) retrouvent l'overlay après F5 ; ailleurs, l'extension fonctionne via `activeTab`, et un rechargement arrête l'analyse.
 
-**Carte** : type (AFFIRMATION, SUBJECTIF, TROP VAGUE), locuteur, reformulation, **citation exacte** (« Mot pour mot », si validée), verdict, explication, source. Bouton ⚑ (carte et récap) : menu de motifs → `reportVerdict` (§8), puis confirmation (ou « Backend injoignable ») dans le menu.
+**Carte** : type (AFFIRMATION, SUBJECTIF, TROP VAGUE), locuteur, reformulation, verdict, explication, source. La citation exacte (« Mot pour mot ») n'est qu'au récap et à l'export : sur la carte, elle surchargeait l'écran. Bouton ⚑ (carte et récap) : menu de motifs → `reportVerdict` (§8), puis confirmation (ou « Backend injoignable ») dans le menu.
 
 **Repères sur la barre de progression** (YouTube, `renderMarkers`) : un trait par affirmation, à la couleur de son verdict, dans `.ytp-progress-bar` ; purement visuel (`pointer-events: none`). Pour un direct, la barre couvre la plage lisible (`video.seekable`), pas une durée.
 
@@ -363,13 +365,14 @@ Aucun GPU, aucune clé ni aucun réseau nécessaires — chaque fichier se lance
 |---|---|
 | `tests/test_claim_matching.py` | comparaison d'affirmations, dédup, cache (cas réels : négation, nombres, pour/contre) |
 | `tests/test_sources.py` | domaines, niveaux partisan / fiabilité faible, verdict normalisé, nom de source, plafonds de confiance ; politique publiée sur le site = code |
+| `tests/test_network.py` | repli IPv4 : modes forcés sans test réseau, repli seulement si l'IPv6 est cassé |
 | `tests/test_replay.py` | overlay du site synchronisé avec l'extension, nettoyage et recalage des sessions publiées, sessions de `site/sessions/` valides |
 | `tests/test_transcript.py` | chevauchement entre chunks, transcript annoté |
 | `tests/test_voices.py` | comparaison de noms, stockage de la banque de voix |
 | `tests/test_vocabulary.py` | mots attendus par Whisper : priorités, noms propres, limite de taille, écho des hotwords |
 | `tests/test_points.py` | note de vérifiabilité, validation et datation de la citation exacte |
 | `tests/test_known_factchecks.py` | lecture des flux RSS, correspondance affirmation ↔ fact-check publié |
-| `tests/test_official_data.py` | décodage JSON-stat Eurostat, déclencheurs d'indicateurs, parsing des scrutins et recherche de votes |
+| `tests/test_official_data.py` | décodage JSON-stat Eurostat, déclencheurs d'indicateurs, jamais d'appel Eurostat pendant un fact-check (cache disque), parsing des scrutins et recherche de votes |
 | `tests/test_backend_smoke.py` | backend complet avec Whisper/ECAPA/Mistral/recherche/RSS/Eurostat simulés : chunk → points (vague, citation) → verdict (fact-check publié et série Eurostat en preuves) → arrêt propre ; signalement ; origines CORS |
 
 Sous Windows, si la sortie est redirigée, lancer avec `PYTHONIOENCODING=utf-8` (les messages du backend contiennent des emojis).

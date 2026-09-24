@@ -521,20 +521,7 @@
   overflow: hidden;
 }
 
-/* Mots exacts du propos, sous la reformulation */
-.fct-quote {
-  margin: -4px 0 12px;
-  padding-left: 9px;
-  border-left: 2px solid color-mix(in oklch, var(--accent) 55%, transparent);
-  font-size: 12px;
-  line-height: 1.45;
-  color: rgba(255, 255, 255, 0.72);
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-  overflow: hidden;
-}
-.fct-quote-label,
+/* Mots exacts du propos (récap) */
 .fct-recap-quote .fct-quote-label {
   font-size: 9.5px;
   font-weight: 700;

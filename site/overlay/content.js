@@ -1194,7 +1194,8 @@ function pump() {
 }
 
 // Mots exacts du propos (validés côté backend), sous la reformulation : la
-// reformulation de Mistral peut durcir ou déformer ce qui a été dit
+// reformulation de Mistral peut durcir ou déformer ce qui a été dit. Au
+// récap et à l'export seulement : sur la carte, ils surchargeaient l'écran.
 function quoteHtml(cls, point) {
   return point.citation
     ? `<p class="${cls}"><span class="fct-quote-label">Mot pour mot</span> « ${esc(point.citation)} »</p>`
@@ -1233,7 +1234,6 @@ function showCard(id, entry) {
         ${tsButton('fct-card-ts', point.vt)}
       </div>
       <p class="fct-claim">« ${esc(point.texte)} »</p>
-      ${quoteHtml('fct-quote', point)}
       <div class="fct-checking">
         <span class="fct-spinner"></span>
         <span>Recoupement des sources…</span>

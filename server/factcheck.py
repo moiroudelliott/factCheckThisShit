@@ -388,10 +388,12 @@ def call_mistral_factcheck(claim: str, context: dict = None, sid: str = None, ci
     # Les trois recherches en parallèle (greenlets) : en série, leurs timeouts
     # s'additionnaient (jusqu'à ~26 s avant même l'appel Mistral)
     jobs = (eventlet.spawn(web_search, web_query), eventlet.spawn(scholar_search, claim),
-            eventlet.spawn(datagouv_search, claim), eventlet.spawn(indicators.evidence, claim))
-    results, academic, official, series = (j.wait() for j in jobs)
-    known = known_factchecks.search(claim)  # index local, instantané
-    ballots = votes.search(claim)           # index local, instantané
+            eventlet.spawn(datagouv_search, claim))
+    results, academic, official = (j.wait() for j in jobs)
+    # Données locales, instantanées : jamais d'appel réseau pendant un fact-check
+    known = known_factchecks.search(claim)  # index des rédactions de fact-checking
+    series = indicators.evidence(claim)     # séries Eurostat préchargées
+    ballots = votes.search(claim)           # scrutins de l'Assemblée nationale
     print(f"[Search] {len(known)} fact-check(s) publié(s) + {len(series)} série(s) Eurostat + {len(ballots)} "
           f"scrutin(s) + {len(results)} web + {len(academic)} académique(s) + {len(official)} data.gouv.fr "
           f"pour «{claim[:50]}»")

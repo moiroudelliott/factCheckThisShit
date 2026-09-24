@@ -22,6 +22,8 @@ os.environ["FACTCHECK_CACHE_DB"] = os.path.join(TMP, "cache.db")
 os.environ["FACTCHECK_INDEX_DB"] = os.path.join(TMP, "index.db")
 os.environ["AN_VOTES"] = "0"  # pas de téléchargement de l'open data de l'Assemblée pendant les tests
 os.environ["REPORTS_FILE"] = os.path.join(TMP, "reports.jsonl")
+os.environ["EUROSTAT_CACHE_FILE"] = os.path.join(TMP, "eurostat.json")
+os.environ["FORCE_IPV4"] = "0"  # pas de test de connectivité IPv6 (aucun réseau pendant les tests)
 os.environ["MISTRAL_API_KEY"] = "test"  # load_dotenv n'écrase pas une variable déjà définie
 os.environ["BACKEND_TOKEN"] = ""
 
@@ -155,6 +157,9 @@ requests.get = _fake_get
 
 import eventlet  # noqa: E402
 from server.routes import app, socketio  # noqa: E402
+from server import indicators  # noqa: E402
+
+indicators.refresh()  # ce que fait la tâche de fond au démarrage (API Eurostat simulée)
 
 
 def _wait_for(client, event, timeout=15):

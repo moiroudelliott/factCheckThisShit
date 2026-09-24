@@ -6,14 +6,22 @@ officielle France + UE-27 est ajoutée aux preuves du fact-check : le modèle
 compare le chiffre avancé à la valeur exacte, année par année, au lieu de
 se fier à un article de presse ou à sa mémoire.
 
-match / format_series / decode_jsonstat sont pures (testables sans réseau) ;
-evidence() interroge l'API (réponses gardées CACHE_S en mémoire)."""
+match / format_series / decode_jsonstat sont pures (testables sans réseau).
+Les séries sont téléchargées en tâche de fond (start → refresh : au
+démarrage puis toutes les CACHE_S) et gardées sur disque
+(EUROSTAT_CACHE_FILE) : evidence() ne lit que ce cache et ne fait jamais
+attendre un fact-check. Cas vécu : appelée pendant la vérification,
+l'API ajoutait 16 à 33 s à chaque affirmation sur le chômage ou la dette."""
 
+import json
+import os
 import re
 import threading
 import time
 
 import requests
+
+from server.config import EUROSTAT_CACHE_FILE
 
 API = "https://ec.europa.eu/eurostat/api/dissemination/statistics/1.0/data/"
 DATABROWSER = "https://ec.europa.eu/eurostat/databrowser/view/{}/default/table?lang=fr"
@@ -130,29 +138,84 @@ def format_series(ind: dict, data: dict) -> str:
 
 
 def _fetch(ind: dict) -> dict:
-    with _lock:
-        hit = _cache.get(ind["key"])
-    if hit and time.time() - hit[0] < CACHE_S:
-        return hit[1]
     params = [("geo", "FR"), ("geo", "EU27_2020"), ("sinceTimePeriod", SINCE), ("lang", "fr"),
               *ind["filters"].items()]
-    r = requests.get(API + ind["dataset"], params=params, timeout=8)
+    r = requests.get(API + ind["dataset"], params=params, timeout=(4, 20))
     r.raise_for_status()
-    data = decode_jsonstat(r.json())
+    return decode_jsonstat(r.json())
+
+
+def load(path: str = EUROSTAT_CACHE_FILE):
+    """Séries déjà téléchargées (disque) : disponibles dès le démarrage."""
+    try:
+        with open(path, encoding="utf-8") as f:
+            saved = json.load(f)
+    except (OSError, ValueError):
+        return
     with _lock:
-        _cache[ind["key"]] = (time.time(), data)
-    return data
+        for key, (fetched_at, data) in saved.items():
+            _cache.setdefault(key, (fetched_at, data))
 
 
-def evidence(claim: str) -> list:
-    """Preuves [{title, body, href}] pour les indicateurs dont parle l'affirmation."""
-    out = []
-    for ind in match(claim):
+def _save(path: str = EUROSTAT_CACHE_FILE):
+    with _lock:
+        snapshot = dict(_cache)
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    tmp = path + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(snapshot, f, ensure_ascii=False)
+    os.replace(tmp, path)
+
+
+def refresh(force: bool = False, path: str = EUROSTAT_CACHE_FILE) -> int:
+    """Télécharge les séries absentes ou périmées ; retourne le nombre mis à jour."""
+    updated = 0
+    for ind in INDICATORS:
+        with _lock:
+            hit = _cache.get(ind["key"])
+        if hit and not force and time.time() - hit[0] < CACHE_S:
+            continue
         try:
-            body = format_series(ind, _fetch(ind))
+            data = _fetch(ind)
         except Exception as e:
             print(f"[Eurostat] {ind['key']}: {type(e).__name__}: {e}")
             continue
+        with _lock:
+            _cache[ind["key"]] = (time.time(), data)
+        updated += 1
+    if updated:
+        try:
+            _save(path)
+        except OSError as e:
+            print(f"[Eurostat] sauvegarde impossible : {e}")
+        print(f"[Eurostat] {updated} série(s) mise(s) à jour, {len(_cache)}/{len(INDICATORS)} disponibles")
+    return updated
+
+
+def start(socketio):
+    """Cache disque, puis téléchargement en tâche de fond (et chaque jour)."""
+    load()
+
+    def loop():
+        while True:
+            try:
+                refresh()
+            except Exception as e:
+                print(f"[Eurostat] {type(e).__name__}: {e}")
+            socketio.sleep(CACHE_S)
+
+    socketio.start_background_task(loop)
+
+
+def evidence(claim: str) -> list:
+    """Preuves [{title, body, href}] pour les indicateurs dont parle
+    l'affirmation — cache uniquement, instantané. Une série pas encore
+    téléchargée est simplement absente (le fact-check ne l'attend pas)."""
+    out = []
+    for ind in match(claim):
+        with _lock:
+            hit = _cache.get(ind["key"])
+        body = format_series(ind, hit[1]) if hit else ""
         if body:
             out.append({"title": f"Eurostat — {ind['label']}", "body": body,
                         "href": DATABROWSER.format(ind["dataset"])})

@@ -31,6 +31,14 @@ def test_site_overlay_is_in_sync_with_the_extension():
             assert a.read() == b.read(), f"{os.path.relpath(dst, ROOT)} en retard — lancer publish_session.py"
 
 
+def test_relecture_page_loads_current_versions():
+    """Sinon les visiteurs gardent l'ancienne version en cache — python publish_session.py"""
+    with open(ps.RELECTURE_HTML, encoding="utf-8") as f:
+        html = f.read()
+    for rel in ps.VERSIONED:
+        assert f"{rel}?v={ps.asset_version(rel)}" in html, f"{rel} : version périmée — lancer publish_session.py"
+
+
 def test_session_is_cleaned_and_sorted():
     s = ps.validate(_export([
         {"t": 55.0, "m": {"type": "fact_check_result", "id": "a1", "verdict": "vrai", "confiance": 80,

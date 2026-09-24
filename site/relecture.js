@@ -36,6 +36,7 @@
   const BACKLOG_S = 20;   // après un saut en avant, un point passé depuis plus longtemps va au récap sans carte
   const JUMP_S = 3;       // écart entre deux relevés au-delà duquel on considère un saut
   const TICK_MS = 250;
+  const PLAYER_TIMEOUT_MS = 10000; // lecteur jamais prêt au-delà : bloqué, on le dit
   const ID_RE = /^[\w-]{11}$/;
 
   const $ = (id) => document.getElementById(id);
@@ -56,6 +57,13 @@
       else $('stage').requestFullscreen?.().catch(() => {});
     });
     renderLegend();
+    // Fichier ouvert directement (double-clic) : le navigateur interdit de
+    // lire les sessions, et le lecteur YouTube refuse l'origine « file »
+    if (location.protocol === 'file:') {
+      setFacade('Ouvre cette page via un serveur local', false,
+        'Dans le dossier du projet : python -m http.server 4173 --directory site, puis http://localhost:4173/relecture.html');
+      return;
+    }
     let index;
     try {
       index = await fetch('sessions/index.json', { cache: 'no-cache' }).then((r) => r.json());
@@ -71,7 +79,8 @@
     const current = list.find((s) => s.id === wanted) || list[list.length - 1];
     renderPicker(list, current);
     try {
-      session = await fetch(`sessions/${current.id}.json`).then((r) => r.json());
+      // no-cache : une session régénérée sous le même identifiant remplace l'ancienne
+      session = await fetch(`sessions/${current.id}.json`, { cache: 'no-cache' }).then((r) => r.json());
     } catch (_) {
       setFacade('Impossible de charger cette relecture.', false);
       return;
@@ -126,26 +135,52 @@
 
   // ── Lecteur YouTube : chargé seulement au clic (aucun service tiers avant) ──
 
-  function setFacade(text, clickable) {
+  const DEFAULT_NOTE = "Le lecteur YouTube (youtube-nocookie.com) n'est chargé qu'à ce moment-là.";
+
+  function setFacade(text, clickable, note = clickable ? DEFAULT_NOTE : '', onClick = loadPlayer) {
     const btn = $('facade');
+    btn.hidden = false;
     btn.querySelector('.facade-label').textContent = text;
     btn.disabled = !clickable;
-    btn.querySelector('.facade-note').hidden = !clickable;
-    if (clickable) btn.addEventListener('click', loadPlayer, { once: true });
+    btn.querySelector('.facade-note').textContent = note;
+    btn.querySelector('.facade-note').hidden = !note;
+    if (clickable) btn.addEventListener('click', onClick, { once: true });
+  }
+
+  // Le lecteur ne se charge pas : dire pourquoi plutôt que « Chargement… » sans fin
+  function playerFailed(reason) {
+    if (reason === 'embed') {
+      setFacade("Cette vidéo ne peut pas être lue ici", false,
+        "La chaîne n'autorise pas la lecture intégrée. La relecture reste possible sur YouTube, sans les cartes.");
+      return;
+    }
+    setFacade('Le lecteur YouTube ne répond pas — cliquer pour réessayer', true,
+      "Un bloqueur de publicités ou de traqueurs (uBlock, Ghostery, Brave…) bloque peut-être YouTube : "
+      + 'autorise youtube.com et youtube-nocookie.com pour cette page.', () => location.reload());
   }
 
   function loadPlayer() {
     $('facade').querySelector('.facade-label').textContent = 'Chargement du lecteur…';
+    let ready = false;
+    const timer = setTimeout(() => { if (!ready) playerFailed('timeout'); }, PLAYER_TIMEOUT_MS);
     window.onYouTubeIframeAPIReady = () => {
       player = new YT.Player('player', {
         host: 'https://www.youtube-nocookie.com',
         videoId: session.video.youtube,
-        playerVars: { rel: 0, playsinline: 1, fs: 0, modestbranding: 1, autoplay: 1 },
-        events: { onReady, onStateChange },
+        // origin : sans elle, avec l'hôte « nocookie », certains navigateurs
+        // ne signalent jamais que le lecteur est prêt
+        playerVars: { rel: 0, playsinline: 1, fs: 0, modestbranding: 1, autoplay: 1, origin: location.origin },
+        events: {
+          onReady: (e) => { ready = true; clearTimeout(timer); onReady(e); },
+          onStateChange,
+          // 101 / 150 : lecture intégrée refusée par la chaîne
+          onError: (e) => { if (e.data === 101 || e.data === 150) { clearTimeout(timer); playerFailed('embed'); } },
+        },
       });
     };
     const script = document.createElement('script');
     script.src = 'https://www.youtube.com/iframe_api';
+    script.onerror = () => { clearTimeout(timer); playerFailed('script'); };
     document.head.appendChild(script);
   }
 

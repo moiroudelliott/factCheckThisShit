@@ -26,6 +26,7 @@ Ensuite : redéployer le dossier site/.
 """
 
 import argparse
+import hashlib
 import json
 import os
 import re
@@ -46,6 +47,13 @@ SYNCED = [
     (os.path.join(EXTENSION, "fonts", f), os.path.join(SITE, "fonts", f))
     for f in sorted(os.listdir(os.path.join(EXTENSION, "fonts"))) if f.endswith(".woff2")
 ]
+
+# Fichiers chargés par site/relecture.html : un numéro de version (empreinte
+# du contenu) dans leur adresse force le navigateur à recharger une version
+# modifiée — sans lui, les visiteurs gardaient l'ancienne en cache (cas vécu :
+# une correction du lecteur invisible après rechargement de la page)
+RELECTURE_HTML = os.path.join(SITE, "relecture.html")
+VERSIONED = ("relecture.js", "overlay/content.js", "overlay/overlay.css")
 
 YOUTUBE_ID_RE = re.compile(r"^[\w-]{11}$")
 
@@ -155,7 +163,29 @@ def sync() -> list:
             os.makedirs(os.path.dirname(dst), exist_ok=True)
             shutil.copyfile(src, dst)
             changed.append(os.path.relpath(dst, ROOT))
+    if stamp_versions():
+        changed.append(os.path.relpath(RELECTURE_HTML, ROOT))
     return changed
+
+
+def asset_version(rel: str) -> str:
+    with open(os.path.join(SITE, rel), "rb") as f:
+        return hashlib.sha1(f.read()).hexdigest()[:10]
+
+
+def stamp_versions() -> bool:
+    """Inscrit dans relecture.html la version de chaque fichier chargé ;
+    renvoie True si la page a changé."""
+    with open(RELECTURE_HTML, encoding="utf-8") as f:
+        html = f.read()
+    new = html
+    for rel in VERSIONED:
+        new = re.sub(rf'(["\']){re.escape(rel)}(\?v=\w+)?\1', rf"\g<1>{rel}?v={asset_version(rel)}\g<1>", new)
+    if new == html:
+        return False
+    with open(RELECTURE_HTML, "w", encoding="utf-8", newline="\n") as f:
+        f.write(new)
+    return True
 
 
 def load_index() -> dict:

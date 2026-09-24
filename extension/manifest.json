@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "SOURCÉ",
-  "version": "3.4",
+  "version": "3.5",
   "description": "Fact-checking en temps réel des débats politiques, sur YouTube et les lecteurs vidéo des chaînes",
   "minimum_chrome_version": "116",
   "permissions": ["tabCapture", "offscreen", "activeTab", "scripting", "storage"],

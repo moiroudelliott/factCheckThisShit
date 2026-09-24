@@ -49,9 +49,10 @@ et les autres fichiers de [`tests/`](tests/) — voir [ARCHITECTURE.md](ARCHITEC
 | `server/` | Logique du serveur : Whisper, diarisation, Mistral, sources, cache — voir [ARCHITECTURE.md](ARCHITECTURE.md) |
 | `tests/` | Tests unitaires et test de fumée du backend complet (sans GPU ni réseau) |
 | `searxng/` | Instance SearxNG auto-hébergée (recherche web sans dépendance à un moteur tiers) |
-| `site/` | Page vitrine statique du projet |
+| `site/` | Site statique du projet : page vitrine, et page de relecture (`relecture.html`) qui rejoue une analyse enregistrée sur un débat YouTube, sans GPU ni backend |
 | `enroll.py`, `harvest_voices.py`, `remove_voice.py` | Outils CLI pour peupler/retirer des voix dans `voices/` (banque d'empreintes vocales) |
 | `vocabulaire.txt` | Mots que Whisper doit s'attendre à entendre (sigles, partis, termes souvent mal transcrits) — modifiable |
+| `publish_session.py` | Publie une session enregistrée (bouton ⏵ du récap) sur la page de relecture du site, et synchronise l'overlay du site avec l'extension |
 | `purge_cache.py` | Purge les verdicts douteux ou signalés du cache de fact-checks (`--dry-run` d'abord ; sauvegarde automatique) |
 | `data/` | Données téléchargées et journaux locaux (gitignored) : open data de l'Assemblée nationale (~40 Mo, au premier démarrage), signalements de verdicts (`reports.jsonl`) |
 | `voices/` | Empreintes vocales enregistrées (gitignored, générées localement) |

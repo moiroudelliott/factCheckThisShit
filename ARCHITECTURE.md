@@ -322,6 +322,8 @@ showCard (spinner)
 
 **Persistance** : le récap est sauvegardé dans `chrome.storage.local` (`scheduleSave`) ; après un F5 pendant l'analyse, `contentReady` remet l'overlay et le récap (`restoreRecap`).
 
+**Enregistrement et relecture** : chaque message du backend utile à l'affichage (`TAPE_TYPES` : points, verdicts, locuteurs, empreintes) est gardé dans `S.tape` avec la position vidéo à laquelle il est arrivé (`record`, copie prise AVANT traitement, position du propos `vt` ajoutée aux points ; « qui parle » réduit au locuteur). La bande est sauvegardée avec le récap et exportée par le bouton ⏵ du récap (`exportSession`, format `source-session` v1). `publish_session.py` la nettoie (champs affichés seulement, positions recalées de `--offset` pour un direct) et la range dans `site/sessions/`. La page `site/relecture.html` charge, après un clic, le lecteur YouTube (youtube-nocookie.com) et **le vrai `content.js`** (copie `site/overlay/`, synchronisée par `publish_session.py`, vérifiée par `tests/test_replay.py`) avec un faux `chrome.runtime` (`site/relecture.js`), puis réinjecte chaque message quand la lecture atteint sa position : cartes, délais, badge et récap sont ceux du direct, sans GPU ni backend. Trois points d'appui dans `content.js`, sans effet sur l'extension : `window.__fctVideo` (objet vidéo exposé par la page, invisible depuis le monde isolé de l'extension), `backlog: true` sur `talking_points` (points déjà passés après un saut en avant : au récap, sans carte) et un `vt` déjà connu gardé par `addPoint`. Revenir en arrière ne rejoue rien (sauf le badge) ; « Recommencer » repart de zéro.
+
 **Reconnexion au backend** (`session_reset`) : `S.epoch` est incrémenté ; un `speaker_map` ne renomme que les points de l'epoch courante, et les points anciens restés anonymes deviennent « Locuteur non identifié ».
 
 ---
@@ -360,7 +362,8 @@ Aucun GPU, aucune clé ni aucun réseau nécessaires — chaque fichier se lance
 | Fichier | Couvre |
 |---|---|
 | `tests/test_claim_matching.py` | comparaison d'affirmations, dédup, cache (cas réels : négation, nombres, pour/contre) |
-| `tests/test_sources.py` | domaines, verdict normalisé, nom de source, plafond sans URL |
+| `tests/test_sources.py` | domaines, niveaux partisan / fiabilité faible, verdict normalisé, nom de source, plafonds de confiance ; politique publiée sur le site = code |
+| `tests/test_replay.py` | overlay du site synchronisé avec l'extension, nettoyage et recalage des sessions publiées, sessions de `site/sessions/` valides |
 | `tests/test_transcript.py` | chevauchement entre chunks, transcript annoté |
 | `tests/test_voices.py` | comparaison de noms, stockage de la banque de voix |
 | `tests/test_vocabulary.py` | mots attendus par Whisper : priorités, noms propres, limite de taille, écho des hotwords |

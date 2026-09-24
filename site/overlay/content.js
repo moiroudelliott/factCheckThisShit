@@ -1509,7 +1509,7 @@ function openRecap() {
   panel.setAttribute('aria-label', 'Récapitulatif SOURCÉ');
   panel.innerHTML = `
     <div class="fct-recap-header">
-      <span class="fct-recap-title">◆ SOURC<span style="color:#e0324f">É</span> — Récapitulatif</span>
+      <span class="fct-recap-title">◆ SOURC<span style="color:#e0324f">É</span> — Récap</span>
       <div style="display:flex;gap:6px">
         <span class="fct-seg" role="group" aria-label="Filtrer le récapitulatif">
           <button type="button" data-filter="all">Tout</button>

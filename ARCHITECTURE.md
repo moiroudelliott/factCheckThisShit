@@ -264,7 +264,7 @@ cache.store (seulement si sourcé, confiance ≥ 60 et verdict ≠ non_verifiabl
 
 Pour ajouter ou reclasser un site : modifier `config.py` **et** la section « Sources » de `site/index.html` (le test échoue sinon), puis `purge_cache.py` pour retirer les verdicts qui s'appuyaient dessus.
 
-**Souveraineté de la recherche web** — `web_search()` n'appelle pas un moteur tiers directement : elle interroge une instance **SearxNG auto-hébergée** (`searxng/docker-compose.yml`, `127.0.0.1:8080`), configurée pour ne solliciter que Brave et Mojeek (`searxng/config/settings.yml`). `datagouv_search()` interroge en direct l'API publique de `data.gouv.fr`. Si SearxNG est injoignable, `web_search()` retourne `[]` (dégradé, jamais bloquant).
+**Souveraineté de la recherche web** — `web_search()` n'appelle pas un moteur tiers directement : elle interroge une instance **SearxNG auto-hébergée** (`searxng/docker-compose.yml`, `127.0.0.1:8080`), configurée pour ne solliciter que des index indépendants de Google et de Bing : Brave, et la recherche plein texte de Wikipédia en français, qui prend le relais quand Brave suspend l'instance pour excès de requêtes (`searxng/config/settings.yml` ; Mojeek, Qwant et Yep ne sont plus utilisables par SearxNG). Wikipédia est annotée `ENCYCLOPÉDIE` : faits simples et datés, jamais seule pour un chiffre. `datagouv_search()` interroge en direct l'API publique de `data.gouv.fr`. Si SearxNG est injoignable, `web_search()` retourne `[]` (dégradé, jamais bloquant).
 
 **Replays** : l'année de la vidéo (`sources.video_year`, depuis la date de publication) est ajoutée à la requête web, et le cache range chaque verdict sous cette année : un replay de 2024 et un direct de 2026 ne partagent pas leurs verdicts.
 

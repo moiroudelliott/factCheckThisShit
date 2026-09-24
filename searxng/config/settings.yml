@@ -2,16 +2,30 @@
 # https://docs.searxng.org/admin/settings/
 
 # Moteurs volontairement limités : ni Google ni Bing/Yahoo (ni aucun moteur qui
-# leur sous-traite son index). Brave (index propre) et Mojeek (UK, index
-# indépendant, pas Big Tech) — cf. ARCHITECTURE.md.
-# Qwant testé et retiré : bloque systématiquement le scraping SearxNG par
-# CAPTCHA (limitation connue et documentée du projet SearxNG, pas un choix de
-# config — inutile de le lister, chaque requête attendrait son timeout pour rien).
+# leur sous-traite son index) — cf. ARCHITECTURE.md. Tous à index propre :
+# - Brave : le plus complet, mais suspendu au moindre excès de requêtes ;
+# - Wikipédia en français, recherche plein texte : faits datés, fonctions,
+#   chronologies — et un relais quand Brave est suspendu.
+# Un seul moteur, c'était une seule panne pour toute la recherche web : cas
+# vécu, Brave suspendu = plus aucune source jusqu'à la fin du débat.
+# Retirés : Qwant (CAPTCHA systématique contre SearxNG), Mojeek (CAPTCHA à
+# preuve de travail, marqué inactif par SearxNG), Yep (API hors service,
+# 503), Mwmbl (index trop petit). Le moteur « wikipedia » fourni ne cherche
+# qu'un titre d'article exact : inutile pour une affirmation.
 use_default_settings:
   engines:
     keep_only:
       - brave
-      - mojeek
+
+engines:
+  - name: wikipedia fr
+    engine: mediawiki
+    shortcut: wpfr
+    base_url: "https://fr.wikipedia.org/"
+    search_type: text
+    categories: [general]
+    timeout: 4.0
+    disabled: false
 
 server:
   secret_key: "u9nTuXtVVDrpzrbgt8BHm0HomEgCjno"

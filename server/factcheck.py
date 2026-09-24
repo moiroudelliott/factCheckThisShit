@@ -103,6 +103,7 @@ RÈGLES DE RIGUEUR:
 - Une DONNÉE OFFICIELLE (Eurostat) donne la série exacte : compare-la au chiffre avancé en vérifiant l'année, le périmètre (France / UE) et la définition (dette au sens de Maastricht, chômage au sens du BIT, SMIC brut ou net…).
 - Un VOTE OFFICIEL (Assemblée nationale) prouve un vote s'il porte bien sur le texte dont parle l'affirmation (vérifie le titre et la date du scrutin) ; sinon ignore-le.
 - Une fiche de JEU DE DONNÉES (data.gouv.fr) prouve seulement qu'une donnée existe : elle ne confirme pas un chiffre à elle seule.
+- Une ENCYCLOPÉDIE (Wikipédia) établit les faits simples et datés (qui a occupé quelle fonction, quand une mesure a été prise ou un texte adopté) ; pour un chiffre ou une statistique, préfère la source officielle ou la presse, et ne tranche pas sur Wikipédia seule.
 - Une SOURCE PARTISANE (site d'un parti ou mouvement politique) prouve seulement ce que ce parti dit ou propose (programme, communiqué, candidat investi) — jamais un fait ou un chiffre, et elle ne compte pas comme source indépendante.
 - Une source de FIABILITÉ FAIBLE (site militant, conspirationniste ou agrégateur) ne suffit jamais seule et ne compte pas comme source indépendante : ne la choisis comme "url" que faute de mieux, avec confiance ≤ 50.
 - "url" doit être COPIÉE depuis un des résultats de recherche fournis — jamais inventée. Si aucun résultat n'appuie ton verdict, url vide ET confiance ≤ 50.
@@ -255,7 +256,7 @@ def search_available() -> bool:
 
 def web_search(query: str, max_results: int = 6) -> list:
     """Recherche web via l'instance SearxNG auto-hébergée (searxng/docker-compose.yml) —
-    Brave + Mojeek uniquement (ni Google ni Bing, cf. searxng/config/settings.yml).
+    Brave + Wikipédia (fr) uniquement (ni Google ni Bing, cf. searxng/config/settings.yml).
     Retourne [] si l'instance est injoignable, jamais d'appel direct à un moteur tiers.
     Les domaines de EXCLUDED_SOURCE_DOMAINS (réseaux sociaux, médias sous
     sanctions de l'UE, satire… — voir config.py) sont écartés avant

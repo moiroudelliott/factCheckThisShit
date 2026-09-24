@@ -22,6 +22,7 @@ def test_tier_uses_hostname_not_substring():
     assert source_tier("https://blog.example.com/?ref=insee.fr") == "FIABILITÉ INCONNUE"
     assert source_tier("https://notafp.com/x") == "FIABILITÉ INCONNUE"
     assert source_tier("https://www.lemonde.fr/x") == "PRESSE ÉTABLIE"
+    assert source_tier("https://fr.wikipedia.org/wiki/Gabriel_Attal") == "ENCYCLOPÉDIE"
 
 
 def test_excluded_domains():

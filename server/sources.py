@@ -103,6 +103,8 @@ def source_tier(url: str) -> str:
         return "SOURCE OFFICIELLE"
     if on_domain(h, TIER_PRESS):
         return "PRESSE ÉTABLIE"
+    if on_domain(h, ("wikipedia.org",)):
+        return "ENCYCLOPÉDIE"
     if on_domain(h, PARTISAN_DOMAINS):
         return "SOURCE PARTISANE"
     if on_domain(h, LOW_RELIABILITY_DOMAINS):

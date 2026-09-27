@@ -8,6 +8,7 @@ sans modèle ni réseau (testables seules, cf. tests/).
 - confiance plafonnée quand aucune preuve n'est liée, ou quand la seule
   preuve est de fiabilité faible."""
 
+import html
 import math
 import re
 import time
@@ -83,6 +84,26 @@ def academic_relevant(claim: str, result: dict) -> bool:
     # il faut au moins un mot commun qui n'en soit pas un
     names = key_words(" ".join(re.findall(r"\b[A-ZÀÂÇÉÈÊËÎÏÔÙÛÜ][\w'’-]*", claim)))
     return len(common) >= max(2, math.ceil(0.3 * len(words))) and bool(common - names)
+
+
+def _strip_tags(text) -> str:
+    return re.sub(r"\s+", " ", re.sub(r"<[^>]+>", "", html.unescape(str(text or "")))).strip()
+
+
+def parse_brave_results(data: dict, max_results: int) -> list:
+    """Réponse de l'API Brave Search → résultats au format de web_search
+    ({title, body, href}), domaines exclus retirés, balises <strong> ôtées."""
+    out = []
+    for res in ((data or {}).get("web") or {}).get("results") or []:
+        href = res.get("url") or ""
+        if not href.startswith(("http://", "https://")) or is_excluded(href):
+            continue
+        body = _strip_tags(res.get("description"))
+        extra = [_strip_tags(x) for x in (res.get("extra_snippets") or [])[:1]]
+        out.append({"title": _strip_tags(res.get("title")), "body": " … ".join([body, *extra])[:450], "href": href})
+        if len(out) >= max_results:
+            break
+    return out
 
 
 def is_factcheck_section(url: str) -> bool:

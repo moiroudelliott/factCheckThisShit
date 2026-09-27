@@ -12,7 +12,7 @@ sys.path.insert(0, ROOT)
 
 from server.config import EXCLUDED_SOURCES, LOW_RELIABILITY_DOMAINS, PARTISAN_DOMAINS  # noqa: E402
 from server.sources import (  # noqa: E402
-    academic_relevant, finalize_result, is_excluded, normalize_verdict, source_label, source_tier, video_year,
+    academic_relevant, finalize_result, parse_brave_results, is_excluded, normalize_verdict, source_label, source_tier, video_year,
 )
 
 
@@ -125,6 +125,21 @@ def test_academic_results_must_be_about_the_claim():
     off_topic = {"title": "Gabriel Attal (2024, OpenAlex)", "body": "Notice de catalogue."}
     assert academic_relevant(claim, on_topic)
     assert not academic_relevant(claim, off_topic)
+
+
+def test_brave_api_results():
+    data = {"web": {"results": [
+        {"title": "Immigration : les entrées <strong>en baisse</strong>", "url": "https://www.lemonde.fr/a",
+         "description": "En 2024, les <strong>entrées</strong> ont baissé &amp; …", "extra_snippets": ["Selon l'Insee…"]},
+        {"title": "Post", "url": "https://x.com/someone/status/1", "description": "réseau social : exclu"},
+        {"title": "Sans lien", "url": "javascript:alert(1)", "description": "x"},
+        {"title": "Insee", "url": "https://www.insee.fr/b", "description": "Chiffres"},
+    ]}}
+    r = parse_brave_results(data, 5)
+    assert [x["href"] for x in r] == ["https://www.lemonde.fr/a", "https://www.insee.fr/b"]
+    assert r[0]["title"] == "Immigration : les entrées en baisse"
+    assert r[0]["body"] == "En 2024, les entrées ont baissé & … … Selon l'Insee…"
+    assert parse_brave_results({}, 5) == [] and len(parse_brave_results(data, 1)) == 1
 
 
 def test_false_needs_a_contradicting_fact_from_a_linked_source():

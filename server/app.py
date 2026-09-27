@@ -19,6 +19,7 @@ from faster_whisper.utils import download_model
 from server import network
 from server.config import (
     SEARXNG_URL, MISTRAL_API_KEY, BACKEND_TOKEN, WHISPER_MODEL, DIARIZATION_DEVICE, ALLOWED_ORIGINS, FORCE_IPV4,
+    BRAVE_API_KEY,
 )
 
 # Origines autorisées : l'extension Chrome (popup + document offscreen,
@@ -88,6 +89,12 @@ try:
 except Exception:
     print(f"⚠️  SearxNG injoignable sur {SEARXNG_URL} — fact-checking sans recherche web "
           f"(cf. searxng/docker-compose.yml : `docker compose up -d`).")
+
+if BRAVE_API_KEY:
+    print("Recherche web : API Brave Search (clé trouvée) + Wikipédia via SearxNG.")
+else:
+    print("ℹ️  Pas de BRAVE_API_KEY : Brave passe par SearxNG et bloque vite la recherche web "
+          "(voir .env.example).")
 
 if not MISTRAL_API_KEY:
     print("⚠️  MISTRAL_API_KEY non définie — les talking points seront désactivés.")

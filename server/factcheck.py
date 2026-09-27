@@ -8,16 +8,20 @@ import re
 import time
 
 import eventlet
+import eventlet.semaphore
 import requests
 
 from server.app import DIARIZATION, socketio
 from server.config import (
-    MISTRAL_API_KEY, MISTRAL_MODEL, MISTRAL_MAX_RETRIES, MISTRAL_RETRY_BASE_S, SEARXNG_URL,
+    BRAVE_API_KEY, BRAVE_API_MIN_GAP_S, MISTRAL_API_KEY, MISTRAL_MODEL, MISTRAL_MAX_RETRIES,
+    MISTRAL_RETRY_BASE_S, SEARXNG_URL,
 )
 from server.text_utils import _STOPWORDS
 from server import cache, indicators, known_factchecks, votes
 from server.notify import describe_error, warn_client
-from server.sources import academic_relevant, finalize_result, is_excluded, source_tier, video_year
+from server.sources import (
+    academic_relevant, finalize_result, is_excluded, parse_brave_results, source_tier, video_year,
+)
 from server.state import session_contexts
 
 # ── Prompts ────────────────────────────────────────────────────────────────
@@ -250,26 +254,81 @@ SEARCH_DOWN_MESSAGE = ("Recherche web éteinte (SearxNG) : les verdicts seront r
 
 
 def search_available() -> bool:
-    """SearxNG répond-il ? Sans lui, presque aucun verdict n'a de source :
-    cas vécu, une session entière à « non vérifié, non sourcé » sans que rien
-    ne le signale ailleurs que dans le terminal au démarrage."""
+    """La recherche web est-elle disponible (API Brave, ou SearxNG qui
+    répond) ? Sans elle, presque aucun verdict n'a de source : cas vécu, une
+    session entière à « non vérifié, non sourcé » sans que rien ne le signale
+    ailleurs que dans le terminal au démarrage."""
+    if BRAVE_API_KEY:
+        return True
     try:
         return requests.get(f"{SEARXNG_URL}/healthz", timeout=1.5).ok
     except Exception:
         return False
 
 
-def web_search(query: str, max_results: int = 6) -> list:
-    """Recherche web via l'instance SearxNG auto-hébergée (searxng/docker-compose.yml) —
-    Brave + Wikipédia (fr) uniquement (ni Google ni Bing, cf. searxng/config/settings.yml).
-    Retourne [] si l'instance est injoignable, jamais d'appel direct à un moteur tiers.
-    Les domaines de EXCLUDED_SOURCE_DOMAINS (réseaux sociaux, médias sous
-    sanctions de l'UE, satire… — voir config.py) sont écartés avant
-    d'atteindre le prompt."""
+BRAVE_API_URL = "https://api.search.brave.com/res/v1/web/search"
+_brave_lock = eventlet.semaphore.Semaphore(1)
+_brave_last = [0.0]
+_brave_warned = set()
+
+
+def brave_api_search(query: str, max_results: int = 4) -> list:
+    """API officielle de Brave Search (clé BRAVE_API_KEY) : au plus une
+    requête par seconde (offre gratuite), les appels simultanés attendent
+    leur tour. [] en cas d'erreur — la recherche continue avec Wikipédia."""
+    if not BRAVE_API_KEY:
+        return []
+    with _brave_lock:
+        wait = _brave_last[0] + BRAVE_API_MIN_GAP_S - time.monotonic()
+        if wait > 0:
+            eventlet.sleep(wait)
+        _brave_last[0] = time.monotonic()
     try:
         r = requests.get(
+            BRAVE_API_URL,
+            params={"q": query, "count": max_results, "country": "FR", "search_lang": "fr",
+                    "safesearch": "moderate"},
+            headers={"Accept": "application/json", "X-Subscription-Token": BRAVE_API_KEY},
+            timeout=8,
+        )
+        if r.status_code in (401, 403, 422, 429):
+            kind = "limite de requêtes atteinte" if r.status_code == 429 else "clé refusée (BRAVE_API_KEY dans .env)"
+            if kind not in _brave_warned or r.status_code == 429:
+                print(f"[Brave API] {kind} — HTTP {r.status_code}")
+                _brave_warned.add(kind)
+            return []
+        r.raise_for_status()
+        return parse_brave_results(r.json(), max_results)
+    except Exception as e:
+        print(f"[Brave API] {type(e).__name__}: {e}")
+        return []
+
+
+def web_search(query: str, max_results: int = 6) -> list:
+    """Recherche web, ni Google ni Bing : l'API officielle de Brave Search si
+    une clé est configurée (presse, sites officiels), plus Wikipédia via
+    l'instance SearxNG auto-hébergée (searxng/config/settings.yml). Sans clé,
+    SearxNG interroge aussi Brave, comme un navigateur — ce qui se fait
+    bloquer. Les domaines de EXCLUDED_SOURCE_DOMAINS (réseaux sociaux, médias
+    sous sanctions de l'UE, satire… — voir config.py) sont écartés avant
+    d'atteindre le prompt."""
+    if BRAVE_API_KEY:
+        found = brave_api_search(query, max(1, max_results - 2))
+        seen = {r["href"] for r in found}
+        wiki = searxng_search(query, 2, engines="wikipedia fr")
+        return found + [w for w in wiki if w["href"] not in seen]
+    return searxng_search(query, max_results)
+
+
+def searxng_search(query: str, max_results: int = 6, engines: str = "") -> list:
+    """Instance SearxNG locale ; [] si elle est injoignable."""
+    try:
+        params = {"q": query, "format": "json", "language": "fr"}
+        if engines:
+            params["engines"] = engines
+        r = requests.get(
             f"{SEARXNG_URL}/search",
-            params={"q": query, "format": "json", "language": "fr"},
+            params=params,
             timeout=8,
         )
         r.raise_for_status()

@@ -20,6 +20,14 @@ MISTRAL_RETRY_BASE_S = 2.0  # backoff exponentiel: 2s, 4s, 8s (sauf Retry-After 
 # tiers qui voit passer les claims.
 SEARXNG_URL = os.environ.get("SEARXNG_URL", "http://127.0.0.1:8080").rstrip("/")
 
+# API officielle de Brave Search — clé dans .env (jamais dans le dépôt). Sans
+# elle, SearxNG interroge Brave comme un navigateur et se fait bloquer après
+# quelques dizaines de recherches (cas vécu : plus aucune source web pendant
+# des heures). Offre gratuite : 1 requête par seconde. Clé :
+# https://api-dashboard.search.brave.com — voir .env.example.
+BRAVE_API_KEY = os.environ.get("BRAVE_API_KEY", "").strip()
+BRAVE_API_MIN_GAP_S = 1.1
+
 # IPv6 annoncé mais inutilisable (box) : chaque connexion sortante perdait 8
 # à 40 s avant le repli IPv4 — voir server/network.py. auto | 1 | 0
 FORCE_IPV4 = os.environ.get("FORCE_IPV4", "auto")

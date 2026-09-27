@@ -55,7 +55,8 @@ sys.path.insert(0, ROOT)
 SR = 16000
 CHUNK_S, OVERLAP_S, PROBE_S = 10.0, 1.5, 2.5   # = CHUNK_MS / OVERLAP_MS / PROBE_MS de offscreen.js
 MAX_PENDING = 3          # analyses / fact-checks en vol avant d'envoyer la suite (débit Mistral)
-SEARCH_GAP_S = 5.0       # écart mini entre deux vérifications (recherche web) : au-delà, Brave suspend SearxNG
+SEARCH_GAP_S = 5.0       # écart mini entre deux vérifications sans API Brave : au-delà, Brave bloque SearxNG
+SEARCH_GAP_API_S = 1.2   # avec l'API Brave (1 requête/s, offre gratuite)
 DONE_TIMEOUT_S = 180     # attente max de la fin des dernières vérifications
 
 # Ce que l'extension enregistre (content.js → TAPE_TYPES), sauf les messages
@@ -257,7 +258,7 @@ def main():
     import server.routes as routes
     from server import factcheck
     from server.app import socketio, app
-    from server.config import BACKEND_TOKEN
+    from server.config import BACKEND_TOKEN, BRAVE_API_KEY
 
     if not args.sans_recherche:
         if not factcheck.search_available():
@@ -284,7 +285,7 @@ def main():
     def paced_factcheck(*a, **k):
         now = time.monotonic()
         start = max(now, next_slot[0])
-        next_slot[0] = start + SEARCH_GAP_S
+        next_slot[0] = start + (SEARCH_GAP_API_S if BRAVE_API_KEY else SEARCH_GAP_S)
         if start > now:
             clock.paused(start - now)
         return _factcheck(*a, **k)

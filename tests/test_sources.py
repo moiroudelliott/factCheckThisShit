@@ -127,6 +127,15 @@ def test_academic_results_must_be_about_the_claim():
     assert not academic_relevant(claim, off_topic)
 
 
+def test_false_needs_a_contradicting_fact_from_a_linked_source():
+    """Cas vécu : FAUX 95 % expliqué par « rien ne prouve que… »."""
+    web = [{"href": "https://www.insee.fr/x", "title": "t"}]
+    base = {"verdict": "faux", "confiance": 95, "explication": "e", "url": "https://www.insee.fr/x"}
+    assert finalize_result({**base, "contredit_par": "Insee : 375 000 entrées en 2022"}, web, [], [])["verdict"] == "faux"
+    assert finalize_result({**base, "contredit_par": ""}, web, [], [])["verdict"] == "non_verifiable"
+    assert finalize_result({**base, "url": "", "contredit_par": "de mémoire"}, web, [], [])["verdict"] == "non_verifiable"
+
+
 def test_true_verdict_with_a_contradicted_element_is_partial():
     """Cas vécu : VRAI 95 % alors que l'explication citait une baisse en 2020."""
     data = {"verdict": "vrai", "confiance": 95, "explication": "Baisse en 2024, mais aussi en 2020.",

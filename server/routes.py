@@ -448,7 +448,8 @@ def flush_to_mistral(sid: str, text: str, ts: float = None, entries: list = ()):
         # Fact-check uniquement les affirmations
         for p in unique:
             if p["type"] == "affirmation":
-                _spawn_tracked(sid, fact_check_affirmation, sid, p["id"], p["texte"], p.get("citation", ""))
+                _spawn_tracked(sid, fact_check_affirmation, sid, p["id"], p["texte"], p.get("citation", ""),
+                               str(p.get("recherche") or ""))
     except Exception as e:
         print(f"[Mistral error] {type(e).__name__}: {e}")
         warn_client(sid, describe_error(e))

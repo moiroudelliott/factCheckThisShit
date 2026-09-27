@@ -32,7 +32,7 @@ MISSION: un passage de débat contient presque toujours 1 à 3 talking points. E
 Ne retourne [] QUE si le passage est réellement vide de contenu politique (politesses, gestion de parole, phrases incompréhensibles). Un tableau vide doit rester RARE.
 
 Réponds UNIQUEMENT avec un tableau JSON valide, sans markdown:
-[{{"type": "TYPE", "texte": "le point condensé en une phrase claire", "qui": "qui l'a dit, ou chaîne vide", "verifiable": 8, "citation": "les mots exacts du passage"}}]
+[{{"type": "TYPE", "texte": "le point condensé en une phrase claire", "qui": "qui l'a dit, ou chaîne vide", "verifiable": 8, "citation": "les mots exacts du passage", "recherche": "mots-clés de recherche (affirmations)"}}]
 
 Types:
 - "affirmation" = fait PRÉCIS et VÉRIFIABLE: chiffre, date, événement, vote, citation, fait historique ou économique.
@@ -59,6 +59,9 @@ Types:
 événement précis ; 5 = fait réel mais flou ; 0 = opinion ou généralité.
 "citation" (pour chaque point) = les mots EXACTS de la transcription où le point est dit (8 à 30 mots),
 recopiés sans rien changer ni corriger — pas de reformulation, pas de nom de locuteur.
+"recherche" (affirmations seulement) = 4 à 10 mots-clés pour trouver dans la presse ou les statistiques
+de quoi vérifier ce point : sujet, chiffre, noms, période — pas une phrase.
+Ex: "entrées immigrés France 2024 baisse Insee", "Attal déclaration politique générale accueillir moins mieux".
 
 RÈGLES:
 1. {attribution_rule}
@@ -81,7 +84,7 @@ Affirmation à vérifier: "{claim}"
 
 Évalue la véracité en te basant PRIORITAIREMENT sur les résultats de recherche ci-dessus (leur fiabilité est annotée), complétés par tes connaissances.
 Réponds UNIQUEMENT avec un objet JSON valide, sans markdown:
-{{"verdict": "VERDICT", "confiance": 85, "explication": "une phrase courte et précise", "inexact": "l'élément de l'affirmation que les sources contredisent (chiffre, date, période, superlatif, attribution), ou chaîne vide", "source": "nom de la source (ex: INSEE, Eurostat, Le Monde)", "url": "URL du résultat de recherche utilisé, ou chaîne vide"}}
+{{"verdict": "VERDICT", "confiance": 85, "explication": "une phrase courte et précise", "inexact": "l'élément de l'affirmation que les sources contredisent (chiffre, date, période, superlatif, attribution), ou chaîne vide", "contredit_par": "pour faux : le fait précis d'une source fournie qui contredit l'affirmation, sinon chaîne vide", "source": "nom de la source (ex: INSEE, Eurostat, Le Monde)", "url": "URL du résultat de recherche utilisé, ou chaîne vide"}}
 
 Verdicts disponibles:
 - "vrai": affirmation exacte et vérifiable
@@ -91,13 +94,15 @@ Verdicts disponibles:
 - "non_verifiable": ni les résultats de recherche ni tes connaissances ne permettent de trancher
 
 RÈGLES DE RIGUEUR:
-- Un verdict tranché ("vrai", "faux", "trompeur") exige AU MOINS deux sources indépendantes concordantes, OU une SOURCE OFFICIELLE (INSEE, Eurostat, Légifrance, parlement…). Sinon: "partiellement_vrai" ou "non_verifiable".
-- "faux" exige qu'une source FOURNIE contredise explicitement l'affirmation (chiffre, date ou fait différent, que tu cites dans l'explication). Tes seules connaissances ne suffisent JAMAIS pour "faux" : sans source contraire, réponds "non_verifiable" (ou "partiellement_vrai" si une partie est confirmée).
-- Vérifie CHAQUE élément : chiffre, date, période, superlatif (« record », « première fois depuis 20 ans », « jamais »), et à qui l'action est attribuée. Recopie dans "inexact" tout élément que tes sources contredisent — ex : « une première depuis 15 ou 20 ans » alors que la série montre une baisse en 2020. Si "inexact" n'est pas vide, le verdict NE PEUT PAS être "vrai" : "partiellement_vrai" (élément secondaire), "trompeur" ou "faux" (élément central).
+- "non_verifiable" est RÉSERVÉ au cas où AUCUNE source fournie ne traite du sujet de l'affirmation. Dès qu'une source fiable donne un chiffre ou un fait sur le MÊME sujet, tu DOIS trancher en comparant : "vrai" s'il concorde ; "partiellement_vrai" si l'écart est faible ou ne porte que sur un détail ; "trompeur" si c'est exact mais présenté de façon à fausser l'impression ; "faux" si la source dit autre chose (autre chiffre, autre date, fait différent). Cite le chiffre ou le fait de la source dans "explication".
+- UNE source fiable qui traite précisément du sujet suffit pour trancher : SOURCE OFFICIELLE, FACT-CHECK PUBLIÉ, DONNÉE OFFICIELLE ou PRESSE ÉTABLIE. Plusieurs sources concordantes augmentent la confiance.
+- "faux" exige un fait précis tiré d'une source FOURNIE, que tu recopies dans "contredit_par" (ex : « Insee : 375 000 entrées d'immigrés en 2022 »). « Rien ne prouve que… » ou « aucune source ne confirme » n'est PAS une contradiction : c'est "non_verifiable". Tes seules connaissances ne suffisent jamais pour "faux".
+- Lis l'affirmation dans son sens le plus plausible dans le débat : « Attal a interdit l'abaya », dit à propos de l'école, veut dire à l'école — ne la juge pas fausse pour une portée qu'elle ne revendique pas.
+- Vérifie CHAQUE élément : chiffre, date, période, superlatif (« record », « première fois depuis 20 ans », « jamais »), et à qui l'action est attribuée. Recopie dans "inexact" tout élément que tes sources contredisent. Si le fait PRINCIPAL est vrai et que seul un détail est faux (superlatif, arrondi, date approchée) : "partiellement_vrai" — ex : « les entrées ont baissé en 2024, une première depuis 15 ans » alors que la baisse est réelle mais qu'il y en a eu une en 2020 → "partiellement_vrai". "faux" seulement si le fait principal est contredit. Si "inexact" n'est pas vide, le verdict ne peut pas être "vrai".
 - Une mesure décidée ou annoncée par un ministre dans son domaine lui est attribuable (« X a interdit… » est vrai si X, ministre compétent, l'a décidée), même si le gouvernement est dirigé par un autre.
 - Une SOURCE ACADÉMIQUE ne prouve un fait d'actualité (qui a fait quoi, quand) que si son résumé le dit explicitement.
 - Pour une affirmation CAUSALE ou sociologique ("X provoque Y", "X n'a pas d'effet sur Y"), les SOURCES ACADÉMIQUES (études évaluées par les pairs) pèsent plus lourd que la presse et que tes intuitions. Ne les utilise que si elles portent réellement sur le sujet de l'affirmation.
-- "confiance" (0-100) = ta certitude dans le verdict: ~90+ = sources officielles concordantes; ~70 = bien sourcé; ~50 = plausible mais mal sourcé; en dessous de 40, utilise plutôt "non_verifiable".
+- "confiance" (0-100) = ta certitude dans le verdict: ~90+ = sources officielles concordantes; ~70 = une source fiable précise; ~50 = plausible mais mal sourcé.
 - Quand les sources donnent un chiffre exact, cite-le dans "explication".
 - Un FACT-CHECK DÉJÀ PUBLIÉ (rédaction de vérification) ou un article annoté FACT-CHECK PUBLIÉ fait autorité s'il porte sur la MÊME affirmation (même chiffre, même période) : reprends sa conclusion et son URL. S'il porte sur un sujet voisin, ignore-le.
 - Une DONNÉE OFFICIELLE (Eurostat) donne la série exacte : compare-la au chiffre avancé en vérifiant l'année, le périmètre (France / UE) et la définition (dette au sens de Maastricht, chômage au sens du BIT, SMIC brut ou net…).
@@ -109,7 +114,7 @@ RÈGLES DE RIGUEUR:
 - "url" doit être COPIÉE depuis un des résultats de recherche fournis — jamais inventée. Si aucun résultat n'appuie ton verdict, url vide ET confiance ≤ 50.
 - "source" = le nom du site de l'URL choisie (ex: "Le Monde" pour lemonde.fr), jamais une autorité que ce site se contente de citer.
 - L'affirmation vient d'une transcription automatique : si elle contient manifestement une erreur de transcription (nom déformé, mot incompréhensible), ne la juge pas "faux" pour autant — réponds "non_verifiable" en commençant l'explication par "Transcription douteuse :". Ne l'utilise pas pour une affirmation simplement incomplète ou sortie de son contexte.
-- Sois honnête : en cas de doute réel, réponds "non_verifiable" plutôt que de deviner."""
+- Ne devine pas, mais ne te dérobe pas : sans AUCUNE source sur le sujet, "non_verifiable" ; avec une source sur le sujet, tranche."""
 
 
 VIDEO_ANALYSIS_PROMPT = """Voici les métadonnées d'une vidéo YouTube de débat ou plateau politique français.
@@ -416,12 +421,17 @@ def build_evidence_block(results: list, academic: list = None, official: list = 
     return "\n".join(lines)
 
 
-def call_mistral_factcheck(claim: str, context: dict = None, sid: str = None, citation: str = "") -> dict:
+def call_mistral_factcheck(claim: str, context: dict = None, sid: str = None, citation: str = "",
+                           query: str = "") -> dict:
     context = context or {}
     # Replay d'un débat passé : sans l'année, la recherche remonte les
     # chiffres d'aujourd'hui pour juger des propos d'alors
     year = video_year(context)
-    web_query = f"{claim} {year}" if year < time.localtime().tm_year and str(year) not in claim else claim
+    # Mots-clés fournis à l'extraction : la phrase entière (« Gabriel Attal a
+    # déclaré à la tribune de l'Assemblée nationale que… ») ramenait des
+    # résultats vagues, et le verdict tombait en « non vérifiable »
+    base = query.strip() if isinstance(query, str) and 3 <= len(query.strip()) <= 150 else claim
+    web_query = f"{base} {year}" if year < time.localtime().tm_year and str(year) not in base else base
     # Les trois recherches en parallèle (greenlets) : en série, leurs timeouts
     # s'additionnaient (jusqu'à ~26 s avant même l'appel Mistral)
     jobs = (eventlet.spawn(web_search, web_query), eventlet.spawn(scholar_search, claim),
@@ -458,7 +468,7 @@ def call_mistral_factcheck(claim: str, context: dict = None, sid: str = None, ci
             "source": "", "url": "", "indisponible": True}
 
 
-def fact_check_affirmation(sid: str, claim_id: str, claim_text: str, citation: str = ""):
+def fact_check_affirmation(sid: str, claim_id: str, claim_text: str, citation: str = "", query: str = ""):
     print(f"[FactCheck] «{claim_text[:60]}»")
     context = session_contexts.get(sid, {})
     year = video_year(context)
@@ -469,7 +479,7 @@ def fact_check_affirmation(sid: str, claim_id: str, claim_text: str, citation: s
         socketio.emit("fact_check_result", {"id": claim_id, **cached}, to=sid)
         return
     try:
-        result = call_mistral_factcheck(claim_text, context=context, sid=sid, citation=citation)
+        result = call_mistral_factcheck(claim_text, context=context, sid=sid, citation=citation, query=query)
         cache.store(claim_text, result, year)
         socketio.emit("fact_check_result", {"id": claim_id, **result}, to=sid)
     except Exception as e:

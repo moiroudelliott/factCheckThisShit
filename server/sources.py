@@ -160,6 +160,10 @@ def finalize_result(data: dict, results: list, academic: list, official: list, k
     # 95 %, l'explication citant une baisse en 2020) : au mieux partiel
     if out["verdict"] == "vrai" and str(data.get("inexact") or "").strip():
         out["verdict"] = "partiellement_vrai"
+    # Plus bas, « faux » sans fait contraire tiré d'une source liée est
+    # ramené à « non vérifiable » (cas vécu : FAUX 95 % sur « rien ne prouve
+    # que… »)
+    wants_false = out["verdict"] == "faux"
     kinds = {r.get("href"): "web" for r in results}
     kinds.update({r.get("href"): "academic" for r in academic})
     kinds.update({r.get("href"): "official" for r in official})
@@ -171,6 +175,8 @@ def finalize_result(data: dict, results: list, academic: list, official: list, k
     if not (isinstance(url, str) and url.startswith(("http://", "https://")) and url in kinds):
         url = ""
     out["url"] = url
+    if wants_false and not (url and str(data.get("contredit_par") or "").strip()):
+        out["verdict"] = "non_verifiable"
     # Fact-check déjà publié : on nomme la rédaction (connue), pas ce que dit Mistral
     out["source"] = outlets[url] if url in outlets else source_label(str(data.get("source") or ""), url, kinds.get(url, ""))
     conf = data.get("confiance")

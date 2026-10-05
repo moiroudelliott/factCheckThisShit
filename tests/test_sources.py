@@ -215,6 +215,23 @@ def test_false_needs_a_source_on_the_same_period():
                            periode="2011")["verdict"] == "faux"
 
 
+def test_absence_of_source_is_not_a_contradiction():
+    """Cas vécus (Mistral Large, Attal / Maréchal) : FAUX 85-90 % sur « aucune
+    projection ne confirme », « aucun accord n'est mentionné »."""
+    web = [{"href": "https://www.lemonde.fr/x", "title": "t"}]
+    base = {"verdict": "faux", "confiance": 90, "url": "https://www.lemonde.fr/x", "explication": "e"}
+    for absent in ("Aucune projection de l'INED ou de l'INSEE ne prévoit une majorité en 2045",
+                   "Aucun accord officiel n'est mentionné dans les sources fiables",
+                   "Les sources ne confirment pas que tous les budgets l'ont été"):
+        assert finalize_result({**base, "contredit_par": absent}, web, [], [])["verdict"] == "non_verifiable", absent
+        assert finalize_result({**base, "contredit_par": "x", "explication": absent}, web, [], [])["verdict"] \
+            == "non_verifiable", absent
+    # un vrai fait contraire qui contient « aucun » reste un « faux »
+    for fact in ("Région Pays de la Loire : aucun élève ne se trouvait dans le bâtiment",
+                 "Aucun élève ne se trouvait dans le bâtiment selon la région"):
+        assert finalize_result({**base, "contredit_par": fact}, web, [], [])["verdict"] == "faux", fact
+
+
 def test_years_in():
     assert years_in("depuis 2017-2026") == set(range(2017, 2027))
     assert years_in("rentrée 2025-2026, budget 2027") == {2025, 2026, 2027}

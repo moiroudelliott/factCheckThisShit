@@ -209,6 +209,11 @@ def self_sourced(explication: str, qui: str, claim: str = "") -> bool:
     return False
 
 
+_ABSENCE_RE = re.compile(
+    r"\W*(?:rien ne|les sources ne|pas de source|aucune source"
+    r"|aucune?\b[^.]*?\b(?:ne|n')\s*(?:\w+\s+)?(?:confirme|mentionne|prevoi|indique|evoque|montre|prouve|etabli"
+    r"|est\s+(?:pas\s+|nulle part\s+)?mentionne))")
+
 _AUTHOR_SIDE_RE = re.compile(r"\b(?:ministere|ministre|gouvernement|matignon|elysee|partisane?|parti|son camp"
                              r"|lui-meme|elle-meme|ses propres|sa propre|son propre)\b")
 
@@ -262,6 +267,11 @@ def finalize_result(data: dict, results: list, academic: list, official: list, k
         url = ""
     out["url"] = url
     if wants_false and not (url and str(data.get("contredit_par") or "").strip()):
+        out["verdict"] = "non_verifiable"
+    # « Aucune projection de l'Insee ne prévoit… » recopié comme fait contraire :
+    # une absence de preuve, pas une contradiction (cas vécus avec Mistral Large)
+    if out["verdict"] == "faux" and (_ABSENCE_RE.match(_ascii(data.get("contredit_par") or ""))
+                                     or _ABSENCE_RE.match(_ascii(out["explication"]))):
         out["verdict"] = "non_verifiable"
     # « non recoupé » = un article rapporte la déclaration ; sans article lié,
     # c'est qu'aucune source ne traite du sujet (cas vécu : « non recoupé » à

@@ -10,6 +10,11 @@ load_dotenv()
 # ── Mistral ────────────────────────────────────────────────────────────────
 MISTRAL_API_KEY = os.environ.get("MISTRAL_API_KEY", "")
 MISTRAL_MODEL = os.environ.get("MISTRAL_MODEL", "mistral-medium-latest")  # medium: suit bien le prompt d'extraction; small le sur-applique
+# Modèle de l'étape de vérification (verdict), réglable à part : c'est elle
+# qui raisonne sur les sources (période, périmètre, cumul / annuel)
+MISTRAL_FACTCHECK_MODEL = os.environ.get("MISTRAL_FACTCHECK_MODEL", MISTRAL_MODEL)
+MISTRAL_TIMEOUT_S = 20            # délai d'une réponse (extraction, identification des voix)
+MISTRAL_FACTCHECK_TIMEOUT_S = 40  # … d'un verdict : prompt long (preuves), modèle parfois plus lent
 MISTRAL_MAX_RETRIES = 3     # tentatives supplémentaires sur 429 (rate limit)
 MISTRAL_RETRY_BASE_S = 2.0  # backoff exponentiel: 2s, 4s, 8s (sauf Retry-After fourni par l'API)
 

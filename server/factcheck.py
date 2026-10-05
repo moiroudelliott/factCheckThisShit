@@ -13,8 +13,8 @@ import requests
 
 from server.app import DIARIZATION, socketio
 from server.config import (
-    BRAVE_API_KEY, BRAVE_API_MIN_GAP_S, MISTRAL_API_KEY, MISTRAL_MODEL, MISTRAL_MAX_RETRIES,
-    MISTRAL_RETRY_BASE_S, SEARXNG_URL,
+    BRAVE_API_KEY, BRAVE_API_MIN_GAP_S, MISTRAL_API_KEY, MISTRAL_FACTCHECK_MODEL, MISTRAL_FACTCHECK_TIMEOUT_S,
+    MISTRAL_MODEL, MISTRAL_MAX_RETRIES, MISTRAL_RETRY_BASE_S, MISTRAL_TIMEOUT_S, SEARXNG_URL,
 )
 from server.text_utils import _STOPWORDS
 from server import cache, indicators, known_factchecks, votes
@@ -228,17 +228,19 @@ def _retry_delay(resp, attempt: int) -> float:
     return MISTRAL_RETRY_BASE_S * (2 ** attempt)
 
 
-def call_mistral_api(prompt: str, sid: str = None) -> str:
+def call_mistral_api(prompt: str, sid: str = None, model: str = None, timeout: float = None) -> str:
     """sid (optionnel) : si fourni, un événement mistral_rate_limited est
     émis à cette session à chaque nouvelle tentative sur 429, pour que
     l'extension affiche l'attente au lieu de laisser l'utilisateur sans
     retour pendant le backoff."""
+    model = model or MISTRAL_MODEL
     for attempt in range(MISTRAL_MAX_RETRIES + 1):
+        started = time.monotonic()
         resp = requests.post(
             "https://api.mistral.ai/v1/chat/completions",
             headers={"Authorization": f"Bearer {MISTRAL_API_KEY}", "Content-Type": "application/json"},
-            json={"model": MISTRAL_MODEL, "messages": [{"role": "user", "content": prompt}], "temperature": 0.1},
-            timeout=20,
+            json={"model": model, "messages": [{"role": "user", "content": prompt}], "temperature": 0.1},
+            timeout=timeout or MISTRAL_TIMEOUT_S,
         )
         if resp.status_code == 429 and attempt < MISTRAL_MAX_RETRIES:
             wait = _retry_delay(resp, attempt)
@@ -250,7 +252,11 @@ def call_mistral_api(prompt: str, sid: str = None) -> str:
             eventlet.sleep(wait)  # eventlet.sleep (coopératif), jamais time.sleep : ne bloque pas la boucle
             continue
         resp.raise_for_status()
-        return resp.json()["choices"][0]["message"]["content"]
+        body = resp.json()
+        usage = body.get("usage") or {}
+        print(f"[Mistral] {model} : {time.monotonic() - started:.1f} s, "
+              f"{usage.get('prompt_tokens', '?')} + {usage.get('completion_tokens', '?')} tokens")
+        return body["choices"][0]["message"]["content"]
 
 
 def call_mistral(text: str, context: dict = None, recent_points: list = None, sid: str = None) -> list:
@@ -565,7 +571,7 @@ def call_mistral_factcheck(claim: str, context: dict = None, sid: str = None, ci
         evidence_block=build_evidence_block(results, academic, official, known, series, ballots),
         session_block=build_session_block(list(previous)),
     )
-    content = call_mistral_api(prompt, sid=sid)
+    content = call_mistral_api(prompt, sid=sid, model=MISTRAL_FACTCHECK_MODEL, timeout=MISTRAL_FACTCHECK_TIMEOUT_S)
     print(f"[FactCheck résultat] {content[:150]}")
     try:
         start = content.find('{')

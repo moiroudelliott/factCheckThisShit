@@ -198,4 +198,4 @@ CACHE_SIM_THRESHOLD = 0.75  # similarité (mots-clés) pour considérer deux cla
 # Version des règles de vérification : un verdict rendu sous des règles plus
 # anciennes n'est plus resservi (cas vécu : des « faux » appuyés sur une
 # autre année, resservis tels quels après la correction du prompt).
-FACTCHECK_RULES_VERSION = 4
+FACTCHECK_RULES_VERSION = 5

@@ -213,6 +213,11 @@ def test_false_needs_a_source_on_the_same_period():
                            periode="2026")["verdict"] == "faux"
     assert finalize_result({**base, "contredit_par": "30,4 élèves en 2011"}, web, [], [],
                            periode="2011")["verdict"] == "faux"
+    # prévision lointaine : l'année est l'affirmation, une autre année la contredit
+    # (cas vécu : « majoritaires en 2045 » face à « après 2050 », classé non vérifiable)
+    r = finalize_result({**base, "contredit_par": "OID : majorité extra-européenne possible après 2050"}, web, [], [],
+                        periode="2045")
+    assert r["verdict"] == "faux"
 
 
 def test_misheard_claims_are_flagged():

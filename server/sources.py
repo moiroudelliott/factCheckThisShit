@@ -42,6 +42,7 @@ _VERDICT_ALIASES = {
     "non_recoupee": "non_recoupe",
 }
 UNSOURCED_MAX_CONF = 50  # plafond de confiance d'un verdict sans URL de preuve
+FORECAST_MIN_YEARS = 5   # période visée au moins ce nombre d'années après aujourd'hui : une prévision (l'année est l'affirmation)
 LOW_RELIABILITY_MAX_CONF = 50  # … ou dont la preuve est de fiabilité faible (jamais mis en cache)
 
 _SOURCE_STOP = {"les", "des", "via", "and", "the", "sur", "avec", "citant", "selon", "source", "sources", "site"}
@@ -267,8 +268,13 @@ def finalize_result(data: dict, results: list, academic: list, official: list, k
     # « faux » appuyé sur une autre année que celle dont parle l'affirmation
     # (cas vécus : « +1,2 milliard » pour le budget 2027 démenti par le budget
     # 2026 ; une visite « lundi dernier » démentie par une page de 2025)
+    # Sauf pour une prévision lointaine (« majoritaires en 2045 ») : l'année
+    # est alors le contenu même de l'affirmation, et une source qui dit « après
+    # 2050 » la contredit (cas vécu : « non vérifiable » au lieu de trompeur)
     claim_years, source_years = years_in(periode), years_in(data.get("contredit_par"))
-    if out["verdict"] == "faux" and claim_years and source_years and not claim_years & source_years:
+    forecast = bool(claim_years) and min(claim_years) >= time.localtime().tm_year + FORECAST_MIN_YEARS
+    if (out["verdict"] == "faux" and claim_years and source_years and not claim_years & source_years
+            and not forecast):
         out["verdict"] = "non_verifiable"
         out["explication"] = (f"Les sources trouvées portent sur une autre période ({', '.join(map(str, sorted(source_years)))}) "
                               f"que celle de l'affirmation ({periode}).")

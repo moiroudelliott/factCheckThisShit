@@ -1253,11 +1253,10 @@
    "citation": "les naissances de personnes non européennes seront majoritaires en 2045",
    "recherche": "naissances non européennes majoritaires 2045 France INED INSEE",
    "accept": [
-    "non_verifiable",
     "trompeur",
     "faux"
    ],
-   "note": "ni l'INED ni l'Insee ne publient de telles projections"
+   "note": "projection attribuée à l'INED et l'Insee : elle vient de l'OID (think tank), après 2050, scénario haut"
   },
   {
    "id": "c786015b",
@@ -1269,11 +1268,11 @@
    "citation": "les personnes immigrées d'origine non européenne seraient majoritaires dans la population",
    "recherche": "immigrés origine non européenne majoritaires population France projections",
    "accept": [
-    "non_verifiable",
     "trompeur",
+    "faux",
     "partiellement_vrai"
    ],
-   "note": ""
+   "note": "« selon les projections » : un scénario haut de l'OID, après 2050"
   },
   {
    "id": "b641ea7b",
@@ -1301,10 +1300,9 @@
    "recherche": "projections population non-européenne France 2070 majorité",
    "accept": [
     "partiellement_vrai",
-    "trompeur",
-    "non_verifiable"
+    "trompeur"
    ],
-   "note": "scénario haut de l'OID"
+   "note": "2070 dans le scénario haut de l'OID : un scénario présenté comme la projection"
   },
   {
    "id": "4c7b1ddb",

@@ -20,6 +20,19 @@ def test_vague_affirmations_are_not_checked():
     assert p["type"] == "affirmation"
 
 
+def test_minor_affirmations_are_not_checked():
+    """Cas vécus : « j'étais à Créteil lundi », « le Conseil national lycéen existe »."""
+    p = apply_checkworthiness({"type": "affirmation", "texte": "J'étais dans un lycée de Créteil lundi",
+                               "verifiable": 8, "enjeu": 2})
+    assert p["type"] == "secondaire"
+    p = apply_checkworthiness({"type": "affirmation", "texte": "78 personnels ont été blessés",
+                               "verifiable": 10, "enjeu": 9})
+    assert p["type"] == "affirmation"
+    # note absente : on vérifie quand même ; trop vague prime sur secondaire
+    assert apply_checkworthiness({"type": "affirmation", "texte": "x", "verifiable": 9})["type"] == "affirmation"
+    assert apply_checkworthiness({"type": "affirmation", "texte": "x", "verifiable": 2, "enjeu": 1})["type"] == "vague"
+
+
 def test_missing_or_bad_score_never_blocks_a_check():
     assert verifiable_score({}) == 10
     assert verifiable_score({"verifiable": "huit"}) == 10

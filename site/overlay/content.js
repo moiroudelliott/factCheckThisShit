@@ -76,8 +76,12 @@ const VERDICT_CFG = {
   partiellement_vrai: { tag: 'PARTIEL',      accent: 'oklch(0.76 0.14 90)',  footerRight: '≈ nuancé',         footerColor: 'oklch(0.76 0.14 90)' },
   trompeur:           { tag: 'TROMPEUR',     accent: 'oklch(0.78 0.14 75)',  footerRight: '⚠ trompeur',       footerColor: 'oklch(0.78 0.14 75)' },
   faux:               { tag: 'FAUX',         accent: 'oklch(0.62 0.20 25)',  footerRight: '✗ démenti',        footerColor: 'oklch(0.72 0.16 28)' },
+  // Seule source : la déclaration de l'orateur lui-même (son ministère, son parti)
+  non_recoupe:        { tag: 'NON RECOUPÉ',  accent: 'oklch(0.66 0.07 230)', footerRight: '◌ non recoupé',    footerColor: 'oklch(0.72 0.07 230)' },
   non_verifiable:     { tag: 'NON VÉRIFIÉ',  accent: 'oklch(0.65 0.02 255)', footerRight: '? non vérifiable', footerColor: 'oklch(0.70 0.02 255)' },
 };
+// Verdicts sans confiance affichée : ce ne sont pas des conclusions sur le fond
+const NO_CONFIDENCE = new Set(['non_verifiable', 'non_recoupe']);
 // États qui ne sont PAS des verdicts : ne jamais les confondre avec un
 // « non vérifiable » (conclusion de fond), ni les compter dans les stats
 const STATE_CFG = {
@@ -88,7 +92,7 @@ const STATE_CFG = {
 // Confiance affichée seulement pour un vrai verdict : « non vérifié · 30 % »
 // ne voulait rien dire (30 % de quoi ?), et une panne n'a pas de confiance
 function confText(fc, sep) {
-  return fc && fc.confiance != null && !fc.pending && !fc.indisponible && fc.verdict !== 'non_verifiable'
+  return fc && fc.confiance != null && !fc.pending && !fc.indisponible && !NO_CONFIDENCE.has(fc.verdict)
     ? `${sep}${fc.confiance}%` : '';
 }
 
@@ -110,6 +114,9 @@ const TYPE_CFG = {
   // Affirmation jugée trop vague pour être vérifiée (note de vérifiabilité
   // basse, voir server/points.py) : ni fact-check ni carte, visible au récap
   vague:       { tag: 'TROP VAGUE',  accent: 'oklch(0.62 0.03 255)' },
+  // Affirmation sans enjeu (agenda, évidence, anecdote — note d'importance
+  // basse, voir server/points.py) : ni fact-check ni carte, visible au récap
+  secondaire:  { tag: 'SECONDAIRE',  accent: 'oklch(0.62 0.03 255)' },
 };
 
 // ── State ──────────────────────────────────────────────────────────────────────
@@ -1579,7 +1586,7 @@ function closeRecap() {
 function renderStats() {
   const statsEl = document.getElementById('fct-recap-stats');
   if (!statsEl) return;
-  const counts = { vrai: 0, partiellement_vrai: 0, trompeur: 0, faux: 0, non_verifiable: 0 };
+  const counts = Object.fromEntries(Object.keys(VERDICT_CFG).map((v) => [v, 0]));
   let affirmations = 0;
   for (const { point, fc } of S.points.values()) {
     if (point.type === 'affirmation') affirmations++;

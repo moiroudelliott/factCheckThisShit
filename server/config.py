@@ -125,6 +125,7 @@ FLUSH_INTERVAL = 22    # secondes max entre deux analyses Mistral
 MIN_WORDS = 30         # ne pas appeler Mistral avec moins de 30 mots (trop peu pour un talking point)
 MAX_BUFFER_WORDS = 55  # flush anticipé dès que le buffer est assez dense (échange rapide = analyse plus tôt)
 CHECKWORTHY_MIN = 6      # note de vérifiabilité (0-10, par Mistral) min pour vérifier une affirmation — dessous : « trop vague »
+ENJEU_MIN = 7            # note d'importance (0-10, par Mistral) min pour vérifier une affirmation — dessous : « secondaire » (agenda, évidence, anecdote)
 MIN_WORDS_ON_PAUSE = 12  # pause de parole (chunk sans texte neuf) : analyser la fin de tirade plutôt que l'oublier
 MIN_WORDS_ON_STOP = 8    # à l'arrêt : dernier buffer analysé s'il reste au moins ça
 FINISH_TIMEOUT_S = 45    # arrêt propre : attente max des analyses / fact-checks encore en vol
@@ -181,3 +182,7 @@ CACHE_DB = os.environ.get("FACTCHECK_CACHE_DB") or os.path.join(
 CACHE_TTL_DAYS = 30      # les chiffres politiques/économiques périment
 CACHE_MIN_CONF = 60      # ne jamais mettre en cache un verdict peu sûr
 CACHE_SIM_THRESHOLD = 0.75  # similarité (mots-clés) pour considérer deux claims identiques
+# Version des règles de vérification : un verdict rendu sous des règles plus
+# anciennes n'est plus resservi (cas vécu : des « faux » appuyés sur une
+# autre année, resservis tels quels après la correction du prompt).
+FACTCHECK_RULES_VERSION = 3

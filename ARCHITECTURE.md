@@ -172,9 +172,11 @@ Le texte accumulé passe par `build_transcript()` qui fusionne les tours de paro
 
 ## 7. Extraction Mistral → déduplication → dispatch
 
-`call_mistral()` renvoie une liste de `{"type", "texte", "qui", "verifiable", "citation"}` :
+`call_mistral()` renvoie une liste de `{"type", "texte", "qui", "verifiable", "enjeu", "periode", "citation", "recherche"}` :
 
 - **`verifiable`** (0-10) — à quel point l'affirmation est vérifiable par des faits (chiffre, date, vote, fait daté). Une affirmation notée sous `CHECKWORTHY_MIN=6` devient `type: "vague"` (`points.apply_checkworthiness`) : affichée « TROP VAGUE », jamais envoyée au fact-check. Le prompt donne des contre-exemples (« il existe des fractures en France », « nous avons un projet »…). Note absente → l'affirmation est vérifiée, comme avant.
+- **`enjeu`** (0-10) — importance du point pour le débat : vérifiable ne veut pas dire important. Sur un débat de 38 min (Bompard / Geffray), un quart des verdicts portaient sur l'agenda du ministre (« j'étais à Créteil lundi »), des évidences (« le Conseil national lycéen existe ») ou des anecdotes. Sous `ENJEU_MIN=7`, l'affirmation devient `type: "secondaire"` : au récap, ni carte ni fact-check (le seuil de vérifiabilité passe avant). Le prompt exclut aussi tout ce que dit le présentateur (même resté « Intervenant X ») et les témoignages diffusés en reportage.
+- **`periode`** (affirmations) — l'année visée, déduite des mots et de la date de la vidéo (« l'année prochaine » dite en octobre 2026 → 2027 ; en automne, « le budget » = celui de l'année suivante). Elle va dans `recherche` et dans le prompt du fact-check, jamais dans `texte`. Sans elle, « +1,2 milliard » (budget 2027) était cherché et jugé avec le budget 2026.
 - **`recherche`** (affirmations) — 4 à 10 mots-clés (« entrées immigrés France 2024 Insee ») passés à la recherche web à la place de la phrase entière, qui ramenait des résultats vagues ; même appel, aucun coût en plus.
 - **`citation`** — les mots exacts prononcés, recopiés de la transcription (le champ `texte` est une reformulation). `points.validate_citation` ne la garde que si elle y figure vraiment, mot pour mot à la normalisation près (casse, accents, ponctuation) ; sinon elle est vidée. Gardée, elle **date le propos** : `points.citation_time` retrouve le segment qui la contient et en prend le `said_at` (plus fin que le début du buffer). Elle est affichée « Mot pour mot » au récap et à l'export (pas sur la carte) et passée au fact-check (§8).
 
@@ -189,7 +191,11 @@ Sans les trois premières conditions, « a voté **contre** » et « a voté **p
 1. **Dédup serveur** (`dedup.is_duplicate_indexed`) — index inversé mot-clé → indices (`session_dupe_index[sid]`), seuil de recouvrement 0.45.
 2. **Dédup d'affichage extension** (`isDuplicateOfAny` + `isNearDupeOfShown`) — même règle, seuil 0.6 : `isDuplicateOfAny` compare à **tout** `S.points` (survit à un redémarrage backend), `isNearDupeOfShown` aux 6 dernières cartes affichées.
 
-Chaque point unique reçoit un `id = uuid4().hex[:8]` — **c'est cet id qui relie `talking_points` et `fact_check_result`**. Seuls les points `type == "affirmation"` déclenchent `fact_check_affirmation` en tâche de fond (les `vague` et `subjectif` jamais).
+Ces deux couches ne voient pas les paraphrases dont les nombres s'écrivent autrement (« un dixième des cours », « une heure sur dix », « 10 % des heures » : vérifié 5 fois dans le même débat), ni une reprise dont les mots changent (« 78 personnels blessés lors de violences ciblant leur statut » / « … depuis le début des événements »). D'où deux compléments :
+- le prompt d'extraction reçoit, en plus des 25 derniers points, **toutes les affirmations plus anciennes du débat** (60 au plus, `build_history_block`), avec la consigne de ne pas relever un fait déjà relevé, même repris par l'autre débatteur, et de ne garder que l'élément nouveau ;
+- **même chiffre, même sujet** (`dedup.repeats_figures_indexed`, `text_utils.same_figures`) : une nouvelle affirmation qui avance exactement les mêmes chiffres qu'une affirmation déjà relevée (années exclues ; proportions en lettres converties — « un sur deux » = 50, « un dixième » = 10), dans le même sens (hausse, baisse…) et avec au moins un mot-clé commun, est écartée. Un chiffre en plus (« 10 %, soit 20 millions d'heures ») en fait une affirmation nouvelle.
+
+Chaque point unique reçoit un `id = uuid4().hex[:8]` — **c'est cet id qui relie `talking_points` et `fact_check_result`**. Seuls les points `type == "affirmation"` déclenchent `fact_check_affirmation` en tâche de fond (les `vague`, `secondaire` et `subjectif` jamais).
 
 ---
 
@@ -219,7 +225,8 @@ bloc de preuves, dans cet ordre (factcheck.build_evidence_block) :
     / SOURCE PARTISANE / FIABILITÉ FAIBLE / FIABILITÉ INCONNUE
         │
         ▼
-prompt Mistral (+ propos exact si citation validée, §7) → JSON {verdict, confiance, explication, source, url}
+prompt Mistral (+ auteur, période visée, propos exact si citation validée — §7 —, verdicts déjà rendus
+dans le débat sur un sujet proche) → JSON {verdict, confiance, explication, inexact, contredit_par, source, url}
         │
         ▼
 sources.finalize_result :
@@ -230,9 +237,12 @@ sources.finalize_result :
     pour une preuve structurée, « Eurostat » / « Assemblée nationale »
   - pas d'URL de preuve → confiance plafonnée à 50 %, source « non sourcé »
   - preuve de FIABILITÉ FAIBLE → confiance plafonnée à 50 % (jamais mise en cache)
+  - « vrai » dont l'explication ne fait que rapporter la déclaration de l'auteur → non_recoupe
+  - « faux » dont le fait contraire porte sur une autre année que la période visée → non_verifiable
         │
         ▼
-cache.store (seulement si sourcé, confiance ≥ 60 et verdict ≠ non_verifiable)
+cache.store (seulement si sourcé, confiance ≥ 60, verdict ≠ non_verifiable / non_recoupe)
+session_verdicts[sid] ← verdict (cohérence des vérifications suivantes)
 ```
 
 **Recherches en parallèle** : en série, leurs timeouts s'additionnaient (jusqu'à ~26 s avant même l'appel Mistral) et dépassaient le délai d'attente de l'extension.
@@ -245,17 +255,20 @@ cache.store (seulement si sourcé, confiance ≥ 60 et verdict ≠ non_verifiabl
 
 **Votes de l'Assemblée nationale** (`votes.py`) — l'open data de l'Assemblée (tous les scrutins publics des législatures 16 et 17, ~12 500, et les députés) est téléchargé au démarrage dans `data/assemblee/` puis rafraîchi chaque semaine (`AN_REFRESH_S`) ; l'index est gardé en pickle (rechargement ~0,2 s). Une affirmation qui parle de vote (« a voté contre », « s'est abstenu »…) et nomme un député (nom complet, ou nom de famille s'il est unique) ou un groupe (`GROUP_ALIASES` : « le RN », « les Insoumis », « LR »…) est comparée aux titres des scrutins (racines des mots, synonymes, années et mois cités, bonus au vote sur l'ensemble d'un texte). La preuve donne la position du député ou le décompte du groupe, avec le lien du scrutin ; le prompt ne la retient que si le scrutin porte bien sur le texte dont parle l'affirmation (titre et date). Les groupes de la 16e législature, absents du fichier des députés actuels, sont déduits de leurs membres. `AN_VOTES=0` désactive le tout (tests).
 
-**Garde-fous du verdict** — cas vécus sur un débat Attal / Maréchal :
+**Garde-fous du verdict** — cas vécus sur les débats Attal / Maréchal et Bompard / Geffray :
 - « non vérifiable » est réservé au cas où aucune source fournie ne traite du sujet : dès qu'une source fiable donne un chiffre ou un fait sur le même sujet, le modèle doit trancher en comparant (une seule source fiable suffit) ;
 - « faux » exige un fait précis tiré d'une source fournie, recopié dans le champ `contredit_par` ; `finalize_result` ramène à « non vérifiable » un « faux » sans ce fait ou sans lien de preuve (FAUX 95 % expliqué par « rien ne prouve que… ») ; les seules connaissances du modèle ne suffisent jamais ;
 - l'affirmation est lue dans son sens le plus plausible (« Attal a interdit l'abaya », dit à propos de l'école) ; si le fait principal est vrai et qu'un détail est faux, c'est « partiellement vrai », pas « faux » ;
 - la réponse contient un champ `inexact` (élément contredit par les sources : chiffre, période, superlatif, attribution) ; `finalize_result` ramène un « vrai » à « partiellement vrai » quand il n'est pas vide (un « VRAI 95 % » dont l'explication citait une baisse en 2020 contre « une première depuis 15-20 ans ») ;
 - une mesure décidée par un ministre dans son domaine lui est attribuable ;
+- **même période, même chose** : une source ne contredit l'affirmation que si elle porte sur la même année et mesure la même chose (pas un autre périmètre, pas un cumul face à un chiffre annuel, pas des euros courants face à des euros constants) ; un cas précis ne se prouve ni ne se dément par un autre cas ; une norme (« le décret fixe 20 °C ») ne contredit pas un constat. Garde-fou dans `finalize_result` : si la période visée (`periode`, §7) et le fait contraire (`contredit_par`, avec son année) citent des années sans aucune en commun, le « faux » devient « non vérifiable », avec l'écart en explication (`sources.years_in`). Sur Bompard / Geffray, 11 des 16 « faux » ne tenaient pas : autre année, autre périmètre, chiffres de la source qui donnaient raison à l'orateur ;
+- **déclaration ≠ preuve** : un article qui rapporte que l'auteur de l'affirmation l'a dite (« le ministre a annoncé 78 blessés ») ne prouve pas qu'elle est vraie, et son ministère, son parti ou son camp ne comptent pas comme source indépendante → verdict **`non_recoupe`** (« Non recoupé »). Le prompt reçoit l'auteur (s'il est nommé) ; garde-fou `sources.self_sourced` : un « vrai » ou « partiellement vrai » dont l'explication est « *Nom* a (bien, effectivement) annoncé / déclaré / dénoncé… » ou « selon … *Nom* » devient `non_recoupe`, sauf si l'affirmation porte elle-même sur une déclaration (« Darmanin a déclaré sur RTL… », « selon Laurent Nuñez… »). Dans l'autre sens, un `non_recoupe` sans article lié, ou dont l'explication ne dit pas de qui vient la déclaration (l'auteur, son ministère, son parti — `sources.names_the_author`), devient `non_verifiable` : le modèle s'en servait comme d'un « non vérifiable » (« aucune source indépendante ne confirme le lien causal… ») ;
+- **cohérence dans le débat** : le prompt reçoit les verdicts déjà rendus dans la session sur un sujet proche (`session_verdicts`, `sources.related_verdicts` : 2 mots-clés communs hors noms propres, 4 au plus) et doit rester cohérent avec eux, sauf si une source montre qu'ils se trompaient — « +1,2 milliard » servait de référence à 28:51 et était jugé faux à 29:11 ;
 - les résultats académiques ne passent au prompt que s'ils portent sur l'affirmation (`sources.academic_relevant` : 2 mots-clés communs et 30 %, dont au moins un qui ne soit pas un nom propre), et OpenAlex ne renvoie que des articles avec résumé (une fiche de catalogue de bibliothèque était citée comme preuve qu'« Attal a été Premier ministre »).
 
 **Recherche web éteinte** — sans SearxNG (Docker éteint), presque aucun verdict n'a de source. `/health` renvoie `web_search` : la popup prévient avant le lancement, et `start_transcription` envoie un `server_warning` sur la puce (`factcheck.search_available`).
 
-**Propos exact** — quand la citation a été validée (§7), le prompt reçoit les mots prononcés à côté de la reformulation : Mistral juge ce qui a été dit, pas le résumé. Si l'affirmation contient manifestement une erreur de transcription (nom déformé, mot incompréhensible), il répond `non_verifiable` avec une explication qui commence par « Transcription douteuse : » au lieu de conclure « faux ».
+**Propos exact** — quand la citation a été validée (§7), le prompt reçoit les mots prononcés à côté de la reformulation : Mistral juge ce qui a été dit, pas le résumé. Si l'affirmation contient manifestement une erreur de transcription (nom déformé, mot incompréhensible, chiffre invraisemblable pour le sujet), il répond `non_verifiable` avec une explication qui commence par « Transcription douteuse : » au lieu de conclure « faux ».
 
 **Signalements** — le bouton ⚑ d'une carte ou du récap envoie `POST /report_verdict` (via le service worker : seule l'origine de l'extension est acceptée) avec un motif parmi `verdict_faux`, `mauvaise_source`, `pas_un_fait`, `transcription`, `locuteur`. Le signalement est ajouté à `data/reports.jsonl` et, sauf pour un mauvais locuteur, le verdict **sort du cache** (`cache.mark_reported`) : il n'est plus jamais resservi, et `purge_cache.py` le supprime.
 
@@ -271,7 +284,7 @@ Pour ajouter ou reclasser un site : modifier `config.py` **et** la page `site/so
 
 **Replays** : l'année de la vidéo (`sources.video_year`, depuis la date de publication) est ajoutée à la requête web, et le cache range chaque verdict sous cette année : un replay de 2024 et un direct de 2026 ne partagent pas leurs verdicts.
 
-Le cache (`factcheck_cache.db`, SQLite, colonnes `video_year` et `reported_at` ajoutées par migration) est à **deux niveaux** : la table persiste entre redémarrages, `_cache_mem` en est une copie en RAM pour le matching flou (`claims_match`, `CACHE_SIM_THRESHOLD=0.75`, `CACHE_TTL_DAYS=30` vérifié à chaque lookup). Ne sont jamais mis en cache les verdicts non sourcés ni ceux d'une affirmation datée par rapport au jour même (« ce soir », « actuellement », « il y a un an » — `text_utils.has_relative_time`). `purge_cache.py` applique ces mêmes règles aux verdicts déjà en base, plus une liste d'identifiants choisis à la main (sauvegarde automatique avant suppression).
+Le cache (`factcheck_cache.db`, SQLite, colonnes `video_year`, `reported_at` et `rules` ajoutées par migration) est à **deux niveaux** : la table persiste entre redémarrages, `_cache_mem` en est une copie en RAM pour le matching flou (`claims_match`, `CACHE_SIM_THRESHOLD=0.75`, `CACHE_TTL_DAYS=30` vérifié à chaque lookup). Un verdict rendu sous des règles de vérification plus anciennes (`rules` ≠ `FACTCHECK_RULES_VERSION`) n'est plus rechargé : les « faux » appuyés sur une autre année auraient été resservis tels quels après la correction du prompt. Ne sont jamais mis en cache les verdicts non sourcés, les « non recoupé » (une source indépendante peut paraître le lendemain) ni ceux d'une affirmation datée par rapport au jour même (« ce soir », « actuellement », « il y a un an » — `text_utils.has_relative_time`). `purge_cache.py` applique ces mêmes règles aux verdicts déjà en base, plus une liste d'identifiants choisis à la main (sauvegarde automatique avant suppression).
 
 **Retry sur 429** (`call_mistral_api`) — jusqu'à `MISTRAL_MAX_RETRIES=3` tentatives, délai = `Retry-After` si fourni, sinon `2s, 4s, 8s`, avec `mistral_rate_limited` au client à chaque tentative. **Les autres erreurs Mistral** (clé invalide 401, crédit épuisé 402, 5xx, timeout, réseau) partent en `server_warning` (`notify.describe_error`), et un fact-check en échec est émis avec `indisponible: true` — jamais confondu avec un vrai « non vérifiable ».
 
@@ -368,7 +381,8 @@ showCard (spinner)
 | `MISTRAL_MAX_RETRIES` / `MISTRAL_RETRY_BASE_S` | 3 / 2.0s (×2^n) | server/config.py |
 | `HOLD_FACT_MS` / `HOLD_FACT_BUSY_MS` / `FC_WAIT_MS` / `MAX_CARD_AGE_MS` | 13000 / 8000 / 30000 / 150000 | content.js |
 | `MAX_QUEUE` / `DUPE_MEMORY` / `PROBE_FRESH_MS` | 8 / 6 / 6000 | content.js |
-| `CHECKWORTHY_MIN` | 6 (sur 10) | server/config.py |
+| `CHECKWORTHY_MIN` / `ENJEU_MIN` | 6 / 7 (sur 10) | server/config.py |
+| `FACTCHECK_RULES_VERSION` | 3 | server/config.py |
 | `MAX_HOTWORDS_CHARS` / `MAX_LEARNED` | 450 / 20 | server/vocabulary.py |
 | `FACTCHECK_FEEDS_REFRESH_S` / `AN_REFRESH_S` | 1h / 7j | server/config.py |
 | cache Eurostat / `MAX_PER_CLAIM` | 24h / 3 | server/indicators.py |
@@ -381,14 +395,14 @@ Aucun GPU, aucune clé ni aucun réseau nécessaires — chaque fichier se lance
 
 | Fichier | Couvre |
 |---|---|
-| `tests/test_claim_matching.py` | comparaison d'affirmations, dédup, cache (cas réels : négation, nombres, pour/contre) |
-| `tests/test_sources.py` | domaines, niveaux partisan / fiabilité faible, verdict normalisé, nom de source, plafonds de confiance ; politique publiée sur le site = code |
+| `tests/test_claim_matching.py` | comparaison d'affirmations, dédup (dont « même chiffre, même sujet »), cache et version des règles (cas réels : négation, nombres, pour/contre) |
+| `tests/test_sources.py` | domaines, niveaux partisan / fiabilité faible, verdict normalisé, nom de source, plafonds de confiance, « non recoupé » quand la seule preuve est la parole de l'auteur, « faux » ramené à « non vérifiable » sur une autre année, verdicts proches ; politique publiée sur le site = code |
 | `tests/test_network.py` | repli IPv4 : modes forcés sans test réseau, repli seulement si l'IPv6 est cassé |
 | `tests/test_replay.py` | overlay du site synchronisé avec l'extension, versions à jour dans chaque page du site, nettoyage et recalage des sessions publiées, sessions de `site/sessions/` valides |
 | `tests/test_transcript.py` | chevauchement entre chunks, transcript annoté |
 | `tests/test_voices.py` | comparaison de noms, stockage de la banque de voix |
 | `tests/test_vocabulary.py` | mots attendus par Whisper : priorités, noms propres, limite de taille, écho des hotwords |
-| `tests/test_points.py` | note de vérifiabilité, validation et datation de la citation exacte, orateur nommé dans sa propre citation |
+| `tests/test_points.py` | notes de vérifiabilité et d'importance, validation et datation de la citation exacte, orateur nommé dans sa propre citation |
 | `tests/test_known_factchecks.py` | lecture des flux RSS, correspondance affirmation ↔ fact-check publié |
 | `tests/test_official_data.py` | décodage JSON-stat Eurostat, déclencheurs d'indicateurs, jamais d'appel Eurostat pendant un fact-check (cache disque), parsing des scrutins et recherche de votes |
 | `tests/test_backend_smoke.py` | backend complet avec Whisper/ECAPA/Mistral/recherche/RSS/Eurostat simulés : chunk → points (vague, citation) → verdict (fact-check publié et série Eurostat en preuves) → arrêt propre ; signalement ; origines CORS |

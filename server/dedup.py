@@ -7,7 +7,7 @@ nombre, la négation ou un mot de sens diffère : sans ça, la réplique de
 l'adversaire (« a voté pour » face à « a voté contre ») était jetée comme
 doublon."""
 
-from server.text_utils import claim_signature, claims_match
+from server.text_utils import claim_signature, claims_match, same_figures
 
 
 def dupe_index_add(index: dict, words: set, idx: int) -> None:
@@ -23,4 +23,16 @@ def is_duplicate_indexed(new_text: str, points: list, index: dict, threshold: fl
     for w in new_sig.words:
         candidates.update(index.get(w, ()))
     return any(claims_match(new_sig, claim_signature(points[idx]['texte']), threshold)
+               for idx in candidates)
+
+
+def repeats_figures_indexed(new_text: str, points: list, index: dict) -> bool:
+    """Affirmation qui reprend exactement les chiffres d'une affirmation déjà
+    relevée, sur le même sujet (text_utils.same_figures) : la même chose dite
+    deux fois, ou reprise par l'autre débatteur — vérifiée une seule fois."""
+    candidates = set()
+    for w in claim_signature(new_text).words:
+        candidates.update(index.get(w, ()))
+    return any(points[idx].get('type') in ('affirmation', 'secondaire')
+               and same_figures(new_text, points[idx]['texte'])
                for idx in candidates)

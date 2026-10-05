@@ -315,7 +315,7 @@
 
   function renderLegend() {
     if (typeof VERDICT_CFG === 'undefined') return;
-    const labels = { vrai: 'vrai', partiellement_vrai: 'partiellement vrai', trompeur: 'trompeur', faux: 'faux', non_verifiable: 'non vérifiable' };
+    const labels = { vrai: 'vrai', partiellement_vrai: 'partiellement vrai', trompeur: 'trompeur', faux: 'faux', non_recoupe: 'non recoupé', non_verifiable: 'non vérifiable' };
     $('legend').innerHTML = Object.entries(VERDICT_CFG)
       .map(([k, c]) => `<span><i style="background:${c.accent}"></i>${labels[k] || k}</span>`)
       .join('');

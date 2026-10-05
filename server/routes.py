@@ -21,7 +21,7 @@ from server.config import (
     MIN_WORDS_ON_PAUSE, MIN_WORDS_ON_STOP, FINISH_TIMEOUT_S, CHUNK_OVERLAP_S, CHUNK_S, REPORTS_FILE,
 )
 from server import cache, indicators, known_factchecks, votes
-from server.dedup import dupe_index_add, is_duplicate_indexed
+from server.dedup import dupe_index_add, is_duplicate_indexed, repeats_figures_indexed
 from server.factcheck import (
     SEARCH_DOWN_MESSAGE, call_mistral, call_mistral_api, fact_check_affirmation, search_available,
     VIDEO_ANALYSIS_PROMPT,
@@ -29,7 +29,7 @@ from server.factcheck import (
 from server.notify import describe_error, warn_client
 from server.points import apply_checkworthiness, citation_time, speaker_named_in_citation, validate_citation
 from server.state import (
-    session_history, session_starts, session_buffers, session_contexts, session_points,
+    session_history, session_starts, session_buffers, session_contexts, session_points, session_verdicts,
     session_dupe_index, session_flush_locks, session_chunk_locks, session_speakers,
     session_excerpts, session_speaker_map, session_map_votes, session_map_state,
     session_voice_locked, session_bank_miss, session_pending, session_warned,
@@ -128,6 +128,7 @@ def on_connect(auth=None):
     session_buffers[sid] = {"entries": [], "last_flush": time.time(), "start_abs": None}
     session_contexts[sid] = {}
     session_points[sid] = []
+    session_verdicts[sid] = []
     session_dupe_index[sid] = {}
     session_flush_locks[sid] = eventlet.semaphore.Semaphore(1)
     session_chunk_locks[sid] = eventlet.semaphore.Semaphore(1)
@@ -157,6 +158,7 @@ def on_disconnect():
     session_buffers.pop(sid, None)
     session_contexts.pop(sid, None)
     session_points.pop(sid, None)
+    session_verdicts.pop(sid, None)
     session_dupe_index.pop(sid, None)
     session_flush_locks.pop(sid, None)
     session_chunk_locks.pop(sid, None)
@@ -423,7 +425,8 @@ def flush_to_mistral(sid: str, text: str, ts: float = None, entries: list = ()):
         combined = list(all_points)
         unique: list = []
         for p in raw_points:
-            if is_duplicate_indexed(p['texte'], combined, index):
+            if is_duplicate_indexed(p['texte'], combined, index) or (
+                    p['type'] == 'affirmation' and repeats_figures_indexed(p['texte'], combined, index)):
                 print(f"[Dedup] ignoré: {p['texte'][:70]}")
             else:
                 # ts = horodatage (unix) approximatif du moment où le propos a été
@@ -449,7 +452,7 @@ def flush_to_mistral(sid: str, text: str, ts: float = None, entries: list = ()):
         for p in unique:
             if p["type"] == "affirmation":
                 _spawn_tracked(sid, fact_check_affirmation, sid, p["id"], p["texte"], p.get("citation", ""),
-                               str(p.get("recherche") or ""))
+                               str(p.get("recherche") or ""), p.get("qui", ""), str(p.get("periode") or "")[:40])
     except Exception as e:
         print(f"[Mistral error] {type(e).__name__}: {e}")
         warn_client(sid, describe_error(e))

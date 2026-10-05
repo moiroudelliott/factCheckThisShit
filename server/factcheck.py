@@ -20,9 +20,9 @@ from server.text_utils import _STOPWORDS
 from server import cache, indicators, known_factchecks, votes
 from server.notify import describe_error, warn_client
 from server.sources import (
-    academic_relevant, finalize_result, is_excluded, parse_brave_results, source_tier, video_year,
+    academic_relevant, finalize_result, is_excluded, parse_brave_results, related_verdicts, source_tier, video_year,
 )
-from server.state import session_contexts
+from server.state import session_contexts, session_verdicts
 
 # ── Prompts ────────────────────────────────────────────────────────────────
 
@@ -36,7 +36,7 @@ MISSION: un passage de débat contient presque toujours 1 à 3 talking points. E
 Ne retourne [] QUE si le passage est réellement vide de contenu politique (politesses, gestion de parole, phrases incompréhensibles). Un tableau vide doit rester RARE.
 
 Réponds UNIQUEMENT avec un tableau JSON valide, sans markdown:
-[{{"type": "TYPE", "texte": "le point condensé en une phrase claire", "qui": "qui l'a dit, ou chaîne vide", "verifiable": 8, "citation": "les mots exacts du passage", "recherche": "mots-clés de recherche (affirmations)"}}]
+[{{"type": "TYPE", "texte": "le point condensé en une phrase claire", "qui": "qui l'a dit, ou chaîne vide", "verifiable": 8, "enjeu": 7, "periode": "année ou période visée (affirmations), ou chaîne vide", "citation": "les mots exacts du passage", "recherche": "mots-clés de recherche (affirmations)"}}]
 
 Types:
 - "affirmation" = fait PRÉCIS et VÉRIFIABLE: chiffre, date, événement, vote, citation, fait historique ou économique.
@@ -48,12 +48,16 @@ Types:
   évidences sans contenu ("L'accord de Paris a été signé à une époque antérieure"),
   appartenance, mérite ou intention ("France Inter appartient à tous les Français",
   "J'ai empêché le RN d'avoir la majorité"), rappel banal de l'orateur sur lui-même
-  ("L'année où j'étais Premier ministre").
+  ("L'année où j'étais Premier ministre"), jugement ou ressenti général ("La réforme Blanquer a créé
+  beaucoup de souffrance", "Parcoursup génère de l'angoisse"), simple démenti de l'adversaire
+  ("C'est faux", "ce n'est pas vrai" → "désaccord" ; l'affirmation, c'est le chiffre qu'il avance ensuite).
 - "argument" = raisonnement cause-effet ou proposition concrète.
   Ex: "Les fermetures d'usines s'expliquent d'abord par le niveau des charges sociales"
 - "subjectif" = opinion, jugement de valeur, promesse vague — non vérifiable.
   Ex: "Le modèle économique actuel abandonne les classes populaires"
-- "remarque" = accusation ou commentaire politique visant l'adversaire.
+- "remarque" = accusation ou commentaire politique visant l'adversaire, SANS fait vérifiable. Une accusation qui
+  s'appuie sur un fait précis (un tweet, un vote, une phrase citée, un chiffre, un événement daté : « Louis Boyard a
+  publié des tweets appelant au blocage », « Mélenchon a parlé de discipline de combat ») est une "affirmation".
   Ex: "L'adversaire est accusé d'admirer des dirigeants hostiles aux intérêts de la France"
   Ex: "L'adversaire est accusé de fantasmer une France qui n'a jamais existé"
 - "question" = interpellation directe sur un sujet politique
@@ -61,6 +65,19 @@ Types:
 
 "verifiable" (0-10, pour chaque point) = peut-on le vérifier avec des sources ? 10 = chiffre, date, vote ou
 événement précis ; 5 = fait réel mais flou ; 0 = opinion ou généralité.
+"enjeu" (0-10, pour chaque point) = importance du point pour le public. Sois exigeant : dans un débat, une
+minorité de points seulement mérite une vérification, et la note doit les distinguer.
+  9-10 = chiffre clé ou fait au cœur du désaccord : bilan, budget, statistique nationale, vote, accusation
+         factuelle grave contre l'adversaire ou son camp ;
+  7-8  = fait national précis qui appuie un argument important ;
+  4-6  = fait local ou cas isolé, témoignage, exemple d'illustration, procédure générale (« une enquête est
+         ouverte si un policier dérape »), calendrier ou rendez-vous (« une mobilisation est prévue mardi ») ;
+  0-3  = agenda ou parcours de l'orateur (« j'étais dans un lycée lundi »), existence d'une institution
+         (« le Conseil national lycéen existe »), évidence, ressenti général présenté comme un fait.
+"periode" (affirmations) = l'année ou la période dont parle l'affirmation, déduite des mots prononcés et de la
+date du débat : « l'année prochaine » dit en octobre 2026 → "2027" ; « depuis 2017 » → "2017-2026". En automne,
+« le budget » sans autre précision désigne le projet de budget de l'année suivante. Chaîne vide si rien ne la
+précise. Mets aussi cette année dans "recherche".
 "citation" (pour chaque point) = les mots EXACTS de la transcription où le point est dit (8 à 30 mots),
 recopiés sans rien changer ni corriger — pas de reformulation, pas de nom de locuteur.
 "recherche" (affirmations seulement) = 4 à 10 mots-clés pour trouver dans la presse ou les statistiques
@@ -70,21 +87,22 @@ Ex: "entrées immigrés France 2024 baisse Insee", "Attal déclaration politique
 RÈGLES:
 1. {attribution_rule}
 2. Ignore la pure gestion de plateau ("laissez-le parler", interruptions) — MAIS les attaques et accusations politiques entre débatteurs sont des points valides (type "remarque").
-3. Ne répète pas un point déjà dans l'historique, même reformulé. Les points NOUVEAUX doivent toujours être extraits.
+3. Ne répète pas un point déjà dans l'historique, même reformulé ou repris par l'autre débatteur : « un dixième des cours », « une heure sur dix » et « 10 % des heures » sont le même fait. S'il ajoute un élément NOUVEAU (un autre chiffre, une précision), relève seulement cet élément. Les points NOUVEAUX doivent toujours être extraits.
 4. PRIORITÉ ABSOLUE aux faits vérifiables: si le passage contient un chiffre, une date ou un fait précis, il DOIT devenir un point de type "affirmation".
 5. La transcription est automatique et contient parfois des erreurs phonétiques sur les noms propres et les sigles (ex: "Mereaux" pour "maires ruraux", "Baïa" pour "abaya") : quand la forme correcte est évidente d'après le contexte, écris-la correctement dans le point ; sinon garde le mot tel quel.
-6. N'ajoute JAMAIS au point un élément qui n'a pas été prononcé : ni date, ni chiffre, ni lieu, ni nom.
-7. Une affirmation doit se comprendre seule : si elle renvoie à un contexte absent (« le candidat en question », « cette loi »), complète-le d'après le passage ou l'historique ; sinon note "verifiable" ≤ 3.
+6. N'ajoute JAMAIS au "texte" du point un élément qui n'a pas été prononcé : ni date, ni chiffre, ni lieu, ni nom (l'année déduite d'une date relative va dans "periode" et "recherche", pas dans "texte").
+7. Une affirmation doit se comprendre seule : si elle renvoie à un contexte absent (« le candidat en question », « cette loi »), complète-le d'après le passage ou l'historique ; sinon note "verifiable" ≤ 3. Ne devine JAMAIS ce que mesure un chiffre : si le passage ne dit pas clairement de quoi il s'agit (« on était à 27 » : élèves par classe ? taux ?), reprends les mots prononcés et note "verifiable" ≤ 3. Garde le périmètre prononcé (« au lycée », « dans le second degré », « dans le public ») : « 30 élèves par classe au lycée » n'est pas « 30 élèves par classe en France ».
 8. Un nom prononcé pour interpeller (« Monsieur Attal, vous… ») désigne la personne À QUI l'on parle, jamais celle qui parle (voir règle 1).
-9. Ignore les relances et résumés du présentateur, qui parle des débatteurs à la 3e personne : ce ne sont pas des points.
+9. Ignore tout ce que dit le présentateur ou le journaliste (questions, relances, résumés, rappels de l'actualité — il pose les questions, présente les invités, distribue la parole, même s'il reste « Intervenant X ») et les témoignages diffusés en reportage (élèves, passants) : on ne relève que les propos des débatteurs et invités politiques.
 10. Dans une "remarque", garde le sens de l'accusation : c'est "qui" qui accuse, jamais l'inverse."""
 
 
 FACTCHECK_PROMPT_TEMPLATE = """Tu es un fact-checker expert sur les données françaises et européennes. Nous sommes le {today}.
 {context_block}
 Affirmation à vérifier: "{claim}"
-{citation_block}
+{speaker_block}{periode_block}{citation_block}
 {evidence_block}
+{session_block}
 
 Évalue la véracité en te basant PRIORITAIREMENT sur les résultats de recherche ci-dessus (leur fiabilité est annotée), complétés par tes connaissances.
 Réponds UNIQUEMENT avec un objet JSON valide, sans markdown:
@@ -95,12 +113,18 @@ Verdicts disponibles:
 - "partiellement_vrai": vrai mais incomplet ou imprécis
 - "trompeur": techniquement vrai mais donne une fausse impression
 - "faux": factuellement incorrect
+- "non_recoupe": les sources ne font que rapporter la déclaration de l'auteur de l'affirmation (ou de son ministère, son parti, son camp) — aucune source indépendante ne la confirme ni ne la contredit. Uniquement dans ce cas : sans article qui rapporte sa déclaration, c'est "non_verifiable"
 - "non_verifiable": ni les résultats de recherche ni tes connaissances ne permettent de trancher
 
 RÈGLES DE RIGUEUR:
-- "non_verifiable" est RÉSERVÉ au cas où AUCUNE source fournie ne traite du sujet de l'affirmation. Dès qu'une source fiable donne un chiffre ou un fait sur le MÊME sujet, tu DOIS trancher en comparant : "vrai" s'il concorde ; "partiellement_vrai" si l'écart est faible ou ne porte que sur un détail ; "trompeur" si c'est exact mais présenté de façon à fausser l'impression ; "faux" si la source dit autre chose (autre chiffre, autre date, fait différent). Cite le chiffre ou le fait de la source dans "explication".
+- "non_verifiable" est RÉSERVÉ au cas où AUCUNE source fournie ne traite du sujet de l'affirmation. Dès qu'une source fiable donne un chiffre ou un fait sur le MÊME sujet, pour la MÊME période, tu DOIS trancher en comparant : "vrai" s'il concorde ; "partiellement_vrai" si l'écart est faible ou ne porte que sur un détail ; "trompeur" si c'est exact mais présenté de façon à fausser l'impression ; "faux" si la source dit autre chose (autre chiffre, autre date, fait différent). Cite le chiffre ou le fait de la source dans "explication".
 - UNE source fiable qui traite précisément du sujet suffit pour trancher : SOURCE OFFICIELLE, FACT-CHECK PUBLIÉ, DONNÉE OFFICIELLE ou PRESSE ÉTABLIE. Plusieurs sources concordantes augmentent la confiance.
-- "faux" exige un fait précis tiré d'une source FOURNIE, que tu recopies dans "contredit_par" (ex : « Insee : 375 000 entrées d'immigrés en 2022 »). « Rien ne prouve que… » ou « aucune source ne confirme » n'est PAS une contradiction : c'est "non_verifiable". Tes seules connaissances ne suffisent jamais pour "faux".
+- "faux" exige un fait précis tiré d'une source FOURNIE, que tu recopies dans "contredit_par" avec son année (ex : « Insee : 375 000 entrées d'immigrés en 2022 »). « Rien ne prouve que… » ou « aucune source ne confirme » n'est PAS une contradiction : c'est "non_verifiable". Tes seules connaissances ne suffisent jamais pour "faux".
+- MÊME PÉRIODE, MÊME CHOSE : une source ne contredit l'affirmation que si elle porte sur la même année (ou le même budget, la même rentrée) et mesure la même chose. Un chiffre d'une autre année, un autre périmètre (premier degré / second degré, public / privé), un cumul comparé à un chiffre annuel, des euros courants comparés à des euros constants ne sont PAS une contradiction : cherche dans les autres sources celle de la bonne période ; à défaut, "non_verifiable" en expliquant l'écart. Si les chiffres de la source, additionnés sur la période dont parle l'orateur, atteignent son chiffre, ce n'est pas "faux". Exemple : « 10 % des enfants sont victimes de violences sexuelles » (au cours de l'enfance) n'est PAS contredit par « 160 000 enfants victimes chaque année ».
+- Si la reformulation et le propos exact ne parlent pas de la même chose (reformulation « taux de réussite de 27 % » pour le propos « on était à 27 »), juge le propos exact ; si l'on ne sait pas ce que mesure son chiffre, "non_verifiable" en commençant par "Transcription douteuse :".
+- Un cas précis (« dans ce lycée, il n'y avait pas de proviseur adjoint », « le ministre était à Créteil lundi ») ne se prouve ni ne se dément par un autre cas : une source sur un autre établissement, une autre ville ou une autre date ne compte pas.
+- Une norme, une loi ou un objectif (ce qui DEVRAIT être : « le décret fixe 20 °C ») ne contredit pas un constat (ce qui EST : « les radiateurs sont bloqués »).
+- DÉCLARATION ≠ PREUVE : un article qui rapporte que l'auteur de l'affirmation l'a dite (« le ministre a annoncé 78 blessés », « X a dénoncé l'infiltration du mouvement ») prouve qu'il l'a dite, pas qu'elle est vraie — son ministère, son parti ou son camp ne comptent pas non plus comme source indépendante. Si c'est tout ce que disent les sources, réponds "non_recoupe" et nomme la source réelle du chiffre dans "explication" (« chiffre du ministère, non recoupé »). Sont des confirmations indépendantes : une enquête ou une vérification de presse, une donnée d'un service statistique (Insee, DEPP, Dares…), un bilan d'une autre autorité (préfecture, parquet, région). Exception : si l'affirmation porte sur ce que quelqu'un a dit (« Darmanin a déclaré sur RTL… ») ou cite elle-même sa source (« selon Laurent Nuñez »), l'article qui rapporte cette déclaration suffit.
 - Lis l'affirmation dans son sens le plus plausible dans le débat : « Attal a interdit l'abaya », dit à propos de l'école, veut dire à l'école — ne la juge pas fausse pour une portée qu'elle ne revendique pas.
 - Vérifie CHAQUE élément : chiffre, date, période, superlatif (« record », « première fois depuis 20 ans », « jamais »), et à qui l'action est attribuée. Recopie dans "inexact" tout élément que tes sources contredisent. Si le fait PRINCIPAL est vrai et que seul un détail est faux (superlatif, arrondi, date approchée) : "partiellement_vrai" — ex : « les entrées ont baissé en 2024, une première depuis 15 ans » alors que la baisse est réelle mais qu'il y en a eu une en 2020 → "partiellement_vrai". "faux" seulement si le fait principal est contredit. Si "inexact" n'est pas vide, le verdict ne peut pas être "vrai".
 - Une mesure décidée ou annoncée par un ministre dans son domaine lui est attribuable (« X a interdit… » est vrai si X, ministre compétent, l'a décidée), même si le gouvernement est dirigé par un autre.
@@ -117,7 +141,7 @@ RÈGLES DE RIGUEUR:
 - Une source de FIABILITÉ FAIBLE (site militant, conspirationniste ou agrégateur) ne suffit jamais seule et ne compte pas comme source indépendante : ne la choisis comme "url" que faute de mieux, avec confiance ≤ 50.
 - "url" doit être COPIÉE depuis un des résultats de recherche fournis — jamais inventée. Si aucun résultat n'appuie ton verdict, url vide ET confiance ≤ 50.
 - "source" = le nom du site de l'URL choisie (ex: "Le Monde" pour lemonde.fr), jamais une autorité que ce site se contente de citer.
-- L'affirmation vient d'une transcription automatique : si elle contient manifestement une erreur de transcription (nom déformé, mot incompréhensible), ne la juge pas "faux" pour autant — réponds "non_verifiable" en commençant l'explication par "Transcription douteuse :". Ne l'utilise pas pour une affirmation simplement incomplète ou sortie de son contexte.
+- L'affirmation vient d'une transcription automatique : si elle contient manifestement une erreur de transcription (nom déformé, mot incompréhensible, chiffre invraisemblable pour le sujet comme une « dépense publique de 54 milliards »), ne la juge pas "faux" pour autant — réponds "non_verifiable" en commençant l'explication par "Transcription douteuse :". Ne l'utilise pas pour une affirmation simplement incomplète ou sortie de son contexte.
 - Ne devine pas, mais ne te dérobe pas : sans AUCUNE source sur le sujet, "non_verifiable" ; avec une source sur le sujet, tranche."""
 
 
@@ -172,11 +196,20 @@ def build_context_block(context: dict) -> str:
     return "Contexte de l'émission:\n" + "\n".join(f"- {p}" for p in parts) + "\n\n"
 
 
-def build_history_block(recent_points: list) -> str:
-    if not recent_points:
+def build_history_block(points: list) -> str:
+    """Les 25 derniers points, plus toutes les affirmations plus anciennes du
+    débat : avec les 25 derniers seulement, « une heure de cours sur dix »
+    relevée à 9 min revenait à 32, 33 et 34 min, vérifiée chaque fois."""
+    if not points:
         return ""
-    lines = ["\nTalking points déjà identifiés — NE PAS RÉPÉTER, même sous une formulation légèrement différente:"]
-    for p in recent_points[-25:]:
+    lines = []
+    older = [p for p in points[:-25] if p.get("type") in ("affirmation", "secondaire")][-60:]
+    if older:
+        lines.append("\nAffirmations relevées plus tôt dans le débat — déjà traitées, NE PAS les relever à nouveau, "
+                     "même reformulées ou reprises par l'autre débatteur:")
+        lines += [f"- {p['texte']}" for p in older]
+    lines.append("\nTalking points déjà identifiés — NE PAS RÉPÉTER, même sous une formulation légèrement différente:")
+    for p in points[-25:]:
         lines.append(f"- [{p['type']}] {p['texte']}")
     return "\n".join(lines)
 
@@ -480,8 +513,21 @@ def build_evidence_block(results: list, academic: list = None, official: list = 
     return "\n".join(lines)
 
 
+def build_session_block(previous: list) -> str:
+    """Verdicts déjà rendus dans ce débat sur un sujet proche. Sans eux, chaque
+    vérification repartait de zéro : « +1,2 milliard » servait de référence
+    à 28:51 et était jugé faux à 29:11, avec un budget d'une autre année."""
+    if not previous:
+        return ""
+    lines = ["Verdicts déjà rendus dans ce débat sur un sujet proche — reste cohérent avec eux (mêmes chiffres de "
+             "référence, même année), sauf si une source fournie montre qu'ils se trompaient :"]
+    for v in previous:
+        lines.append(f"- « {v['claim']} » → {v['verdict']} : {v['explication']} ({v['source']})")
+    return "\n".join(lines) + "\n"
+
+
 def call_mistral_factcheck(claim: str, context: dict = None, sid: str = None, citation: str = "",
-                           query: str = "") -> dict:
+                           query: str = "", qui: str = "", periode: str = "", previous: list = ()) -> dict:
     context = context or {}
     # Replay d'un débat passé : sans l'année, la recherche remonte les
     # chiffres d'aujourd'hui pour juger des propos d'alors
@@ -503,15 +549,21 @@ def call_mistral_factcheck(claim: str, context: dict = None, sid: str = None, ci
     print(f"[Search] {len(known)} fact-check(s) publié(s) + {len(series)} série(s) Eurostat + {len(ballots)} "
           f"scrutin(s) + {len(results)} web + {len(academic)} académique(s) + {len(official)} data.gouv.fr "
           f"pour «{claim[:50]}»")
+    # Auteur : sans lui, « le ministre a annoncé 78 blessés » servait de
+    # preuve à l'affirmation… du ministre
+    named = qui if qui and not re.match(r"^Intervenant ([A-Z]|\d+)$", qui) else ""
     prompt = FACTCHECK_PROMPT_TEMPLATE.format(
         today=time.strftime("%d/%m/%Y"),
         context_block=build_context_block(context),
         claim=claim,
+        speaker_block=f"Auteur de l'affirmation : {named}\n" if named else "",
+        periode_block=f"Période visée : {periode}\n" if periode else "",
         # Propos d'origine : l'affirmation ci-dessus est une reformulation, qui
         # peut durcir ou déformer ce qui a réellement été dit
         citation_block=(f"Propos exact (transcription automatique) : « {citation} » — juge ce qui a été "
                         "réellement dit si la reformulation ci-dessus s'en écarte.\n") if citation else "",
         evidence_block=build_evidence_block(results, academic, official, known, series, ballots),
+        session_block=build_session_block(list(previous)),
     )
     content = call_mistral_api(prompt, sid=sid)
     print(f"[FactCheck résultat] {content[:150]}")
@@ -520,26 +572,33 @@ def call_mistral_factcheck(claim: str, context: dict = None, sid: str = None, ci
         if start != -1:
             data, _ = json.JSONDecoder().raw_decode(content, start)
             if isinstance(data, dict) and "verdict" in data:
-                return finalize_result(data, results, academic, official, known, series + ballots)
+                return finalize_result(data, results, academic, official, known, series + ballots,
+                                       claim=claim, qui=named, periode=periode)
     except (json.JSONDecodeError, ValueError):
         pass
     return {"verdict": "non_verifiable", "confiance": None, "explication": "Réponse du modèle illisible.",
             "source": "", "url": "", "indisponible": True}
 
 
-def fact_check_affirmation(sid: str, claim_id: str, claim_text: str, citation: str = "", query: str = ""):
+def fact_check_affirmation(sid: str, claim_id: str, claim_text: str, citation: str = "", query: str = "",
+                           qui: str = "", periode: str = ""):
     print(f"[FactCheck] «{claim_text[:60]}»")
     context = session_contexts.get(sid, {})
     year = video_year(context)
+    done = session_verdicts.setdefault(sid, [])
     # Claim déjà vérifié (cette session ou une précédente) → verdict instantané
     cached = cache.lookup(claim_text, year)
     if cached:
         print(f"[FactCheck] cache hit → {cached['verdict']} ({cached.get('confiance')}%)")
+        done.append({"claim": claim_text, **cached})
         socketio.emit("fact_check_result", {"id": claim_id, **cached}, to=sid)
         return
     try:
-        result = call_mistral_factcheck(claim_text, context=context, sid=sid, citation=citation, query=query)
+        result = call_mistral_factcheck(claim_text, context=context, sid=sid, citation=citation, query=query,
+                                        qui=qui, periode=periode, previous=related_verdicts(claim_text, done))
         cache.store(claim_text, result, year)
+        if not result.get("indisponible"):
+            done.append({"claim": claim_text, **result})
         socketio.emit("fact_check_result", {"id": claim_id, **result}, to=sid)
     except Exception as e:
         print(f"[FactCheck error] {type(e).__name__}: {e}")

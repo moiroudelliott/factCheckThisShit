@@ -74,6 +74,47 @@ def claim_signature(text: str) -> ClaimSig:
     return ClaimSig(frozenset(key_words(low)), numbers, bool(_NEGATION_RE.search(low)), polar)
 
 
+# Proportions dites en toutes lettres → pourcentage, pour reconnaître le même
+# chiffre sous une autre forme (« un dixième des cours », « une heure de
+# cours sur dix », « 10 % des heures » : vérifié 5 fois dans le même débat)
+_FRACTIONS = (
+    (re.compile(r"\bun dixième\b|\b(?:une?|1)(?:\s+[\w'’-]+){1,6}\s+sur\s+dix\b"), "10"),
+    (re.compile(r"\bla moitié\b|\b(?:une?|1)(?:\s+[\w'’-]+){1,6}\s+sur\s+deux\b"), "50"),
+    (re.compile(r"\bun quart\b|\b(?:une?|1)(?:\s+[\w'’-]+){1,6}\s+sur\s+quatre\b"), "25"),
+    (re.compile(r"\bun tiers\b|\b(?:une?|1)(?:\s+[\w'’-]+){1,6}\s+sur\s+trois\b"), "33"),
+)
+_YEAR_NUMBER_RE = re.compile(r"^(?:19|20)\d\d$")
+_APPROX_RE = re.compile(r"\bau (?:moins|plus)\b")
+
+
+def figures(text: str) -> frozenset:
+    """Chiffres d'une affirmation, années exclues, proportions en lettres
+    converties (« un sur deux » → 50)."""
+    low = str(text).lower()
+    compact = re.sub(r'(?<=\d)[\s.](?=\d{3}(?!\d))', '', low)
+    found = {_norm_number(n) for n in re.findall(r'\d+(?:[.,]\d+)?', compact)}
+    found = {n for n in found if not _YEAR_NUMBER_RE.match(n)}
+    for pattern, value in _FRACTIONS:
+        if pattern.search(low):
+            found.add(value)
+    found.discard("1")  # le « un » de « un sur deux », ou « 1 » isolé : rien de distinctif
+    return frozenset(found)
+
+
+def same_figures(a: str, b: str) -> bool:
+    """Même chiffre, même sujet : deux affirmations qui avancent exactement les
+    mêmes chiffres (hors années), dans le même sens (hausse, baisse…) et avec
+    au moins un mot-clé commun. Rattrape les reprises qu'un recouvrement de
+    mots ne voit pas (« 78 personnels blessés lors de violences ciblant leur
+    statut » / « 78 personnels blessés depuis le début des événements »)."""
+    fa, fb = figures(a), figures(b)
+    if not fa or fa != fb:
+        return False
+    # « au moins 24 » / « 24 » : une approximation, pas un sens différent
+    sa, sb = (claim_signature(_APPROX_RE.sub(" ", t.lower())) for t in (a, b))
+    return sa.polar == sb.polar and bool(sa.words & sb.words)
+
+
 def claims_match(a: ClaimSig, b: ClaimSig, threshold: float) -> bool:
     """Vrai si a et b disent la même chose (reformulation), faux dès qu'un
     nombre, la négation ou un mot de sens diffère."""

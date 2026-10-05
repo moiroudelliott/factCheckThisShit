@@ -10,13 +10,15 @@ Deux garde-fous contre un verdict resservi à tort :
   ayant changé entre-temps.
 Seuls les verdicts sourcés (URL issue de la recherche) sont mis en cache, et
 jamais ceux d'une affirmation datée par rapport au jour même (« ce soir »,
-« actuellement »). Nettoyage des verdicts déjà en base : purge_cache.py."""
+« actuellement »). Un verdict rendu sous des règles de vérification plus
+anciennes (FACTCHECK_RULES_VERSION) n'est plus resservi. Nettoyage des
+verdicts déjà en base : purge_cache.py."""
 
 import sqlite3
 import threading
 import time
 
-from server.config import CACHE_DB, CACHE_TTL_DAYS, CACHE_MIN_CONF, CACHE_SIM_THRESHOLD
+from server.config import CACHE_DB, CACHE_TTL_DAYS, CACHE_MIN_CONF, CACHE_SIM_THRESHOLD, FACTCHECK_RULES_VERSION
 from server.text_utils import claim_signature, claims_match, has_relative_time
 
 _cache_conn = sqlite3.connect(CACHE_DB, check_same_thread=False)
@@ -39,6 +41,10 @@ if "video_year" not in _columns:
 # plus jamais resservi, supprimé par purge_cache.py
 if "reported_at" not in _columns:
     _cache_conn.execute("ALTER TABLE factchecks ADD COLUMN reported_at REAL")
+# Migration : version des règles sous lesquelles le verdict a été rendu
+# (NULL pour les lignes antérieures — jamais resservies)
+if "rules" not in _columns:
+    _cache_conn.execute("ALTER TABLE factchecks ADD COLUMN rules INTEGER")
 _cache_conn.commit()
 _cache_lock = threading.Lock()
 _cache_mem: list = []  # [(signature, année, created_at, résultat)] — copie mémoire pour le matching flou
@@ -55,7 +61,7 @@ def load():
         _cache_conn.commit()
         rows = _cache_conn.execute(
             "SELECT claim, verdict, confiance, explication, source, url, created_at, video_year "
-            "FROM factchecks WHERE reported_at IS NULL").fetchall()
+            "FROM factchecks WHERE reported_at IS NULL AND rules = ?", (FACTCHECK_RULES_VERSION,)).fetchall()
     skipped = 0
     for claim, verdict, conf, expl, src, url, created_at, video_year in rows:
         # Verdicts non sourcés (antérieurs à la règle « pas d'URL, pas de
@@ -102,7 +108,8 @@ def lookup(claim: str, year: int):
 
 def store(claim: str, result: dict, year: int):
     conf = result.get("confiance")
-    if (result.get("verdict") in (None, "", "non_verifiable") or not result.get("url")
+    # « non recoupé » : une source indépendante peut paraître le lendemain
+    if (result.get("verdict") in (None, "", "non_verifiable", "non_recoupe") or not result.get("url")
             or not isinstance(conf, int) or conf < CACHE_MIN_CONF
             or has_relative_time(claim)):  # « ce soir », « actuellement »… : vrai un jour, pas le suivant
         return
@@ -112,9 +119,9 @@ def store(claim: str, result: dict, year: int):
     now = time.time()
     with _cache_lock:
         _cache_conn.execute(
-            "INSERT INTO factchecks (claim, verdict, confiance, explication, source, url, created_at, video_year)"
-            " VALUES (?,?,?,?,?,?,?,?)",
+            "INSERT INTO factchecks (claim, verdict, confiance, explication, source, url, created_at, video_year, rules)"
+            " VALUES (?,?,?,?,?,?,?,?,?)",
             (claim, result["verdict"], conf, result.get("explication", ""),
-             result.get("source", ""), result.get("url", ""), now, year))
+             result.get("source", ""), result.get("url", ""), now, year, FACTCHECK_RULES_VERSION))
         _cache_conn.commit()
     _cache_mem.append((sig, year, now, {k: result.get(k) for k in ("verdict", "confiance", "explication", "source", "url")}))

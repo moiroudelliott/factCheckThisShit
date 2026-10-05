@@ -8,6 +8,7 @@ session_starts: dict[str, float] = {}
 session_buffers: dict[str, dict] = {}
 session_contexts: dict[str, dict] = {}   # { sid: {"emission": str, "guests": [str]} }
 session_points: dict[str, list] = {}     # { sid: talking points récents pour le contexte }
+session_verdicts: dict[str, list] = {}   # { sid: verdicts déjà rendus dans ce débat } — cohérence des verdicts suivants
 session_dupe_index: dict[str, dict] = {}  # { sid: {mot_clé: [indices dans session_points[sid]]} } — évite un scan O(n) à chaque dédup
 session_flush_locks: dict[str, object] = {}  # { sid: Semaphore } évite la race condition sur session_points
 session_chunk_locks: dict[str, object] = {}  # { sid: Semaphore } sérialise les chunks d'UNE session (le tracker n'est pas thread-safe), sans bloquer les autres sessions

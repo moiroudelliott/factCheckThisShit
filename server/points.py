@@ -6,30 +6,48 @@ trop vague pour être vérifiée (« Il existe des fractures en France »,
 « L'islam est une civilisation et une religion ») recevait quand même un
 verdict — VRAI à 90 % sur une généralité, qui ne veut rien dire. Sous
 CHECKWORTHY_MIN, elle devient « vague » : pas de fact-check, pas de carte,
-visible au récap comme telle."""
+visible au récap comme telle.
+
+Importance : vérifiable ne veut pas dire important. Sur un débat de 38 min,
+un quart des verdicts portaient sur l'agenda du ministre (« j'étais à
+Créteil lundi »), des évidences (« le Conseil national lycéen existe ») ou
+des anecdotes. Mistral note aussi l'enjeu de 0 à 10 ; sous ENJEU_MIN,
+l'affirmation devient « secondaire » : au récap, sans fact-check ni carte."""
 
 import re
 
-from server.config import CHECKWORTHY_MIN
+from server.config import CHECKWORTHY_MIN, ENJEU_MIN
 from server.names import norm_name
 
 _RAW_LABEL_RE = re.compile(r"^Intervenant ([A-Z]|\d+)$")
 
 
-def verifiable_score(point: dict) -> int:
-    """Note de vérifiabilité 0-10 donnée par Mistral ; absente ou illisible
-    → 10 (on ne retire jamais une vérification faute de note)."""
-    raw = point.get("verifiable")
+def _score(point: dict, key: str) -> int:
+    raw = point.get(key)
     try:
         return max(0, min(10, int(round(float(raw)))))
     except (TypeError, ValueError):
         return 10
 
 
+def verifiable_score(point: dict) -> int:
+    """Note de vérifiabilité 0-10 donnée par Mistral ; absente ou illisible
+    → 10 (on ne retire jamais une vérification faute de note)."""
+    return _score(point, "verifiable")
+
+
+def enjeu_score(point: dict) -> int:
+    """Note d'importance 0-10 donnée par Mistral ; absente ou illisible → 10."""
+    return _score(point, "enjeu")
+
+
 def apply_checkworthiness(point: dict) -> dict:
     point["verifiable"] = verifiable_score(point)
+    point["enjeu"] = enjeu_score(point)
     if point.get("type") == "affirmation" and point["verifiable"] < CHECKWORTHY_MIN:
         point["type"] = "vague"
+    elif point.get("type") == "affirmation" and point["enjeu"] < ENJEU_MIN:
+        point["type"] = "secondaire"
     return point
 
 

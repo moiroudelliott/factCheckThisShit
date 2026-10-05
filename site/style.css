@@ -26,6 +26,7 @@
   --v-partiel: #8a6200;
   --v-trompeur: #a65200;
   --v-faux: #b0261c;
+  --v-nr: #3c6585;
   --v-nv: #5b6270;
 }
 
@@ -124,6 +125,7 @@ strong { font-weight: 600; }
 .v-partiel { color: var(--v-partiel); }
 .v-trompeur { color: var(--v-trompeur); }
 .v-faux { color: var(--v-faux); }
+.v-nr { color: var(--v-nr); }
 .v-nv { color: var(--v-nv); }
 
 /* Tableaux */

@@ -12,7 +12,8 @@ sys.path.insert(0, ROOT)
 
 from server.config import EXCLUDED_SOURCES, LOW_RELIABILITY_DOMAINS, PARTISAN_DOMAINS  # noqa: E402
 from server.sources import (  # noqa: E402
-    academic_relevant, finalize_result, parse_brave_results, is_excluded, normalize_verdict, source_label, source_tier, video_year,
+    academic_relevant, finalize_result, parse_brave_results, is_excluded, normalize_verdict, related_verdicts,
+    self_sourced, source_label, source_tier, video_year, years_in,
 )
 
 
@@ -157,6 +158,75 @@ def test_true_verdict_with_a_contradicted_element_is_partial():
             "inexact": "une première depuis 15 ou 20 ans", "url": ""}
     assert finalize_result(data, [], [], [])["verdict"] == "partiellement_vrai"
     assert finalize_result({**data, "inexact": ""}, [], [], [])["verdict"] == "vrai"
+
+
+def test_unrecouped_verdict():
+    assert normalize_verdict("non_recoupe") == "non_recoupe"
+    assert normalize_verdict("Non recoupé") == "non_recoupe"
+
+
+def test_speaker_quoting_himself_is_not_a_proof():
+    """Cas vécus (Geffray, France 2) : VRAI 95 % parce qu'un article rapporte
+    ce que le ministre a lui-même annoncé."""
+    qui = "Édouard Geffray"
+    assert self_sourced("Édouard Geffray a effectivement annoncé que 24 établissements ont été saccagés.", qui)
+    assert self_sourced("Édouard Geffray a bien déclaré que 78 personnels ont été blessés.", qui)
+    assert self_sourced("Selon le ministre Édouard Geffray, 170 lycéens ont été blessés.", qui)
+    assert self_sourced("Édouard Geffray a confirmé que 170 élèves ont été blessés.", qui)
+    # preuve indépendante, autre personne, affirmation sur une déclaration
+    assert not self_sourced("Le rectorat confirme que 24 établissements ont été saccagés.", qui)
+    assert not self_sourced("Gérald Darmanin a bien déclaré sur RTL vouloir…", "Manuel Bompard")
+    assert not self_sourced("Gérald Darmanin a bien déclaré…", "Gérald Darmanin",
+                            claim="Gérald Darmanin a déclaré sur RTL vouloir engager la responsabilité des parents")
+    assert not self_sourced("Édouard Geffray a annoncé…", "")
+    web = [{"href": "https://www.lefigaro.fr/x", "title": "t"}]
+    data = {"verdict": "vrai", "confiance": 95, "url": "https://www.lefigaro.fr/x",
+            "explication": "Édouard Geffray a effectivement déclaré que 78 personnels ont été blessés."}
+    assert finalize_result(data, web, [], [], qui=qui)["verdict"] == "non_recoupe"
+    assert finalize_result(data, web, [], [], qui="Manuel Bompard")["verdict"] == "vrai"
+    # « non recoupé » sans article lié : aucune source ne traite du sujet
+    nr = {"verdict": "non_recoupe", "confiance": 60, "explication": "Chiffre du ministère, non recoupé.", "url": ""}
+    assert finalize_result(nr, [], [], [])["verdict"] == "non_verifiable"
+    assert finalize_result({**nr, "url": "https://www.lefigaro.fr/x"}, web, [], [])["verdict"] == "non_recoupe"
+    # « non recoupé » qui ne dit pas de qui vient la déclaration : un « non vérifiable » déguisé
+    vague = {**nr, "url": "https://www.lefigaro.fr/x",
+             "explication": "Aucune source indépendante ne confirme ni ne contredit le lien causal."}
+    assert finalize_result(vague, web, [], [], qui="Manuel Bompard")["verdict"] == "non_verifiable"
+    named = {**vague, "explication": "Chiffre avancé par Édouard Geffray, sans confirmation indépendante."}
+    assert finalize_result(named, web, [], [], qui="Édouard Geffray")["verdict"] == "non_recoupe"
+
+
+def test_false_needs_a_source_on_the_same_period():
+    """Cas vécus : « +1,2 milliard » (budget 2027) démenti par le budget 2026 ;
+    une visite « lundi dernier » démentie par une page de 2025."""
+    web = [{"href": "https://www.senat.fr/x", "title": "t"}]
+    base = {"verdict": "faux", "confiance": 90, "explication": "e", "url": "https://www.senat.fr/x"}
+    r = finalize_result({**base, "contredit_par": "PLF 2026 : hausse de 166 millions d'euros"}, web, [], [],
+                        periode="2027")
+    assert r["verdict"] == "non_verifiable" and "2026" in r["explication"]
+    r = finalize_result({**base, "contredit_par": "Le Monde : budget 2027 en hausse de 1,2 milliard"}, web, [], [],
+                        periode="2027")
+    assert r["verdict"] == "faux"
+    # sans période connue, ou sans année dans le fait contraire : rien ne change
+    assert finalize_result({**base, "contredit_par": "PLF 2026 : +166 M€"}, web, [], [])["verdict"] == "faux"
+    assert finalize_result({**base, "contredit_par": "aucun élève dans le bâtiment"}, web, [], [],
+                           periode="2026")["verdict"] == "faux"
+    assert finalize_result({**base, "contredit_par": "30,4 élèves en 2011"}, web, [], [],
+                           periode="2011")["verdict"] == "faux"
+
+
+def test_years_in():
+    assert years_in("depuis 2017-2026") == set(range(2017, 2027))
+    assert years_in("rentrée 2025-2026, budget 2027") == {2025, 2026, 2027}
+    assert years_in("10 000 postes") == set() and years_in("") == set()
+
+
+def test_related_verdicts_share_the_subject():
+    done = [{"claim": "Le budget 2027 de l'Éducation nationale est en hausse de 1,2 milliard", "verdict": "vrai"},
+            {"claim": "170 lycéens ont été blessés", "verdict": "vrai"}]
+    got = related_verdicts("Le budget de l'Éducation nationale prévoit 650 millions de coupes", done)
+    assert [v["verdict"] for v in got] == ["vrai"] and "budget" in got[0]["claim"]
+    assert related_verdicts("Édouard Geffray était à Créteil lundi", done) == []
 
 
 if __name__ == "__main__":

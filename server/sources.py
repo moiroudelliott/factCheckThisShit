@@ -35,10 +35,11 @@ TIER_PRESS = (
     "courrierinternational.com", "la-croix.com", "sudouest.fr",
 )
 
-VERDICTS = ("vrai", "partiellement_vrai", "trompeur", "faux", "non_verifiable")
+VERDICTS = ("vrai", "partiellement_vrai", "trompeur", "faux", "non_recoupe", "non_verifiable")
 _VERDICT_ALIASES = {
     "partiel": "partiellement_vrai", "partiellement": "partiellement_vrai",
     "trompeuse": "trompeur", "non_verifie": "non_verifiable", "inverifiable": "non_verifiable",
+    "non_recoupee": "non_recoupe",
 }
 UNSOURCED_MAX_CONF = 50  # plafond de confiance d'un verdict sans URL de preuve
 LOW_RELIABILITY_MAX_CONF = 50  # … ou dont la preuve est de fiabilité faible (jamais mis en cache)
@@ -167,8 +168,61 @@ def source_label(claimed: str, url: str, kind: str = "") -> str:
     return h or "source"
 
 
+_YEAR_RE = re.compile(r"\b((?:19|20)\d\d)\b")
+_YEAR_RANGE_RE = re.compile(r"\b((?:19|20)\d\d)\s*(?:-|–|à|au)\s*((?:19|20)\d\d)\b")
+
+
+def years_in(text: str) -> set:
+    """Années citées dans un texte, intervalles compris (« 2017-2026 »)."""
+    text = str(text or "")
+    years = {int(y) for y in _YEAR_RE.findall(text)}
+    for a, b in _YEAR_RANGE_RE.findall(text):
+        a, b = int(a), int(b)
+        if a < b <= a + 30:
+            years.update(range(a, b + 1))
+    return years
+
+
+_STATEMENT_VERBS = (r"(?:annonce|declare|affirme|denonce|indique|assure|explique|precise|evoque|confirme"
+                    r"|souligne|revendique|chiffre|estime)")
+_CLAIM_ABOUT_STATEMENT_RE = re.compile(
+    r"\b(?:a|ont|avait|aurait)\s+(?:\w+\s+)?(?:dit|declare|annonce|affirme|ecrit|tweete|promis|propose)\b|\bselon\b")
+
+
+def self_sourced(explication: str, qui: str, claim: str = "") -> bool:
+    """L'explication d'un verdict favorable ne fait que rapporter la
+    déclaration de l'auteur de l'affirmation (« Édouard Geffray a
+    effectivement annoncé que 24 établissements… ») : la preuve, c'est sa
+    propre parole. Cas vécus : « 78 personnels blessés », « des militants
+    d'ultragauche ont infiltré le mouvement », VRAI à 90-95 % sur ce seul
+    fondement. Sauf si l'affirmation porte elle-même sur une déclaration
+    (« Darmanin a déclaré sur RTL… », « selon Laurent Nuñez… »)."""
+    parts = [w for w in re.findall(r"[a-z]+", _ascii(qui)) if len(w) >= 4]
+    if not parts or _CLAIM_ABOUT_STATEMENT_RE.search(_ascii(claim)):
+        return False
+    said = _ascii(explication)
+    for name in parts[1:] or parts:
+        if re.search(rf"\b{name}\b[^.;]{{0,40}}\b(?:a|avait|ont)\s+(?:\w+\s+)?{_STATEMENT_VERBS}", said):
+            return True
+        if re.search(rf"\bselon\s+(?:\w+\s+){{0,4}}{name}\b", said):
+            return True
+    return False
+
+
+_AUTHOR_SIDE_RE = re.compile(r"\b(?:ministere|ministre|gouvernement|matignon|elysee|partisane?|parti|son camp"
+                             r"|lui-meme|elle-meme|ses propres|sa propre|son propre)\b")
+
+
+def names_the_author(explication: str, qui: str) -> bool:
+    """L'explication d'un « non recoupé » nomme la source de la déclaration :
+    l'auteur lui-même (nom de famille) ou son camp (ministère, parti…)."""
+    said = _ascii(explication)
+    names = [w for w in re.findall(r"[a-z]+", _ascii(qui)) if len(w) >= 4]
+    return bool(_AUTHOR_SIDE_RE.search(said)) or any(re.search(rf"\b{n}\b", said) for n in names[1:] or names)
+
+
 def finalize_result(data: dict, results: list, academic: list, official: list, known: list = (),
-                    structured: list = ()) -> dict:
+                    structured: list = (), claim: str = "", qui: str = "", periode: str = "") -> dict:
     """Normalise la réponse Mistral : verdict connu, URL issue des résultats
     de recherche (jamais inventée ; http(s) uniquement — une URL javascript:
     serait un vecteur XSS), nom de source cohérent avec l'URL, confiance
@@ -181,6 +235,17 @@ def finalize_result(data: dict, results: list, academic: list, official: list, k
     # 95 %, l'explication citant une baisse en 2020) : au mieux partiel
     if out["verdict"] == "vrai" and str(data.get("inexact") or "").strip():
         out["verdict"] = "partiellement_vrai"
+    # Seule preuve : la parole de l'auteur lui-même
+    if out["verdict"] in ("vrai", "partiellement_vrai") and self_sourced(out["explication"], qui, claim):
+        out["verdict"] = "non_recoupe"
+    # « faux » appuyé sur une autre année que celle dont parle l'affirmation
+    # (cas vécus : « +1,2 milliard » pour le budget 2027 démenti par le budget
+    # 2026 ; une visite « lundi dernier » démentie par une page de 2025)
+    claim_years, source_years = years_in(periode), years_in(data.get("contredit_par"))
+    if out["verdict"] == "faux" and claim_years and source_years and not claim_years & source_years:
+        out["verdict"] = "non_verifiable"
+        out["explication"] = (f"Les sources trouvées portent sur une autre période ({', '.join(map(str, sorted(source_years)))}) "
+                              f"que celle de l'affirmation ({periode}).")
     # Plus bas, « faux » sans fait contraire tiré d'une source liée est
     # ramené à « non vérifiable » (cas vécu : FAUX 95 % sur « rien ne prouve
     # que… »)
@@ -198,6 +263,14 @@ def finalize_result(data: dict, results: list, academic: list, official: list, k
     out["url"] = url
     if wants_false and not (url and str(data.get("contredit_par") or "").strip()):
         out["verdict"] = "non_verifiable"
+    # « non recoupé » = un article rapporte la déclaration ; sans article lié,
+    # c'est qu'aucune source ne traite du sujet (cas vécu : « non recoupé » à
+    # 40 % sur un lien de cause à effet, sans aucune source)
+    # … et l'explication doit dire de qui vient la déclaration (l'auteur, son
+    # ministère, son parti) — sinon le modèle s'en sert comme d'un « non
+    # vérifiable » (cas vécu : un lien de cause à effet « non recoupé »)
+    if out["verdict"] == "non_recoupe" and not (url and names_the_author(out["explication"], qui)):
+        out["verdict"] = "non_verifiable"
     # Fact-check déjà publié : on nomme la rédaction (connue), pas ce que dit Mistral
     out["source"] = outlets[url] if url in outlets else source_label(str(data.get("source") or ""), url, kinds.get(url, ""))
     conf = data.get("confiance")
@@ -208,6 +281,19 @@ def finalize_result(data: dict, results: list, academic: list, official: list, k
     if is_low_reliability(url) and conf is not None:
         conf = min(conf, LOW_RELIABILITY_MAX_CONF)
     out["confiance"] = conf
+    return out
+
+
+def related_verdicts(claim: str, previous: list, max_n: int = 4) -> list:
+    """Verdicts déjà rendus dans le débat sur un sujet proche (au moins deux
+    mots-clés communs hors noms propres), les plus récents d'abord."""
+    words = key_words(claim) - key_words(" ".join(re.findall(r"\b[A-ZÀÂÇÉÈÊËÎÏÔÙÛÜ][\w'’-]*", claim)))
+    out = []
+    for v in reversed(previous):
+        if len(words & key_words(v.get("claim", ""))) >= 2:
+            out.append(v)
+            if len(out) >= max_n:
+                break
     return out
 
 

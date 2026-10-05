@@ -15,6 +15,10 @@
 (function () {
   'use strict';
 
+  // Relecture : content.js garde chaque carte une durée fixe (pas de
+  // raccourcissement quand d'autres attendent, comme en direct)
+  window.__fctReplay = true;
+
   // ── Faux chrome.* : ce que content.js attend de l'extension ──
   const listeners = [];
   window.chrome = {
@@ -223,6 +227,16 @@
       if (!recordedEnd && overlayOn) {
         send({ type: 'finalizing' });
         send({ type: 'session_done', complete: true });
+      }
+      // Le lecteur s'arrête souvent quelques secondes avant la fin de
+      // l'enregistrement : les derniers verdicts n'arrivaient jamais, et la
+      // dernière carte restait 30 s « en vérification ». Tout ce qui reste est
+      // livré d'un coup — les points au récap, sans carte.
+      if (recordedEnd && overlayOn) {
+        while (idx < events.length) {
+          const m = events[idx++].m;
+          send(m.type === 'talking_points' ? { ...m, backlog: true } : m);
+        }
       }
     }
   }

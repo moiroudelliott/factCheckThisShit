@@ -382,6 +382,7 @@ showCard (spinner)
 | `UNSOURCED_MAX_CONF` | 50 | server/sources.py |
 | `MISTRAL_MAX_RETRIES` / `MISTRAL_RETRY_BASE_S` | 3 / 2.0s (×2^n) | server/config.py |
 | `HOLD_FACT_MS` / `HOLD_FACT_BUSY_MS` / `FC_WAIT_MS` / `MAX_CARD_AGE_MS` | 13000 / 8000 / 30000 / 150000 | content.js |
+| `HOLD_REPLAY_MS` (relecture : durée fixe) / `CARD_MAX_MS` (durée max d'une carte, tout état confondu) | 12000 / 45000 | content.js |
 | `MAX_QUEUE` / `DUPE_MEMORY` / `PROBE_FRESH_MS` | 8 / 6 / 6000 | content.js |
 | `CHECKWORTHY_MIN` / `ENJEU_MIN` | 6 / 7 (sur 10) | server/config.py |
 | `FACTCHECK_RULES_VERSION` | 3 | server/config.py |

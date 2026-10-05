@@ -30,6 +30,10 @@ const HOLD_FACT_BUSY_MS = 8000;  // …raccourci quand d'autres cartes attendent
 const MAX_CARD_AGE_MS   = 150000; // une affirmation reçue il y a plus longtemps ne passe plus en carte (reste au récap)
 const RESOLVE_DELAY = 400;   // délai avant résolution quand le fact-check est déjà connu
 const FC_WAIT_MS    = 30000; // attente max d'un fact-check avant de libérer la carte
+const HOLD_REPLAY_MS = 12000; // relecture du site : chaque carte résolue reste exactement ce temps
+// Filet de sécurité : aucune carte ne reste plus longtemps à l'écran, quel
+// que soit son état (attente du verdict comprise)
+const CARD_MAX_MS   = FC_WAIT_MS + HOLD_FACT_MS + 2000;
 const EXIT_MS       = 560;   // durée de l'animation de sortie
 const GAP_MS        = 220;   // pause entre deux cartes
 const MAX_QUEUE     = 8;     // file d'affichage max (les plus anciennes sautent, restent au récap)
@@ -1284,6 +1288,10 @@ function showCard(id, entry) {
   slot.innerHTML = '';
   slot.appendChild(el);
   S.current = { id, el };
+  later(() => {
+    if (S.current?.el === el) exitCurrent();
+    else if (el.isConnected && !el.classList.contains('fct-card--out')) el.remove();
+  }, CARD_MAX_MS);
   // Reflow forcé plutôt que requestAnimationFrame : l'état initial est posé,
   // la transition part tout de suite — même dans un onglet où rAF est gelé
   void el.offsetWidth;
@@ -1347,8 +1355,9 @@ function resolveCurrent() {
     if (reportSlot) reportSlot.innerHTML = reportButton(S.points.get(id));
   }
   // D'autres cartes attendent : maintien raccourci, sinon le retard sur le
-  // direct s'accumule (jusqu'à ~2 min avec une file pleine)
-  const hold = S.queue.length >= 2 ? HOLD_FACT_BUSY_MS : HOLD_FACT_MS;
+  // direct s'accumule (jusqu'à ~2 min avec une file pleine). En relecture
+  // sur le site : durée fixe, la même pour toutes les cartes.
+  const hold = window.__fctReplay ? HOLD_REPLAY_MS : S.queue.length >= 2 ? HOLD_FACT_BUSY_MS : HOLD_FACT_MS;
   if (S.recapOpen) {
     // Récap ouvert par-dessus : ne pas lancer le décompte maintenant, la
     // carte sortirait sans avoir été vue — il reprendra à la fermeture

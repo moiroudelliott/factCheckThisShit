@@ -12,15 +12,18 @@ import eventlet.semaphore
 import requests
 
 from server.app import DIARIZATION, socketio
+from server.articles import fetch_passage
 from server.config import (
-    BRAVE_API_KEY, BRAVE_API_MIN_GAP_S, MISTRAL_API_KEY, MISTRAL_FACTCHECK_MODEL, MISTRAL_FACTCHECK_TIMEOUT_S,
-    MISTRAL_MODEL, MISTRAL_MAX_RETRIES, MISTRAL_RETRY_BASE_S, MISTRAL_TIMEOUT_S, SEARXNG_URL,
+    ARTICLE_FETCH_MAX, BRAVE_API_KEY, BRAVE_API_MIN_GAP_S, FACTCHECK_RECHECK_FALSE, MISTRAL_API_KEY,
+    MISTRAL_FACTCHECK_MODEL, MISTRAL_FACTCHECK_TIMEOUT_S, MISTRAL_MODEL, MISTRAL_MAX_RETRIES, MISTRAL_RETRY_BASE_S,
+    MISTRAL_TIMEOUT_S, SEARXNG_URL,
 )
 from server.text_utils import _STOPWORDS
 from server import cache, indicators, known_factchecks, votes
 from server.notify import describe_error, warn_client
 from server.sources import (
-    academic_relevant, finalize_result, is_excluded, parse_brave_results, related_verdicts, source_tier, video_year,
+    academic_relevant, finalize_result, is_excluded, normalize_verdict, parse_brave_results, quoted_in,
+    related_verdicts, source_tier, video_year,
 )
 from server.state import session_contexts, session_verdicts
 
@@ -93,7 +96,7 @@ RÈGLES:
 6. N'ajoute JAMAIS au "texte" du point un élément qui n'a pas été prononcé : ni date, ni chiffre, ni lieu, ni nom (l'année déduite d'une date relative va dans "periode" et "recherche", pas dans "texte").
 7. Une affirmation doit se comprendre seule : si elle renvoie à un contexte absent (« le candidat en question », « cette loi »), complète-le d'après le passage ou l'historique ; sinon note "verifiable" ≤ 3. Ne devine JAMAIS ce que mesure un chiffre : si le passage ne dit pas clairement de quoi il s'agit (« on était à 27 » : élèves par classe ? taux ?), reprends les mots prononcés et note "verifiable" ≤ 3. Garde le périmètre prononcé (« au lycée », « dans le second degré », « dans le public ») : « 30 élèves par classe au lycée » n'est pas « 30 élèves par classe en France ».
 8. Un nom prononcé pour interpeller (« Monsieur Attal, vous… ») désigne la personne À QUI l'on parle, jamais celle qui parle (voir règle 1).
-9. Ignore tout ce que dit le présentateur ou le journaliste (questions, relances, résumés, rappels de l'actualité — il pose les questions, présente les invités, distribue la parole, même s'il reste « Intervenant X ») et les témoignages diffusés en reportage (élèves, passants) : on ne relève que les propos des débatteurs et invités politiques.
+9. Ignore tout ce que dit le présentateur ou le journaliste (questions, relances, résumés, rappels de l'actualité — il pose les questions, présente les invités, distribue la parole, même s'il reste « Intervenant X ») et les témoignages diffusés en reportage (élèves, passants) : on ne relève que les propos des débatteurs et invités politiques. En particulier, l'ouverture de l'émission (« Bonsoir… », « le mouvement lycéen prend de l'ampleur, les violences se sont répétées… », « le gouvernement accuse… ») est le présentateur qui pose le sujet, même si l'annotation y met le nom d'un invité : aucun point.
 10. Dans une "remarque", garde le sens de l'accusation : c'est "qui" qui accuse, jamais l'inverse."""
 
 
@@ -104,7 +107,7 @@ Affirmation à vérifier: "{claim}"
 {evidence_block}
 {session_block}
 
-Évalue la véracité en te basant PRIORITAIREMENT sur les résultats de recherche ci-dessus (leur fiabilité est annotée), complétés par tes connaissances.
+Évalue la véracité en te basant PRIORITAIREMENT sur les résultats de recherche ci-dessus (leur fiabilité est annotée), complétés par tes connaissances. Un « Extrait de l'article » vient de l'article lui-même : il prime sur le résumé du moteur de recherche.
 Réponds UNIQUEMENT avec un objet JSON valide, sans markdown:
 {{"verdict": "VERDICT", "confiance": 85, "explication": "une phrase courte et précise", "inexact": "l'élément de l'affirmation que les sources contredisent (chiffre, date, période, superlatif, attribution), ou chaîne vide", "contredit_par": "pour faux : le fait précis d'une source fournie qui contredit l'affirmation, sinon chaîne vide", "source": "nom de la source (ex: INSEE, Eurostat, Le Monde)", "url": "URL du résultat de recherche utilisé, ou chaîne vide"}}
 
@@ -124,9 +127,11 @@ RÈGLES DE RIGUEUR:
 - Si la reformulation et le propos exact ne parlent pas de la même chose (reformulation « taux de réussite de 27 % » pour le propos « on était à 27 »), juge le propos exact ; si l'on ne sait pas ce que mesure son chiffre, "non_verifiable" en commençant par "Transcription douteuse :".
 - Un cas précis (« dans ce lycée, il n'y avait pas de proviseur adjoint », « le ministre était à Créteil lundi ») ne se prouve ni ne se dément par un autre cas : une source sur un autre établissement, une autre ville ou une autre date ne compte pas.
 - Une norme, une loi ou un objectif (ce qui DEVRAIT être : « le décret fixe 20 °C ») ne contredit pas un constat (ce qui EST : « les radiateurs sont bloqués »).
-- DÉCLARATION ≠ PREUVE : un article qui rapporte que l'auteur de l'affirmation l'a dite (« le ministre a annoncé 78 blessés », « X a dénoncé l'infiltration du mouvement ») prouve qu'il l'a dite, pas qu'elle est vraie — son ministère, son parti ou son camp ne comptent pas non plus comme source indépendante. Si c'est tout ce que disent les sources, réponds "non_recoupe" et nomme la source réelle du chiffre dans "explication" (« chiffre du ministère, non recoupé »). Sont des confirmations indépendantes : une enquête ou une vérification de presse, une donnée d'un service statistique (Insee, DEPP, Dares…), un bilan d'une autre autorité (préfecture, parquet, région). Exception : si l'affirmation porte sur ce que quelqu'un a dit (« Darmanin a déclaré sur RTL… ») ou cite elle-même sa source (« selon Laurent Nuñez »), l'article qui rapporte cette déclaration suffit.
+- DÉCLARATION ≠ PREUVE : un article qui rapporte que l'auteur de l'affirmation l'a dite (« le ministre a annoncé 78 blessés », « X a dénoncé l'infiltration du mouvement ») prouve qu'il l'a dite, pas qu'elle est vraie — son ministère, son parti ou son camp ne comptent pas non plus comme source indépendante. Si c'est tout ce que disent les sources, réponds "non_recoupe" et nomme la source réelle du chiffre dans "explication" (« chiffre du ministère, non recoupé »). Sont des confirmations indépendantes : une enquête ou une vérification de presse, une donnée d'un service statistique (Insee, DEPP, Dares…), un bilan d'une autre autorité (préfecture, parquet, région). Exception : si l'affirmation porte sur ce que quelqu'un a dit (« Darmanin a déclaré sur RTL… », « Alma Dufour affirme que… ») ou cite elle-même sa source (« selon Laurent Nuñez »), l'article qui rapporte cette déclaration suffit : c'est le fait qu'il l'ait dit qu'on vérifie ("vrai" s'il l'a dit), pas l'exactitude de ce qu'il a dit.
 - Lis l'affirmation dans son sens le plus plausible dans le débat : « Attal a interdit l'abaya », dit à propos de l'école, veut dire à l'école — ne la juge pas fausse pour une portée qu'elle ne revendique pas.
 - Vérifie CHAQUE élément : chiffre, date, période, superlatif (« record », « première fois depuis 20 ans », « jamais »), et à qui l'action est attribuée. Recopie dans "inexact" tout élément que tes sources contredisent. Si le fait PRINCIPAL est vrai et que seul un détail est faux (superlatif, arrondi, date approchée) : "partiellement_vrai" — ex : « les entrées ont baissé en 2024, une première depuis 15 ans » alors que la baisse est réelle mais qu'il y en a eu une en 2020 → "partiellement_vrai". "faux" seulement si le fait principal est contredit. Si "inexact" n'est pas vide, le verdict ne peut pas être "vrai".
+- Ne pinaille pas : un mot ou une préposition de différence (« discipline du combat » / « de combat »), un synonyme (LBD / flashball), un arrondi (« 1 600 » pour 1 588) ne rendent pas une affirmation inexacte.
+- Une hausse en euros courants inférieure à l'inflation est une baisse en euros constants : « des coupes dans le budget » face à un budget en hausse nominale mais inférieure à l'inflation est "trompeur" ou "partiellement_vrai", jamais "faux" ; « le budget est en hausse » dans ce cas est vrai en valeur, trompeur en volume.
 - Une mesure décidée ou annoncée par un ministre dans son domaine lui est attribuable (« X a interdit… » est vrai si X, ministre compétent, l'a décidée), même si le gouvernement est dirigé par un autre.
 - Une SOURCE ACADÉMIQUE ne prouve un fait d'actualité (qui a fait quoi, quand) que si son résumé le dit explicitement.
 - Pour une affirmation CAUSALE ou sociologique ("X provoque Y", "X n'a pas d'effet sur Y"), les SOURCES ACADÉMIQUES (études évaluées par les pairs) pèsent plus lourd que la presse et que tes intuitions. Ne les utilise que si elles portent réellement sur le sujet de l'affirmation.
@@ -144,6 +149,23 @@ RÈGLES DE RIGUEUR:
 - L'affirmation vient d'une transcription automatique : si elle contient manifestement une erreur de transcription (nom déformé, mot incompréhensible, chiffre invraisemblable pour le sujet comme une « dépense publique de 54 milliards »), ne la juge pas "faux" pour autant — réponds "non_verifiable" en commençant l'explication par "Transcription douteuse :". Ne l'utilise pas pour une affirmation simplement incomplète ou sortie de son contexte.
 - Ne devine pas, mais ne te dérobe pas : sans AUCUNE source sur le sujet, "non_verifiable" ; avec une source sur le sujet, tranche."""
 
+
+RECHECK_FALSE_PROMPT_TEMPLATE = """Tu compares une affirmation prononcée dans un débat politique à des sources.
+{context_block}
+Affirmation : "{claim}"
+{speaker_block}{periode_block}{citation_block}
+{evidence_block}
+
+Question : que disent les sources du FAIT PRINCIPAL de l'affirmation (l'acteur, le chiffre ou le fait, la période) ?
+- "contredit" : une phrase des sources rend le fait principal impossible — même acteur, même mesure, même période — de sorte que l'affirmation et cette phrase ne peuvent pas être vraies en même temps. Un niveau ne contredit pas une évolution (« 71 députés aujourd'hui » ne dit pas s'il y en avait plus avant) ; le maintien d'une mesure ne contredit pas la baisse de son montant ; un chiffre sur un autre périmètre ne contredit rien ;
+- "confirme" : une phrase des sources dit la même chose (un arrondi ou un ordre de grandeur juste compte comme une confirmation) ;
+- "nuance" : le fait principal est juste, mais un détail est faux ou exagéré (date, chiffre approché, superlatif) ;
+- "ne_tranche_pas" : aucune phrase ne parle précisément de ce fait principal (un résultat global ne dit rien du vote d'un groupe ; une mesure voisine ne dit rien d'un chiffre ; l'absence d'une information n'est pas une contradiction).
+Juge ce qui a réellement été dit (propos exact) si la reformulation s'en écarte. Tes propres connaissances ne comptent pas : seulement les phrases des sources.
+
+Réponds UNIQUEMENT avec un objet JSON, sans markdown :
+{{"relation": "contredit", "phrase_source": "la phrase des sources, recopiée mot pour mot", "incompatibilite": "pour « contredit » : pourquoi l'affirmation et cette phrase ne peuvent pas être vraies en même temps", "explication": "une phrase courte et précise"}}
+"phrase_source" est obligatoire pour "contredit", "confirme" et "nuance" : elle sera vérifiée. Si tu ne peux pas expliquer l'incompatibilité en une phrase, ce n'est pas "contredit"."""
 
 VIDEO_ANALYSIS_PROMPT = """Voici les métadonnées d'une vidéo YouTube de débat ou plateau politique français.
 Titre: {title}
@@ -515,7 +537,10 @@ def build_evidence_block(results: list, academic: list = None, official: list = 
         title = (r.get("title") or "").strip()
         body = (r.get("body") or "").strip()[:300]
         href = (r.get("href") or "").strip()
-        lines.append(f"[{i}] [{source_tier(href)}] {title} — {body}\n    URL: {href}")
+        extrait = (r.get("extrait") or "").strip()
+        lines.append(f"[{i}] [{source_tier(href)}] {title} — {body}"
+                     + (f"\n    Extrait de l'article : {extrait}" if extrait else "")
+                     + f"\n    URL: {href}")
     return "\n".join(lines)
 
 
@@ -532,8 +557,11 @@ def build_session_block(previous: list) -> str:
     return "\n".join(lines) + "\n"
 
 
-def call_mistral_factcheck(claim: str, context: dict = None, sid: str = None, citation: str = "",
-                           query: str = "", qui: str = "", periode: str = "", previous: list = ()) -> dict:
+def gather_evidence(claim: str, context: dict = None, query: str = "", periode: str = "") -> dict:
+    """Toutes les preuves d'une affirmation : recherche web (avec le passage
+    utile des premiers articles), académique, data.gouv.fr, fact-checks
+    publiés, séries Eurostat, scrutins. Séparé du jugement pour pouvoir
+    figer les preuves et rejouer le verdict seul (bench_verdicts.py)."""
     context = context or {}
     # Replay d'un débat passé : sans l'année, la recherche remonte les
     # chiffres d'aujourd'hui pour juger des propos d'alors
@@ -548,42 +576,128 @@ def call_mistral_factcheck(claim: str, context: dict = None, sid: str = None, ci
     jobs = (eventlet.spawn(web_search, web_query), eventlet.spawn(scholar_search, claim),
             eventlet.spawn(datagouv_search, claim))
     results, academic, official = (j.wait() for j in jobs)
+    # Les premiers articles, ouverts en parallèle : seules les phrases qui
+    # parlent de l'affirmation sont gardées (server/articles.py)
+    reads = [(r, eventlet.spawn(fetch_passage, r["href"], claim, base, periode))
+             for r in results[:ARTICLE_FETCH_MAX]]
+    for r, job in reads:
+        passage = job.wait()
+        if passage:
+            r["extrait"] = passage
     # Données locales, instantanées : jamais d'appel réseau pendant un fact-check
     known = known_factchecks.search(claim)  # index des rédactions de fact-checking
     series = indicators.evidence(claim)     # séries Eurostat préchargées
     ballots = votes.search(claim)           # scrutins de l'Assemblée nationale
     print(f"[Search] {len(known)} fact-check(s) publié(s) + {len(series)} série(s) Eurostat + {len(ballots)} "
-          f"scrutin(s) + {len(results)} web + {len(academic)} académique(s) + {len(official)} data.gouv.fr "
-          f"pour «{claim[:50]}»")
+          f"scrutin(s) + {len(results)} web ({sum(bool(r.get('extrait')) for r in results)} article(s) lu(s)) + "
+          f"{len(academic)} académique(s) + {len(official)} data.gouv.fr pour «{claim[:50]}»")
+    return {"results": results, "academic": academic, "official": official, "known": known,
+            "series": series, "ballots": ballots}
+
+
+def _json_object(content: str):
+    start = (content or "").find("{")
+    if start == -1:
+        return None
+    try:
+        data, _ = json.JSONDecoder().raw_decode(content, start)
+    except (json.JSONDecodeError, ValueError):
+        return None
+    return data if isinstance(data, dict) else None
+
+
+def _claim_blocks(qui: str, periode: str, citation: str) -> dict:
+    return {
+        "speaker_block": f"Auteur de l'affirmation : {qui}\n" if qui else "",
+        "periode_block": f"Période visée : {periode}\n" if periode else "",
+        # Propos d'origine : l'affirmation est une reformulation, qui peut
+        # durcir ou déformer ce qui a réellement été dit
+        "citation_block": (f"Propos exact (transcription automatique) : « {citation} » — juge ce qui a été "
+                           "réellement dit si la reformulation ci-dessus s'en écarte.\n") if citation else "",
+    }
+
+
+def judge(claim: str, evidence: dict, context: dict = None, sid: str = None, citation: str = "",
+          qui: str = "", periode: str = "", previous: list = ()) -> dict:
+    """Verdict de Mistral sur des preuves déjà réunies, normalisé par
+    finalize_result, puis contre-vérifié s'il conclut « faux »."""
+    context = context or {}
     # Auteur : sans lui, « le ministre a annoncé 78 blessés » servait de
     # preuve à l'affirmation… du ministre
     named = qui if qui and not re.match(r"^Intervenant ([A-Z]|\d+)$", qui) else ""
+    ev = evidence
+    evidence_block = build_evidence_block(ev["results"], ev["academic"], ev["official"], ev["known"],
+                                          ev["series"], ev["ballots"])
     prompt = FACTCHECK_PROMPT_TEMPLATE.format(
         today=time.strftime("%d/%m/%Y"),
         context_block=build_context_block(context),
         claim=claim,
-        speaker_block=f"Auteur de l'affirmation : {named}\n" if named else "",
-        periode_block=f"Période visée : {periode}\n" if periode else "",
-        # Propos d'origine : l'affirmation ci-dessus est une reformulation, qui
-        # peut durcir ou déformer ce qui a réellement été dit
-        citation_block=(f"Propos exact (transcription automatique) : « {citation} » — juge ce qui a été "
-                        "réellement dit si la reformulation ci-dessus s'en écarte.\n") if citation else "",
-        evidence_block=build_evidence_block(results, academic, official, known, series, ballots),
+        evidence_block=evidence_block,
         session_block=build_session_block(list(previous)),
+        **_claim_blocks(named, periode, citation),
     )
     content = call_mistral_api(prompt, sid=sid, model=MISTRAL_FACTCHECK_MODEL, timeout=MISTRAL_FACTCHECK_TIMEOUT_S)
     print(f"[FactCheck résultat] {content[:150]}")
+    data = _json_object(content)
+    if not data or "verdict" not in data:
+        return {"verdict": "non_verifiable", "confiance": None, "explication": "Réponse du modèle illisible.",
+                "source": "", "url": "", "indisponible": True}
+    finalize = lambda d: finalize_result(d, ev["results"], ev["academic"], ev["official"], ev["known"],  # noqa: E731
+                                         ev["series"] + ev["ballots"], claim=claim, qui=named, periode=periode)
+    result = finalize(data)
+    if result["verdict"] == "faux" and FACTCHECK_RECHECK_FALSE:
+        result = recheck_false(claim, data, result, evidence_block, context, sid, named, periode, citation, finalize)
+    return result
+
+
+def recheck_false(claim: str, data: dict, result: dict, evidence_block: str, context: dict, sid: str,
+                  qui: str, periode: str, citation: str, finalize) -> dict:
+    """Second examen d'un « faux », le verdict le plus accusateur, fait à
+    l'aveugle : le modèle ne voit pas le verdict proposé (relu, un « faux »
+    était presque toujours confirmé, même quand la source donnait raison à
+    l'orateur — « LFI est passée de 75 à 71 députés » jugé faux à « LFI a
+    perdu des députés »). Il dit seulement si les sources contredisent,
+    confirment, nuancent ou ne tranchent pas, phrase à l'appui. « Faux » ne
+    reste que si les deux examens concordent ET que la phrase figure mot pour
+    mot dans les preuves. En cas d'erreur de l'appel, le premier verdict est
+    gardé."""
+    prompt = RECHECK_FALSE_PROMPT_TEMPLATE.format(
+        context_block=build_context_block(context),
+        claim=claim,
+        evidence_block=evidence_block,
+        **_claim_blocks(qui, periode, citation),
+    )
     try:
-        start = content.find('{')
-        if start != -1:
-            data, _ = json.JSONDecoder().raw_decode(content, start)
-            if isinstance(data, dict) and "verdict" in data:
-                return finalize_result(data, results, academic, official, known, series + ballots,
-                                       claim=claim, qui=named, periode=periode)
-    except (json.JSONDecodeError, ValueError):
-        pass
-    return {"verdict": "non_verifiable", "confiance": None, "explication": "Réponse du modèle illisible.",
-            "source": "", "url": "", "indisponible": True}
+        review = _json_object(call_mistral_api(prompt, sid=sid, model=MISTRAL_FACTCHECK_MODEL,
+                                               timeout=MISTRAL_FACTCHECK_TIMEOUT_S))
+    except Exception as e:
+        print(f"[Contre-vérification] {type(e).__name__}: {e} — premier verdict gardé")
+        return result
+    if not review:
+        return result
+    print(f"[Contre-vérification] {json.dumps(review, ensure_ascii=False)[:400]}")
+    relation = str(review.get("relation") or "").strip().lower()
+    quoted = quoted_in(str(review.get("phrase_source") or ""), evidence_block)
+    if relation == "contredit" and quoted:
+        print("[Contre-vérification] « faux » confirmé")
+        return result
+    verdict = {"confirme": "vrai", "nuance": "partiellement_vrai"}.get(relation) if quoted else None
+    explication = str(review.get("explication") or "").strip() if verdict else ""
+    revised = finalize({
+        **data,
+        "verdict": verdict or "non_verifiable",
+        "explication": explication or "Les sources consultées ne contredisent pas nettement l'affirmation.",
+        "contredit_par": "",
+        "inexact": "" if verdict == "vrai" else data.get("inexact", ""),
+    })
+    print(f"[Contre-vérification] « faux » → {revised['verdict']}")
+    return revised
+
+
+def call_mistral_factcheck(claim: str, context: dict = None, sid: str = None, citation: str = "",
+                           query: str = "", qui: str = "", periode: str = "", previous: list = ()) -> dict:
+    evidence = gather_evidence(claim, context, query, periode)
+    return judge(claim, evidence, context, sid, citation, qui, periode, previous)
 
 
 def fact_check_affirmation(sid: str, claim_id: str, claim_text: str, citation: str = "", query: str = "",
@@ -600,8 +714,10 @@ def fact_check_affirmation(sid: str, claim_id: str, claim_text: str, citation: s
         socketio.emit("fact_check_result", {"id": claim_id, **cached}, to=sid)
         return
     try:
+        started = time.monotonic()
         result = call_mistral_factcheck(claim_text, context=context, sid=sid, citation=citation, query=query,
                                         qui=qui, periode=periode, previous=related_verdicts(claim_text, done))
+        print(f"[FactCheck] {result['verdict']} en {time.monotonic() - started:.1f} s")
         cache.store(claim_text, result, year)
         if not result.get("indisponible"):
             done.append({"claim": claim_text, **result})

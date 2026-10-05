@@ -1,0 +1,1591 @@
+{
+ "sessions": {
+  "Np12sKLLYro": {
+   "title": "Manuel Bompard face à Édouard Geffray",
+   "context": {
+    "emission": "Franc-jeu",
+    "guests": [
+     "Manuel Bompard",
+     "Édouard Geffray"
+    ],
+    "date": "2026-10-04"
+   }
+  },
+  "IWsfqdiX8vI": {
+   "title": "Gabriel Attal face à Marion Maréchal",
+   "context": {
+    "emission": "Franc-jeu",
+    "guests": [
+     "Gabriel Attal",
+     "Marion Maréchal"
+    ],
+    "date": "2026-09-20"
+   }
+  }
+ },
+ "claims": [
+  {
+   "id": "8f7bda45",
+   "video": "Np12sKLLYro",
+   "vt": 8.5,
+   "texte": "Le mouvement lycéen prend de l'ampleur",
+   "qui": "",
+   "periode": "2026",
+   "citation": "le mouvement lycéen prend de l'ampleur",
+   "recherche": "mouvement lycéen ampleur octobre 2026",
+   "accept": [
+    "vrai",
+    "partiellement_vrai",
+    "non_verifiable"
+   ],
+   "note": "présentateur, ne devrait pas être vérifié"
+  },
+  {
+   "id": "a31d39b3",
+   "video": "Np12sKLLYro",
+   "vt": 8.5,
+   "texte": "Des scènes de violence se sont répétées ces derniers jours",
+   "qui": "",
+   "periode": "2026-10",
+   "citation": "les scènes de violence se sont répétées ces derniers jours",
+   "recherche": "violences lycées France octobre 2026",
+   "accept": [
+    "vrai",
+    "partiellement_vrai",
+    "non_verifiable"
+   ],
+   "note": "présentateur"
+  },
+  {
+   "id": "4eef79d2",
+   "video": "Np12sKLLYro",
+   "vt": 13.5,
+   "texte": "Le gouvernement accuse la France insoumise d'être à l'origine des blocages",
+   "qui": "",
+   "periode": "2026-10",
+   "citation": "le gouvernement accuse la France insoumise d'être à l'origine des blocages",
+   "recherche": "gouvernement accuse France insoumise blocages lycées octobre 2026",
+   "accept": [
+    "vrai",
+    "partiellement_vrai"
+   ],
+   "note": "présentateur ; Matignon a bien accusé LFI"
+  },
+  {
+   "id": "8537ece4",
+   "video": "Np12sKLLYro",
+   "vt": 167.0,
+   "texte": "24 établissements scolaires ont été saccagés",
+   "qui": "Édouard Geffray",
+   "periode": "2026",
+   "citation": "J'ai 24 établissements qui ont été...",
+   "recherche": "lycées saccagés France 2026 Édouard Geffray",
+   "accept": [
+    "non_recoupe"
+   ],
+   "note": "chiffre du ministre (24 saccagés), repris par la presse"
+  },
+  {
+   "id": "9ea283e7",
+   "video": "Np12sKLLYro",
+   "vt": 157.7,
+   "texte": "Des cours ont été suspendus vendredi dans certains établissements pour des raisons de sécurité ou de dégradations matérielles",
+   "qui": "Édouard Geffray",
+   "periode": "2026-10-03",
+   "citation": "vendredi, on a suspendu les cours dans ce nombre d'établissements. soit parce que les conditions de sécurité n'étaient pas remplies pour des raisons matérielles, parce qu'ils ont été saccagés",
+   "recherche": "suspension cours lycées sécurité dégradations 2026",
+   "accept": [
+    "vrai",
+    "partiellement_vrai",
+    "non_recoupe"
+   ],
+   "note": "cours suspendus vendredi : largement rapporté"
+  },
+  {
+   "id": "d5bb5a97",
+   "video": "Np12sKLLYro",
+   "vt": 178.5,
+   "texte": "Entre 400 et 500 établissements scolaires ont suspendu leurs cours vendredi pour des raisons de sécurité ou de dégradations matérielles",
+   "qui": "Édouard Geffray",
+   "periode": "2026-10-03",
+   "citation": "il y en avait entre 4 et 500 qui ont suspendu leur cours vendredi",
+   "recherche": "suspension cours lycées France 2026 sécurité dégradations 400 500",
+   "accept": [
+    "non_recoupe",
+    "partiellement_vrai"
+   ],
+   "note": "400-500 : chiffre du ministre ; lundi plutôt que vendredi"
+  },
+  {
+   "id": "b0a405d0",
+   "video": "Np12sKLLYro",
+   "vt": 187.0,
+   "texte": "Une reprise partielle et progressive des cours est prévue dès lundi, notamment pour les élèves de terminale préparant le baccalauréat",
+   "qui": "Édouard Geffray",
+   "periode": "2026-10-06",
+   "citation": "il y en aura probablement autant lundi, mais avec une reprise partielle des cours et progressive qui va se mettre en place, notamment pour les élèves terminales parce qu'il y a des élèves qui préparent le baccalauréat",
+   "recherche": "reprise cours lycées France 2026 terminale baccalauréat",
+   "accept": [
+    "vrai",
+    "partiellement_vrai",
+    "non_recoupe"
+   ],
+   "note": "reprise annoncée par le ministre lui-même : l'annonce est le fait"
+  },
+  {
+   "id": "439b55d8",
+   "video": "Np12sKLLYro",
+   "vt": 246.5,
+   "texte": "La mobilisation lycéenne est née dans le lycée Saint-Exupéry à Créteil, dans le Val-de-Marne",
+   "qui": "Manuel Bompard",
+   "periode": "2026",
+   "citation": "cette mobilisation, elle est née d'un lycée à Créteil, dans le Val-de-Marne, le lycée Saint-Exupéry",
+   "recherche": "mobilisation lycéenne lycée Saint-Exupéry Créteil Val-de-Marne 2026",
+   "accept": [
+    "vrai"
+   ],
+   "note": "Saint-Exupéry à Créteil"
+  },
+  {
+   "id": "d941153d",
+   "video": "Np12sKLLYro",
+   "vt": 258.9,
+   "texte": "Un lycée souffrait de manques criants en personnel éducatif, dont l'absence de proviseur adjoint",
+   "qui": "Manuel Bompard",
+   "periode": "2026",
+   "citation": "Il manquait plusieurs professeurs, il manquait un certain nombre de personnels éducatifs, il n'y avait pas de proviseur adjoint",
+   "recherche": "lycée manque professeurs proviseur adjoint 2026",
+   "accept": [
+    "vrai",
+    "partiellement_vrai",
+    "non_verifiable"
+   ],
+   "note": "proviseur adjoint manquant à Créteil (Sud Ouest)"
+  },
+  {
+   "id": "7100761e",
+   "video": "Np12sKLLYro",
+   "vt": 289.0,
+   "texte": "10 000 suppressions de postes d'enseignants ont été décidée sous le gouvernement Macron",
+   "qui": "Manuel Bompard",
+   "periode": "2017-2026",
+   "citation": "macroniste, de 10 000 suppressions de postes d'enseignants",
+   "recherche": "suppressions postes enseignants Macron 10000 2017-2026",
+   "accept": [
+    "vrai",
+    "partiellement_vrai"
+   ],
+   "note": "8 865 suppressions 2017-2025 + ~4 000 en 2026 : 10 000 tient"
+  },
+  {
+   "id": "e1ee603a",
+   "video": "Np12sKLLYro",
+   "vt": 289.0,
+   "texte": "Le point d'indice des fonctionnaires et des enseignants n'a pas été revalorisé sous Macron",
+   "qui": "Manuel Bompard",
+   "periode": "2017-2026",
+   "citation": "de refus de revalorisation du point d'indice des fonctionnaires et des... enseignants eux-mêmes",
+   "recherche": "revalorisation point indice fonctionnaires enseignants Macron 2017-2026",
+   "accept": [
+    "vrai",
+    "partiellement_vrai",
+    "trompeur"
+   ],
+   "note": "gel 2024-2026, mais hausses en 2022 et 2023 : pas « faux »"
+  },
+  {
+   "id": "95992e82",
+   "video": "Np12sKLLYro",
+   "vt": 297.5,
+   "texte": "La réforme Blanquer a désorganisé les emplois du temps et créé de la souffrance chez les lycéens",
+   "qui": "Manuel Bompard",
+   "periode": "2017-2026",
+   "citation": "d'une réforme blanquer qui a absolument désorganisé les emplois du temps et qui a créé beaucoup de souffrance parmi nos lycéens",
+   "recherche": "réforme Blanquer désorganisation emplois du temps souffrance lycéens",
+   "accept": [
+    "vrai",
+    "partiellement_vrai",
+    "non_verifiable"
+   ],
+   "note": "jugement, ne devrait pas être vérifié"
+  },
+  {
+   "id": "41966320",
+   "video": "Np12sKLLYro",
+   "vt": 375.8,
+   "texte": "Louis Boyard a publié des tweets encourageant les lycéens à bloquer leurs établissements",
+   "qui": "Édouard Geffray",
+   "periode": "2026",
+   "citation": "il en fait plusieurs, dans lesquels il encourage très fortement, bien sûr, les lycéens à bloquer, etc.",
+   "recherche": "Louis Boyard tweets blocages lycéens 2026",
+   "accept": [
+    "non_verifiable",
+    "partiellement_vrai",
+    "non_recoupe"
+   ],
+   "note": "tweets de Boyard : rien de net ; une absence n'est pas un faux"
+  },
+  {
+   "id": "e7c55b31",
+   "video": "Np12sKLLYro",
+   "vt": 391.0,
+   "texte": "Des députés LFI ont fait le tour d'établissements scolaires pour inciter les lycéens au blocage",
+   "qui": "Édouard Geffray",
+   "periode": "2026",
+   "citation": "un certain nombre de députés LFI vont faire le tour d'établissement en incitant les lycéens au blocage",
+   "recherche": "députés LFI tour établissements incitation blocage lycéens 2026",
+   "accept": [
+    "non_verifiable",
+    "partiellement_vrai"
+   ],
+   "note": "présence de députés LFI, incitation non établie"
+  },
+  {
+   "id": "c14cb0e1",
+   "video": "Np12sKLLYro",
+   "vt": 399.5,
+   "texte": "Des blocages d'établissements scolaires ont empêché l'accès aux cours",
+   "qui": "Édouard Geffray",
+   "periode": "2026-09-25",
+   "citation": "à interdire l'accès des établissements à ceux qui voudraient y aller et suivre des cours",
+   "recherche": "blocages lycées accès cours septembre 2026",
+   "accept": [
+    "vrai",
+    "partiellement_vrai"
+   ],
+   "note": ""
+  },
+  {
+   "id": "bb84cf0f",
+   "video": "Np12sKLLYro",
+   "vt": 437.1,
+   "texte": "Jean-Luc Mélenchon a employé l'expression « discipline de combat »",
+   "qui": "Édouard Geffray",
+   "periode": "",
+   "citation": "à partir du moment où on a des propos comme discipline de combat comme « discipline de combat », qui sont ceux qu'ont employé Jean-Luc Mélenchon",
+   "recherche": "Jean-Luc Mélenchon discipline de combat citation",
+   "accept": [
+    "vrai",
+    "partiellement_vrai"
+   ],
+   "note": "« discipline du combat » : pinaillage si partiel"
+  },
+  {
+   "id": "1f57e306",
+   "video": "Np12sKLLYro",
+   "vt": 450.5,
+   "texte": "Le maire de Saint-Denis a déclaré que les violences peuvent être légitimes",
+   "qui": "Édouard Geffray",
+   "periode": "2026",
+   "citation": "le maire de Saint-Denis dit, dans une ambiance, j'allais dire qu'on peut qualifier d'assez surchauffée, que les violences peuvent être légitimes",
+   "recherche": "maire Saint-Denis violences légitimes déclaration 2026",
+   "accept": [
+    "vrai"
+   ],
+   "note": "maire de Saint-Denis"
+  },
+  {
+   "id": "50b78fb9",
+   "video": "Np12sKLLYro",
+   "vt": 507.6,
+   "texte": "78 personnels de l'éducation nationale ont été blessés lors de violences délibérées",
+   "qui": "Édouard Geffray",
+   "periode": "2026",
+   "citation": "78 personnels de l'éducation nationale ont été blessés, on n'a jamais vu ça. et on n'a jamais vu ça. Ils ont été attaqués délibérément parce qu'ils étaient personnels.",
+   "recherche": "violences éducation nationale 78 blessés personnels 2026",
+   "accept": [
+    "non_recoupe"
+   ],
+   "note": "78 personnels blessés : chiffre du ministre"
+  },
+  {
+   "id": "0dddb9d1",
+   "video": "Np12sKLLYro",
+   "vt": 549.0,
+   "texte": "Un établissement scolaire du second degré public sur deux manque au moins un enseignant à cette rentrée",
+   "qui": "Manuel Bompard",
+   "periode": "2026",
+   "citation": "quand vous avez un établissement scolaire du second degré, lycée ou collège public sur deux dans lequel à cette rentrée il manque au moins un enseignant",
+   "recherche": "manque enseignants rentrée 2026 second degré public France",
+   "accept": [
+    "vrai",
+    "partiellement_vrai"
+   ],
+   "note": "53 % selon le SNES-FSU"
+  },
+  {
+   "id": "d48edede",
+   "video": "Np12sKLLYro",
+   "vt": 561.0,
+   "texte": "Un dixième des cours ne peuvent pas être suivis parce que les professeurs ne sont pas remplacés",
+   "qui": "Manuel Bompard",
+   "periode": "2026",
+   "citation": "un dixième des cours qui ne peuvent pas être suivis parce que les profs ne sont pas remplacés",
+   "recherche": "cours non assurés absence professeurs remplacement ministère Éducation nationale 2026",
+   "accept": [
+    "vrai",
+    "partiellement_vrai"
+   ],
+   "note": "9,8 % des heures selon la DEPP"
+  },
+  {
+   "id": "85b3c788",
+   "video": "Np12sKLLYro",
+   "vt": 586.5,
+   "texte": "Une circulaire a été co-signée par Édouard Geffray et le ministre de l'Intérieur, monsieur Nunez, concernant la gestion des situations par les proviseurs",
+   "qui": "Manuel Bompard",
+   "periode": "2026",
+   "citation": "vous avez produit une circulaire, co-signée avec le ministre de l'Intérieur, monsieur Nunez, disant en gros l'éproviseur, on co-signe quand il y a une situation",
+   "recherche": "circulaire Geffray Nunez proviseur 2026",
+   "accept": [
+    "non_verifiable",
+    "vrai",
+    "partiellement_vrai"
+   ],
+   "note": "circulaire Geffray / Nuñez"
+  },
+  {
+   "id": "d6f89d44",
+   "video": "Np12sKLLYro",
+   "vt": 697.0,
+   "texte": "Des travaux ont été lancés par le gouvernement suite à des recommandations de l'OCDE",
+   "qui": "Manuel Bompard",
+   "periode": "2026",
+   "citation": "OCDE, et ça je m'y suis engagé et on a commencé à lancer les travaux.",
+   "recherche": "OCDE travaux gouvernement français 2026 éducation",
+   "accept": [
+    "non_verifiable"
+   ],
+   "note": "transcription incomplète"
+  },
+  {
+   "id": "a3e7a222",
+   "video": "Np12sKLLYro",
+   "vt": 697.0,
+   "texte": "Le gouvernement a fait des annonces après avoir reçu des responsables lycéens et éducatifs",
+   "qui": "Manuel Bompard",
+   "periode": "2026",
+   "citation": "on va bien évidemment parler notamment des premières annonces que vous avez pu faire après avoir reçu un certain nombre de responsables lycéens et éducatifs.",
+   "recherche": "gouvernement annonces responsables lycéens éducatifs 2026",
+   "accept": [
+    "vrai",
+    "partiellement_vrai"
+   ],
+   "note": ""
+  },
+  {
+   "id": "4469192f",
+   "video": "Np12sKLLYro",
+   "vt": 714.0,
+   "texte": "Un lycée a été incendié à Nantes",
+   "qui": "Manuel Bompard",
+   "periode": "2026",
+   "citation": "on a vu un lycée incendié à Nantes",
+   "recherche": "lycée incendié Nantes 2026",
+   "accept": [
+    "vrai"
+   ],
+   "note": "lycée Nelson-Mandela"
+  },
+  {
+   "id": "9dcddf1a",
+   "video": "Np12sKLLYro",
+   "vt": 722.5,
+   "texte": "5000 interpellations ont eu lieu la semaine dernière",
+   "qui": "Manuel Bompard",
+   "periode": "2026-09-28 à 2026-10-04",
+   "citation": "5000 interpellations la semaine dernière",
+   "recherche": "interpellations France semaine 2026-10-04 police",
+   "accept": [
+    "vrai"
+   ],
+   "note": "5 000 interpellations (Nuñez)"
+  },
+  {
+   "id": "2b90cd3c",
+   "video": "Np12sKLLYro",
+   "vt": 826.5,
+   "texte": "Le lycée Mandela a été incendié par des voyous alors que 160 internes étaient à l'intérieur",
+   "qui": "Édouard Geffray",
+   "periode": "2026",
+   "citation": "",
+   "recherche": "lycée Mandela incendie 160 internes 2026",
+   "accept": [
+    "partiellement_vrai",
+    "faux",
+    "trompeur"
+   ],
+   "note": "internes : dans l'internat, pas dans le bâtiment incendié"
+  },
+  {
+   "id": "06333550",
+   "video": "Np12sKLLYro",
+   "vt": 869.0,
+   "texte": "Des personnels de l'éducation nationale ont été aspergés d'essence à Marseille et La Ciotat",
+   "qui": "Édouard Geffray",
+   "periode": "2026",
+   "citation": "",
+   "recherche": "personnels éducation aspergés essence Marseille La Ciotat 2026",
+   "accept": [
+    "partiellement_vrai",
+    "trompeur",
+    "vrai"
+   ],
+   "note": "La Ciotat et La Floride (Marseille) confirmés ; démenti CheckNews sur un autre lycée de Marseille"
+  },
+  {
+   "id": "b40d288f",
+   "video": "Np12sKLLYro",
+   "vt": 892.5,
+   "texte": "170 lycéens ont été blessés lors des manifestations",
+   "qui": "Édouard Geffray",
+   "periode": "2026",
+   "citation": "on a eu 170 lycéens blessés quand même",
+   "recherche": "lycéens blessés manifestations 2026 170",
+   "accept": [
+    "non_recoupe"
+   ],
+   "note": "170 lycéens blessés : chiffre du ministère"
+  },
+  {
+   "id": "8978a55e",
+   "video": "Np12sKLLYro",
+   "vt": 901.0,
+   "texte": "70 lycéens ont été blessés",
+   "qui": "Édouard Geffray",
+   "periode": "2026",
+   "citation": "70 lycéens blessés quand même",
+   "recherche": "lycéens blessés manifestations 2026 Geffray",
+   "accept": [
+    "non_verifiable",
+    "non_recoupe",
+    "partiellement_vrai"
+   ],
+   "note": "« 70 » : sans doute 170 mal transcrit"
+  },
+  {
+   "id": "99079a0d",
+   "video": "Np12sKLLYro",
+   "vt": 960.5,
+   "texte": "Un lycéen a perdu un œil après avoir été touché par un tir de flashball des forces de l'ordre",
+   "qui": "Manuel Bompard",
+   "periode": "2026",
+   "citation": "quand vous avez un lycéen qui perd un oeil parce qu'il se fait tirer dessus par une intervention des forces de l'ordre par un flashball",
+   "recherche": "lycéen blessé œil flashball forces ordre 2026",
+   "accept": [
+    "vrai",
+    "partiellement_vrai"
+   ],
+   "note": "Tours, LBD"
+  },
+  {
+   "id": "c2450715",
+   "video": "Np12sKLLYro",
+   "vt": 982.6,
+   "texte": "Des personnels du lycée de Pamiers ont témoigné de violences contre des lycéens",
+   "qui": "Manuel Bompard",
+   "periode": "2026",
+   "citation": "j'ai entendu par exemple les personnels du lycée de Pamier",
+   "recherche": "témoignages personnels lycée Pamiers violences lycéens 2026",
+   "accept": [
+    "vrai",
+    "partiellement_vrai"
+   ],
+   "note": "Pamiers"
+  },
+  {
+   "id": "6adedf46",
+   "video": "Np12sKLLYro",
+   "vt": 994.5,
+   "texte": "Des personnels de l'éducation nationale en Ariège ont été blessés lors d'une intervention des forces de l'ordre",
+   "qui": "Manuel Bompard",
+   "periode": "2026",
+   "citation": "et même des personnels disent qu'eux-mêmes ils ont été blessés",
+   "recherche": "Ariège intervention forces ordre blessés personnels éducation 2026",
+   "accept": [
+    "partiellement_vrai",
+    "vrai",
+    "non_verifiable",
+    "non_recoupe"
+   ],
+   "note": "Ariège"
+  },
+  {
+   "id": "f189d3ae",
+   "video": "Np12sKLLYro",
+   "vt": 1011.5,
+   "texte": "Des enquêtes ont été ouvertes et l'inspection générale de la police nationale a été saisie pour des faits de violences policières à Tours et à Saint-Ouen-le-Monde",
+   "qui": "Manuel Bompard",
+   "periode": "2026",
+   "citation": "à Tours, à Saint-Ouen-le-Monde, que des enquêtes ont été ouvertes, et que l'inspection générale de la police nationale a été saisie",
+   "recherche": "violences policières Tours Saint-Ouen-le-Monde enquête IGPN 2026",
+   "accept": [
+    "vrai",
+    "partiellement_vrai"
+   ],
+   "note": "IGPN saisie"
+  },
+  {
+   "id": "12ee4e8a",
+   "video": "Np12sKLLYro",
+   "vt": 1096.5,
+   "texte": "Le ministre de l'Intérieur a donné des consignes de très grande proportionnalité aux forces de police",
+   "qui": "Édouard Geffray",
+   "periode": "2026",
+   "citation": "le ministre de l'Intérieur a donné des consignes de très grande proportionnalité",
+   "recherche": "consignes proportionnalité police ministre Intérieur 2026",
+   "accept": [
+    "vrai",
+    "partiellement_vrai"
+   ],
+   "note": "« stricte proportionnalité »"
+  },
+  {
+   "id": "b013e72f",
+   "video": "Np12sKLLYro",
+   "vt": 1141.0,
+   "texte": "Un étudiant a perdu un œil à Tours à cause d'un tir de LBD",
+   "qui": "Manuel Bompard",
+   "periode": "2026",
+   "citation": "un étudiant qui, effectivement, a... visiblement perdu un œil à Tours à cause de ce qui ressemble à un tir de LBD",
+   "recherche": "étudiant œil perdu LBD Tours 2026",
+   "accept": [
+    "vrai",
+    "partiellement_vrai"
+   ],
+   "note": ""
+  },
+  {
+   "id": "f945d5f4",
+   "video": "Np12sKLLYro",
+   "vt": 1173.0,
+   "texte": "Des manifestants se sont présentés devant des établissements avec des coffres remplis de mortiers et des bouteilles d'acide chlorhydrique",
+   "qui": "Édouard Geffray",
+   "periode": "2026",
+   "citation": "des gens qui se pointent devant des établissements, avec des coffres remplis de mortiers. qui ne sont pas en ventes libres, je le rappelle en France, avec des bouteilles d'acide chlorhydrique",
+   "recherche": "manifestations lycées mortiers acide chlorhydrique France 2026",
+   "accept": [
+    "vrai",
+    "partiellement_vrai"
+   ],
+   "note": ""
+  },
+  {
+   "id": "8809ce5c",
+   "video": "Np12sKLLYro",
+   "vt": 1215.5,
+   "texte": "Un grand appel à la mobilisation est prévu mardi avec la participation de la CGT",
+   "qui": "Manuel Bompard",
+   "periode": "2026-10-06",
+   "citation": "il y aura mardi, un grand appel à la mobilisation, d'ailleurs un certain nombre de centrales syndicales sont rentrées dans le jeu, notamment la CGT",
+   "recherche": "mobilisation lycéens CGT 6 octobre 2026",
+   "accept": [
+    "vrai"
+   ],
+   "note": "6 octobre, CGT"
+  },
+  {
+   "id": "e28b221a",
+   "video": "Np12sKLLYro",
+   "vt": 1275.0,
+   "texte": "Un bâtiment public a été saccagé et incendié lors d'une mobilisation des agriculteurs il y a deux ans",
+   "qui": "Manuel Bompard",
+   "periode": "2024",
+   "citation": "quand il y a deux ans, il y a un bâtiment public dans le cadre d'une mobilisation des agriculteurs qui a été saccagée, qui a été incendiée",
+   "recherche": "bâtiment public incendié mobilisation agriculteurs 2024 France",
+   "accept": [
+    "vrai"
+   ],
+   "note": "MSA de Narbonne, 2024"
+  },
+  {
+   "id": "c400a232",
+   "video": "Np12sKLLYro",
+   "vt": 1326.0,
+   "texte": "Gérald Darmanin a déclaré en janvier 2024 qu'on ne répond pas à la souffrance des agriculteurs en envoyant les CRS",
+   "qui": "Manuel Bompard",
+   "periode": "2024-01",
+   "citation": "C'est très précis, Édouard Geffray, la phrase de Gérald Darman en janvier 2024, face à la colère des agriculteurs, c'était de dire, on ne répond pas à la souffrance en envoyant les CRS.",
+   "recherche": "Darmanin janvier 2024 CRS agriculteurs souffrance citation",
+   "accept": [
+    "vrai"
+   ],
+   "note": "Darmanin, janvier 2024"
+  },
+  {
+   "id": "d555dcd9",
+   "video": "Np12sKLLYro",
+   "vt": 1419.5,
+   "texte": "Le gouvernement souhaite accélérer l'examen de la loi dite casseur-payeur pour étendre la responsabilité collective aux auteurs de dégradations",
+   "qui": "Manuel Bompard",
+   "periode": "2026",
+   "citation": "que le gouvernement souhaitait accélérer l'examen de la loi dite casseur-payeur pour notamment étendre la responsabilité collective à ceux qui... casseraient",
+   "recherche": "loi casseur-payeur accélération responsabilité collective 2026",
+   "accept": [
+    "vrai"
+   ],
+   "note": "casseurs-payeurs"
+  },
+  {
+   "id": "29cfc880",
+   "video": "Np12sKLLYro",
+   "vt": 1428.0,
+   "texte": "Le garde des Sceaux a annoncé vouloir engager la responsabilité civile des parents",
+   "qui": "Manuel Bompard",
+   "periode": "2026",
+   "citation": "On a aussi entendu le garde des Sceaux dire à la radio chez nos confrères d'RTL vendredi matin qu'il voulait qu'il y ait une responsabilité civile des parents qui soient engagés",
+   "recherche": "garde des Sceaux responsabilité civile parents RTL 2026",
+   "accept": [
+    "vrai"
+   ],
+   "note": "Darmanin sur RTL"
+  },
+  {
+   "id": "78c4fa82",
+   "video": "Np12sKLLYro",
+   "vt": 1452.1,
+   "texte": "Au moins 24 établissements scolaires ont été incendiés ou saccagés",
+   "qui": "Édouard Geffray",
+   "periode": "2026",
+   "citation": "vous avez 24 établissements qui ont été incendiés ou sacrifiés. d'établissements qui ont été incendiés ou saccagés.",
+   "recherche": "lycées incendiés saccagés France 2026 24 établissements",
+   "accept": [
+    "non_recoupe"
+   ],
+   "note": "doublon de 24 établissements"
+  },
+  {
+   "id": "0b7cae22",
+   "video": "Np12sKLLYro",
+   "vt": 1464.0,
+   "texte": "Les dommages matériels dans les établissements scolaires s'élèvent entre 20 et 30 millions d'euros",
+   "qui": "Édouard Geffray",
+   "periode": "2026",
+   "citation": "",
+   "recherche": "dommages établissements scolaires 2026 20-30 millions euros",
+   "accept": [
+    "non_recoupe",
+    "partiellement_vrai"
+   ],
+   "note": "20-30 M€ : estimation du ministre, chiffres régionaux"
+  },
+  {
+   "id": "782c6ded",
+   "video": "Np12sKLLYro",
+   "vt": 1470.5,
+   "texte": "Le lycée Mandela a subi 2 millions d'euros de dommages",
+   "qui": "Édouard Geffray",
+   "periode": "2026",
+   "citation": "le lycée Mandelaire, c'est 2 millions d'euros",
+   "recherche": "lycée Mandela dégâts 2 millions euros 2026",
+   "accept": [
+    "vrai"
+   ],
+   "note": "2 M€ selon la Région"
+  },
+  {
+   "id": "18bf2ede",
+   "video": "Np12sKLLYro",
+   "vt": 1566.0,
+   "texte": "La France insoumise a voté collectivement contre la perpétuité pour les violeurs d'enfants en série",
+   "qui": "Édouard Geffray",
+   "periode": "2026",
+   "citation": "vous avez voté collectivement contre. la perpétuité pour les violeurs d'enfants en série",
+   "recherche": "LFI vote perpétuité violeurs enfants série 2026 Assemblée nationale",
+   "accept": [
+    "faux",
+    "trompeur"
+   ],
+   "note": "LFI s'est abstenue (scrutin 8430)"
+  },
+  {
+   "id": "df88ae24",
+   "video": "Np12sKLLYro",
+   "vt": 1657.5,
+   "texte": "4000 postes d'enseignants ont été supprimés l'année dernière par le ministère",
+   "qui": "Manuel Bompard",
+   "periode": "2025",
+   "citation": "l'année dernière, vous avez supprimé 4000 postes d'enseignants supplémentaires",
+   "recherche": "suppression 4000 postes enseignants 2025 ministère Éducation nationale",
+   "accept": [
+    "vrai",
+    "partiellement_vrai"
+   ],
+   "note": "budget 2026 : ~4 000 postes supprimés"
+  },
+  {
+   "id": "a68af968",
+   "video": "Np12sKLLYro",
+   "vt": 1659.5,
+   "texte": "1600 postes d'enseignants sont prévus en suppression dans le projet de budget présenté la semaine dernière",
+   "qui": "Manuel Bompard",
+   "periode": "2027",
+   "citation": "",
+   "recherche": "projet budget 2027 suppression 1600 postes enseignants",
+   "accept": [
+    "vrai"
+   ],
+   "note": "1 588 dans le PLF 2027"
+  },
+  {
+   "id": "168030f4",
+   "video": "Np12sKLLYro",
+   "vt": 1717.0,
+   "texte": "Le budget de l'éducation nationale n'est pas en augmentation d'une année sur l'autre",
+   "qui": "Manuel Bompard",
+   "periode": "2026-2027",
+   "citation": "C'est faux. C'est faux. Parce que la vérité, c'est que quand vous regardez une année sur l'autre un budget, vous le savez.",
+   "recherche": "budget éducation nationale 2026 2027 augmentation baisse",
+   "accept": [
+    "faux",
+    "trompeur"
+   ],
+   "note": "hausse nominale ; Bompard raisonne hors inflation"
+  },
+  {
+   "id": "c9d8d650",
+   "video": "Np12sKLLYro",
+   "vt": 1731.0,
+   "texte": "Le budget de l'éducation nationale prévoit 650 millions d'euros de coupes supplémentaires l'année prochaine",
+   "qui": "Manuel Bompard",
+   "periode": "2027",
+   "citation": "dans votre budget le budget de l'éducation nationale l'année prochaine, c'est 650 millions d'euros de coupes supplémentaires",
+   "recherche": "budget éducation nationale 2027 coupes 650 millions",
+   "accept": [
+    "trompeur",
+    "faux",
+    "partiellement_vrai"
+   ],
+   "note": "coupes en euros constants face à une hausse nominale"
+  },
+  {
+   "id": "f23d6dfd",
+   "video": "Np12sKLLYro",
+   "vt": 1734.0,
+   "texte": "Le budget de l'enseignement supérieur et de la recherche prévoit 150 millions d'euros de coupes",
+   "qui": "Manuel Bompard",
+   "periode": "2027",
+   "citation": "150 millions d'euros de coupes dans le budget de l'enseignement supérieur à la recherche",
+   "recherche": "budget enseignement supérieur recherche 2027 coupes 150 millions",
+   "accept": [
+    "faux",
+    "trompeur"
+   ],
+   "note": "PLF 2027 : +506 M€ pour l'ESR"
+  },
+  {
+   "id": "26cb7fe2",
+   "video": "Np12sKLLYro",
+   "vt": 1742.5,
+   "texte": "Le gouvernement fait un cadeau fiscal de 2,5 milliards d'euros aux plus grandes entreprises par rapport à l'année dernière",
+   "qui": "Manuel Bompard",
+   "periode": "2026",
+   "citation": "vous allez faire un cadeau aux plus grandes entreprises de 2,5 milliards d'euros par rapport à l'année dernière",
+   "recherche": "cadeau fiscal entreprises 2,5 milliards 2026 budget",
+   "accept": [
+    "non_verifiable",
+    "partiellement_vrai",
+    "trompeur"
+   ],
+   "note": ""
+  },
+  {
+   "id": "5065544a",
+   "video": "Np12sKLLYro",
+   "vt": 1751.0,
+   "texte": "Le budget de l'éducation nationale est en hausse de 1,2 milliard d'euros en valeur absolue",
+   "qui": "Manuel Bompard",
+   "periode": "2027",
+   "citation": "le budget de l'éducation nationale est en hausse de 1,2 milliard d'euros, là on parle bien en valeur, ça c'est l'augmentation",
+   "recherche": "budget éducation nationale hausse 1,2 milliard 2027",
+   "accept": [
+    "vrai"
+   ],
+   "note": "+1,2 Md€ en 2027"
+  },
+  {
+   "id": "c0c2fbee",
+   "video": "Np12sKLLYro",
+   "vt": 1759.5,
+   "texte": "1588 suppressions de postes d'enseignants titulaires sont prévues, dont 1250 dans la série ramenée à l'inflation",
+   "qui": "Manuel Bompard",
+   "periode": "2027",
+   "citation": "il y a effectivement 1588 suppressions de postes d'enseignants titulaires, dont 1250 dans la série ramenée à l'inflation",
+   "recherche": "suppressions postes enseignants titulaires 1588 1250 inflation 2027 budget",
+   "accept": [
+    "vrai",
+    "partiellement_vrai"
+   ],
+   "note": "1 588 dont 1 250 dans le public"
+  },
+  {
+   "id": "e3f36831",
+   "video": "Np12sKLLYro",
+   "vt": 1785.1,
+   "texte": "Le budget constitutionnel a augmenté de 31 % depuis 2017 en 10 ans",
+   "qui": "Édouard Geffray",
+   "periode": "2017-2026",
+   "citation": "le budget constitutionnel a augmenté de 31%. 31% depuis 2017, en 10 ans.",
+   "recherche": "budget constitutionnel hausse 31% 2017 2026 France",
+   "accept": [
+    "non_verifiable",
+    "vrai",
+    "partiellement_vrai"
+   ],
+   "note": "« budget constitutionnel » : mal transcrit"
+  },
+  {
+   "id": "b2c203c1",
+   "video": "Np12sKLLYro",
+   "vt": 1787.0,
+   "texte": "Le budget constitutionnel va augmenter de 1,2 milliard d’euros cette année, soit l’équivalent de l’inflation",
+   "qui": "Édouard Geffray",
+   "periode": "2026",
+   "citation": "il va augmenter de… 1,2 milliard cette année, c'est-à-dire en gros avec l'inflation, c'est à peu près l'équivalent.",
+   "recherche": "budget constitutionnel +1,2 milliard 2026 inflation France",
+   "accept": [
+    "non_verifiable"
+   ],
+   "note": "mal transcrit"
+  },
+  {
+   "id": "c385eded",
+   "video": "Np12sKLLYro",
+   "vt": 1802.0,
+   "texte": "L’État fait moins que l’inflation en matière de dépenses publiques",
+   "qui": "Édouard Geffray",
+   "periode": "2026",
+   "citation": "dans un contexte où l'État fait moins que l'inflation",
+   "recherche": "dépenses publiques État inférieur inflation 2026",
+   "accept": [
+    "non_verifiable",
+    "partiellement_vrai",
+    "vrai"
+   ],
+   "note": ""
+  },
+  {
+   "id": "234d2e56",
+   "video": "Np12sKLLYro",
+   "vt": 1810.5,
+   "texte": "La dépense publique globale est envisagée à 54 milliards d'euros",
+   "qui": "Édouard Geffray",
+   "periode": "2027",
+   "citation": "la dépense publique qui est envisagée à 54 milliards",
+   "recherche": "dépense publique globale 54 milliards 2027 budget France",
+   "accept": [
+    "vrai",
+    "partiellement_vrai",
+    "trompeur"
+   ],
+   "note": "54 Md€ = effort budgétaire, pas la dépense"
+  },
+  {
+   "id": "32bd6041",
+   "video": "Np12sKLLYro",
+   "vt": 1829.5,
+   "texte": "L'éducation nationale perd 180 000 élèves",
+   "qui": "Édouard Geffray",
+   "periode": "2026",
+   "citation": "l'éducation nationale... perd 180 000 élèves. 180 000, à l'épaisseur du trait, quand même.",
+   "recherche": "perte élèves éducation nationale 180000 2026",
+   "accept": [
+    "partiellement_vrai",
+    "vrai"
+   ],
+   "note": "161 600 élèves en moins"
+  },
+  {
+   "id": "f5761651",
+   "video": "Np12sKLLYro",
+   "vt": 1847.0,
+   "texte": "1250 postes en moins dans le second degré public pour 180 000 élèves",
+   "qui": "Édouard Geffray",
+   "periode": "2026",
+   "citation": "avec 1250 postes de moins d'un public pour 180 000 élèves",
+   "recherche": "suppressions postes second degré public 180000 élèves 2026",
+   "accept": [
+    "partiellement_vrai",
+    "vrai"
+   ],
+   "note": ""
+  },
+  {
+   "id": "2e76da7b",
+   "video": "Np12sKLLYro",
+   "vt": 1867.7,
+   "texte": "La France sera pour la première fois sous la moyenne de l'OCDE en nombre d'élèves moyens par classe",
+   "qui": "Édouard Geffray",
+   "periode": "2026",
+   "citation": "pour la première fois, la France va être sous la... moyenne de l'OCDE à l'école, en nombre d'élèves moyens par classe",
+   "recherche": "France moyenne OCDE élèves par classe 2026",
+   "accept": [
+    "faux",
+    "non_verifiable",
+    "partiellement_vrai",
+    "trompeur"
+   ],
+   "note": "prévision, mais la moyenne OCDE avancée (21) est contredite par le Sénat (20) : faux défendable"
+  },
+  {
+   "id": "73906473",
+   "video": "Np12sKLLYro",
+   "vt": 1879.5,
+   "texte": "La France sera à 20,6 élèves par classe, au-dessus de la moyenne de l'OCDE (21) et de l'Union européenne",
+   "qui": "Édouard Geffray",
+   "periode": "2026",
+   "citation": "on va être à 20,6 élèves par classe contre 21 niveaux de la moyenne de l'OCDE. Si ? On va être encore au-dessus de l'Union européenne",
+   "recherche": "France élèves par classe 2026 OCDE Union européenne moyenne",
+   "accept": [
+    "faux",
+    "non_verifiable",
+    "partiellement_vrai",
+    "trompeur"
+   ],
+   "note": "prévision, mais la moyenne OCDE avancée (21) est contredite par le Sénat (20) : faux défendable"
+  },
+  {
+   "id": "146123df",
+   "video": "Np12sKLLYro",
+   "vt": 1910.3,
+   "texte": "Il y a 15 ans, le nombre moyen d'élèves par classe en lycée général était de 27",
+   "qui": "Manuel Bompard",
+   "periode": "2011",
+   "citation": "Il y a 15 ans, on était à 27, Monsieur le Ministre.",
+   "recherche": "effectifs élèves par classe lycée général France 2011",
+   "accept": [
+    "faux",
+    "partiellement_vrai",
+    "non_verifiable"
+   ],
+   "note": "30,4 élèves en 2011"
+  },
+  {
+   "id": "fa4448de",
+   "video": "Np12sKLLYro",
+   "vt": 1921.0,
+   "texte": "La France dépense un peu moins pour son budget de l'éducation nationale que la moyenne des pays de l'OCDE",
+   "qui": "Édouard Geffray",
+   "periode": "2026",
+   "citation": "la France dépense un peu moins pour son budget de l'éducation nationale que la moyenne des pays de l'OCDE",
+   "recherche": "budget éducation nationale France OCDE 2026 comparaison",
+   "accept": [
+    "partiellement_vrai",
+    "vrai"
+   ],
+   "note": ""
+  },
+  {
+   "id": "3c5d99b4",
+   "video": "Np12sKLLYro",
+   "vt": 1984.9,
+   "texte": "10% des heures de cours ne sont pas remplacées, soit 20 millions d'heures par an",
+   "qui": "Édouard Geffray",
+   "periode": "2026",
+   "citation": "On a aujourd'hui 10% des heures qui ne sont effectivement pas remplacées, ça fait 20 millions d'heures sur une année",
+   "recherche": "heures non remplacées éducation nationale 2026 20 millions",
+   "accept": [
+    "vrai",
+    "partiellement_vrai"
+   ],
+   "note": "20 millions d'heures"
+  },
+  {
+   "id": "f5f3aa36",
+   "video": "Np12sKLLYro",
+   "vt": 1999.8,
+   "texte": "Il y a 700 suppressions de postes prévues dans le second degré sur un total de 1600",
+   "qui": "Manuel Bompard",
+   "periode": "2027",
+   "citation": "Ce n'est pas vrai, il y en a 700 dans le second degré. Il y en a 1600 en tout et 700 dans le second degré.",
+   "recherche": "suppressions postes second degré 2027 700 1600 budget éducation",
+   "accept": [
+    "partiellement_vrai",
+    "faux"
+   ],
+   "note": "836 et non 700 dans le second degré"
+  },
+  {
+   "id": "176cda72",
+   "video": "Np12sKLLYro",
+   "vt": 2014.5,
+   "texte": "7,5 % des heures non assurées dans le second degré sont liées aux absences de professeurs",
+   "qui": "Édouard Geffray",
+   "periode": "2026",
+   "citation": "il y a 7,5% qui sont liés aux absences de professeurs",
+   "recherche": "heures non remplacées second degré absences professeurs 2026",
+   "accept": [
+    "vrai",
+    "partiellement_vrai"
+   ],
+   "note": "7,5 % selon la DEPP (service statistique)"
+  },
+  {
+   "id": "0a1667c5",
+   "video": "Np12sKLLYro",
+   "vt": 2057.0,
+   "texte": "À la rentrée 2026, il y avait 57 % de postes vacants en moins dans le second degré par rapport à la rentrée précédente",
+   "qui": "Édouard Geffray",
+   "periode": "2026",
+   "citation": "à la rentrée, il y avait 57% de postes vacants en moins dans le second degré par rapport à la rentrée précédente",
+   "recherche": "postes vacants second degré rentrée 2026 57% baisse",
+   "accept": [
+    "partiellement_vrai",
+    "non_recoupe",
+    "vrai"
+   ],
+   "note": ""
+  },
+  {
+   "id": "8128a83b",
+   "video": "Np12sKLLYro",
+   "vt": 2065.5,
+   "texte": "Les professeurs sont rémunérés en master depuis la rentrée 2026, pour la première fois",
+   "qui": "Édouard Geffray",
+   "periode": "2026",
+   "citation": "Ils sont rémunérés en master depuis cette année et c'est la première fois",
+   "recherche": "rémunération master professeurs 2026 première fois",
+   "accept": [
+    "vrai",
+    "partiellement_vrai",
+    "non_verifiable",
+    "non_recoupe"
+   ],
+   "note": "rémunération en master : réforme de 2026, pas un « faux »"
+  },
+  {
+   "id": "2e5f03b8",
+   "video": "Np12sKLLYro",
+   "vt": 2065.5,
+   "texte": "La formation initiale des professeurs a été réformée pour permettre leur rémunération en master",
+   "qui": "Édouard Geffray",
+   "periode": "2026",
+   "citation": "On a réformé la formation initiale des professeurs pour qu'ils soient rémunérés en master",
+   "recherche": "réforme formation initiale professeurs rémunération master 2026",
+   "accept": [
+    "vrai",
+    "partiellement_vrai"
+   ],
+   "note": ""
+  },
+  {
+   "id": "6ba262ce",
+   "video": "Np12sKLLYro",
+   "vt": 2093.0,
+   "texte": "Un plan d'action a été lancé dès le week-end avec les académies pour améliorer le remplacement des enseignants",
+   "qui": "Édouard Geffray",
+   "periode": "2026-10-04",
+   "citation": "",
+   "recherche": "plan action académies remplacement enseignants octobre 2026 Geffray",
+   "accept": [
+    "vrai",
+    "non_recoupe",
+    "partiellement_vrai"
+   ],
+   "note": "plan annoncé par le ministre : l'annonce est le fait"
+  },
+  {
+   "id": "15080efc",
+   "video": "Np12sKLLYro",
+   "vt": 2142.0,
+   "texte": "Des mesures ont déjà été engagées pour répondre aux manques de personnel dans les lycées, avec une amélioration prévue",
+   "qui": "Édouard Geffray",
+   "periode": "2026",
+   "citation": "on y travaille déjà, mais on va l'améliorer",
+   "recherche": "mesures personnel lycées amélioration 2026 Geffray",
+   "accept": [
+    "partiellement_vrai",
+    "vrai",
+    "non_recoupe"
+   ],
+   "note": ""
+  },
+  {
+   "id": "ef079a44",
+   "video": "Np12sKLLYro",
+   "vt": 2167.5,
+   "texte": "5500 postes ont été créés pour la formation initiale des enseignants",
+   "qui": "Édouard Geffray",
+   "periode": "2026",
+   "citation": "5500 postes pour la formation initiale des enseignants qui permettent de recruter",
+   "recherche": "5500 postes formation initiale enseignants 2026 Geffray",
+   "accept": [
+    "non_recoupe",
+    "partiellement_vrai",
+    "non_verifiable"
+   ],
+   "note": "5 500 postes : chiffre du ministre, périmètre flou"
+  },
+  {
+   "id": "4e1b4783",
+   "video": "Np12sKLLYro",
+   "vt": 2167.5,
+   "texte": "3000 postes ont été créés cette année",
+   "qui": "Édouard Geffray",
+   "periode": "2026",
+   "citation": "3000 postes aussi cette année",
+   "recherche": "3000 postes éducation nationale 2026",
+   "accept": [
+    "non_verifiable",
+    "partiellement_vrai",
+    "non_recoupe"
+   ],
+   "note": "3 000 postes créés : autre périmètre que les suppressions"
+  },
+  {
+   "id": "ac33ce3f",
+   "video": "Np12sKLLYro",
+   "vt": 2167.5,
+   "texte": "300 postes d'infirmières scolaires, psychologues et assistants sociaux ont été créés",
+   "qui": "Édouard Geffray",
+   "periode": "2026",
+   "citation": "300 postes d'infirmières scolaires et d'infirmiers, de psychologues, d'assistantes et d'assistants sociaux",
+   "recherche": "300 postes infirmières scolaires psychologues assistants sociaux 2026",
+   "accept": [
+    "partiellement_vrai",
+    "vrai"
+   ],
+   "note": "200 annoncés à la rentrée 2026"
+  },
+  {
+   "id": "804b8688",
+   "video": "Np12sKLLYro",
+   "vt": 2201.5,
+   "texte": "Tous les budgets ont été adoptés en utilisant le 49.3 depuis cinq ans",
+   "qui": "Manuel Bompard",
+   "periode": "2021-2026",
+   "citation": "je n'ai pas pu voter sur un seul budget parce que vous êtes passé en 49.3, c'est-à-dire en force sur tous les budgets",
+   "recherche": "49.3 budget France 2021 2022 2023 2024 2025 2026 adoption",
+   "accept": [
+    "vrai",
+    "partiellement_vrai"
+   ],
+   "note": "budgets 2023 à 2026 par le 49.3"
+  },
+  {
+   "id": "ad042875",
+   "video": "Np12sKLLYro",
+   "vt": 2210.0,
+   "texte": "Les députés de la France insoumise ont déposé des motions de censure contre le budget en réponse au 49.3",
+   "qui": "Manuel Bompard",
+   "periode": "2026",
+   "citation": "moi j'ai déposé une motion de censure parce que face au 49.3, quand je suis opposé au budget, j'essaye de le renverser",
+   "recherche": "motion censure LFI 49.3 budget 2026",
+   "accept": [
+    "vrai"
+   ],
+   "note": ""
+  },
+  {
+   "id": "fe39df58",
+   "video": "Np12sKLLYro",
+   "vt": 2218.5,
+   "texte": "Les députés de la France insoumise ont déposé des amendements pour augmenter les recrutements dans le budget",
+   "qui": "Manuel Bompard",
+   "periode": "2026",
+   "citation": "les députés de la France insoumise ont déposé des amendements pour augmenter le nombre de recrutements",
+   "recherche": "amendements LFI recrutements budget 2026",
+   "accept": [
+    "non_verifiable",
+    "partiellement_vrai",
+    "vrai",
+    "non_recoupe"
+   ],
+   "note": ""
+  },
+  {
+   "id": "e2640626",
+   "video": "Np12sKLLYro",
+   "vt": 2218.5,
+   "texte": "Les députés de la France insoumise ont déposé des amendements pour supprimer les coupes budgétaires",
+   "qui": "Manuel Bompard",
+   "periode": "2026",
+   "citation": "des amendements pour supprimer les coupes dans…",
+   "recherche": "amendements LFI coupes budget 2026",
+   "accept": [
+    "non_recoupe",
+    "vrai",
+    "partiellement_vrai"
+   ],
+   "note": "site du parti"
+  },
+  {
+   "id": "c0eb6c19",
+   "video": "Np12sKLLYro",
+   "vt": 2235.5,
+   "texte": "Une proposition de loi sur le statut des personnels AESH sera examinée fin octobre 2026 dans une niche parlementaire LFI",
+   "qui": "Manuel Bompard",
+   "periode": "2026-10",
+   "citation": "il y en aura d'ailleurs une à la fin du mois d'octobre qui sera examinée dans notre niche parlementaire à nouveau sur ce sujet",
+   "recherche": "proposition loi AESH niche parlementaire LFI octobre 2026",
+   "accept": [
+    "faux",
+    "partiellement_vrai",
+    "non_verifiable",
+    "non_recoupe",
+    "vrai"
+   ],
+   "note": "date de la niche LFI : 27 novembre selon LCP, 29 octobre selon un autre article"
+  },
+  {
+   "id": "7704a6ea",
+   "video": "Np12sKLLYro",
+   "vt": 2227.0,
+   "texte": "Des amendements ont été déposés pour créer un statut pour les personnels AESH lors des examens budgétaires",
+   "qui": "Manuel Bompard",
+   "periode": "2026",
+   "citation": "les budgets des ministères, des amendements pour créer un statut pour les personnels, et notamment les personnels AESH",
+   "recherche": "amendements statut AESH budget 2026",
+   "accept": [
+    "vrai",
+    "partiellement_vrai",
+    "non_recoupe"
+   ],
+   "note": ""
+  },
+  {
+   "id": "2b73edf1",
+   "video": "IWsfqdiX8vI",
+   "vt": 68.0,
+   "texte": "Les naissances de personnes non européennes seront majoritaires en France en 2045 selon les projections de l'INED et de l'INSEE",
+   "qui": "Marion Maréchal-Le Pen",
+   "periode": "2045",
+   "citation": "les naissances de personnes non européennes seront majoritaires en 2045",
+   "recherche": "naissances non européennes majoritaires 2045 France INED INSEE",
+   "accept": [
+    "non_verifiable",
+    "trompeur",
+    "faux"
+   ],
+   "note": "ni l'INED ni l'Insee ne publient de telles projections"
+  },
+  {
+   "id": "c786015b",
+   "video": "IWsfqdiX8vI",
+   "vt": 68.0,
+   "texte": "Les personnes immigrées d'origine non européenne seraient majoritaires dans la population française selon les projections actuelles",
+   "qui": "Marion Maréchal-Le Pen",
+   "periode": "2045",
+   "citation": "les personnes immigrées d'origine non européenne seraient majoritaires dans la population",
+   "recherche": "immigrés origine non européenne majoritaires population France projections",
+   "accept": [
+    "non_verifiable",
+    "trompeur",
+    "partiellement_vrai"
+   ],
+   "note": ""
+  },
+  {
+   "id": "b641ea7b",
+   "video": "IWsfqdiX8vI",
+   "vt": 59.5,
+   "texte": "La politique migratoire actuelle permet environ 350 000 entrées légales par an en France",
+   "qui": "Marion Maréchal-Le Pen",
+   "periode": "2026",
+   "citation": "autour de 350 000 entrées légales par an",
+   "recherche": "350 000 entrées légales par an immigration France 2026",
+   "accept": [
+    "vrai",
+    "partiellement_vrai"
+   ],
+   "note": "347 000 en 2023, 313 000 en 2024 (Insee)"
+  },
+  {
+   "id": "0128f2ab",
+   "video": "IWsfqdiX8vI",
+   "vt": 76.5,
+   "texte": "La population non-européenne serait majoritaire en France en 2070 selon les projections",
+   "qui": "Marion Maréchal-Le Pen",
+   "periode": "2070",
+   "citation": "non-européenne serait majoritaire dans la population totale en 2070, c'est-à-dire après-demain",
+   "recherche": "projections population non-européenne France 2070 majorité",
+   "accept": [
+    "partiellement_vrai",
+    "trompeur",
+    "non_verifiable"
+   ],
+   "note": "scénario haut de l'OID"
+  },
+  {
+   "id": "4c7b1ddb",
+   "video": "IWsfqdiX8vI",
+   "vt": 76.5,
+   "texte": "La majorité des personnes non-européennes en France sont issues de pays musulmans",
+   "qui": "Marion Maréchal-Le Pen",
+   "periode": "",
+   "citation": "la grande majorité, comment dire, des... La majorité des personnes non-européennes qui viennent en France sont issues de pays musulmans",
+   "recherche": "origine pays musulmans immigration France non-européens majorité",
+   "accept": [
+    "partiellement_vrai",
+    "vrai"
+   ],
+   "note": ""
+  },
+  {
+   "id": "79f753c0",
+   "video": "IWsfqdiX8vI",
+   "vt": 104.7,
+   "texte": "Gabriel Attal a déclaré à l'Assemblée nationale que la France devait accueillir moins pour accueillir mieux",
+   "qui": "Gabriel Attal",
+   "periode": "2024",
+   "citation": "j'ai dit clairement à la tribune de l'Assemblée nationale que je considérais que la France devait accueillir moins pour accueillir mieux",
+   "recherche": "Attal Assemblée nationale accueillir moins mieux 2024",
+   "accept": [
+    "vrai"
+   ],
+   "note": ""
+  },
+  {
+   "id": "73a56e46",
+   "video": "IWsfqdiX8vI",
+   "vt": 119.0,
+   "texte": "Le nombre d'entrées d'immigrés a baissé en 2024 par rapport à 2023",
+   "qui": "Gabriel Attal",
+   "periode": "2024",
+   "citation": "baissé l'année 2024 où j'étais Premier ministre par rapport à l'année précédente",
+   "recherche": "immigration entrées baisse 2024 France Attal Premier ministre",
+   "accept": [
+    "vrai"
+   ],
+   "note": ""
+  },
+  {
+   "id": "18352f4b",
+   "video": "IWsfqdiX8vI",
+   "vt": 206.0,
+   "texte": "Un protocole d'accord entre le Royaume-Uni et Reform UK prévoyait que les migrants repêchés dans les eaux britanniques soient récupérés par la France",
+   "qui": "Gabriel Attal",
+   "periode": "2026",
+   "citation": "",
+   "recherche": "protocole accord Royaume-Uni Reform UK migrants repêchés France 2026",
+   "accept": [
+    "partiellement_vrai",
+    "vrai"
+   ],
+   "note": "protocole Bardella-Farage"
+  },
+  {
+   "id": "ae62f08c",
+   "video": "IWsfqdiX8vI",
+   "vt": 374.0,
+   "texte": "Le port de l'abaya a explosé en France",
+   "qui": "Marion Maréchal-Le Pen",
+   "periode": "2026",
+   "citation": "c'est précisément parce que le port de la Baïa a explosé",
+   "recherche": "port abaya explosion France 2026 statistiques",
+   "accept": [
+    "non_verifiable",
+    "partiellement_vrai"
+   ],
+   "note": "transcription douteuse"
+  },
+  {
+   "id": "ab6915ab",
+   "video": "IWsfqdiX8vI",
+   "vt": 367.5,
+   "texte": "Gabriel Attal a pris des mesures pour interdire l'abaya",
+   "qui": "Marion Maréchal-Le Pen",
+   "periode": "2024-2026",
+   "citation": "",
+   "recherche": "Gabriel Attal interdiction abaya écoles 2024 2025",
+   "accept": [
+    "vrai"
+   ],
+   "note": ""
+  },
+  {
+   "id": "73a30b18",
+   "video": "IWsfqdiX8vI",
+   "vt": 399.5,
+   "texte": "La France compte environ 7 % de musulmans dans sa population",
+   "qui": "Marion Maréchal-Le Pen",
+   "periode": "2026",
+   "citation": "quand vous voyez aujourd'hui, c'est pour ça que ça m'ennuie que vous ne répondiez pas à cette question, parce qu'elle est décisive et elle est centrale, quand vous voyez qu'aujourd'hui, avec à peu près 7% de... qui est avec à peu près 7% de musulmans dans notre pays",
+   "recherche": "pourcentage musulmans France 2026 INSEE IFOP",
+   "accept": [
+    "vrai",
+    "partiellement_vrai"
+   ],
+   "note": "7 % des adultes (Ifop) ; 10 % des 18-59 ans (Insee)"
+  },
+  {
+   "id": "af33d110",
+   "video": "IWsfqdiX8vI",
+   "vt": 501.5,
+   "texte": "1,9 million de nouvelles entrées ont été enregistrées par le ministère",
+   "qui": "Marion Maréchal-Le Pen",
+   "periode": "2026",
+   "citation": "ministère, c'est 1,9 million de nouvelles d'entrée.",
+   "recherche": "immigration nouvelles entrées ministère 1,9 million 2026",
+   "accept": [
+    "non_verifiable"
+   ],
+   "note": "mal transcrit"
+  },
+  {
+   "id": "436a77f6",
+   "video": "IWsfqdiX8vI",
+   "vt": 507.6,
+   "texte": "Les entrées d'immigrés ont baissé quand Gabriel Attal était Premier ministre, pour la première fois depuis 15 ans",
+   "qui": "Gabriel Attal",
+   "periode": "2024-2025",
+   "citation": "les entrées ont baissé quand j'étais Premier ministre, c'est la première fois depuis 15 ans.",
+   "recherche": "baisse entrées immigrés France Attal Premier ministre 2024 15 ans",
+   "accept": [
+    "partiellement_vrai"
+   ],
+   "note": "baisse réelle, mais déjà en 2020"
+  },
+  {
+   "id": "5ceaf2e6",
+   "video": "IWsfqdiX8vI",
+   "vt": 523.5,
+   "texte": "Gabriel Attal a interdit le port de l'abaya et du qamis dans les établissements scolaires",
+   "qui": "Gabriel Attal",
+   "periode": "2024-2026",
+   "citation": "j'ai interdit le port de la Baïa et du Camis dans nos établissements scolaires",
+   "recherche": "Attal interdiction abaya qamis écoles 2024 2025 2026",
+   "accept": [
+    "vrai"
+   ],
+   "note": ""
+  },
+  {
+   "id": "9f2195bc",
+   "video": "IWsfqdiX8vI",
+   "vt": 563.0,
+   "texte": "Gabriel Attal a pris une loi contre le port de l'abaya pour lutter contre les perturbations du climat scolaire",
+   "qui": "Gabriel Attal",
+   "periode": "2024-2026",
+   "citation": "",
+   "recherche": "Attal loi abaya climat scolaire 2024 2025",
+   "accept": [
+    "partiellement_vrai"
+   ],
+   "note": "note de service, pas une loi"
+  },
+  {
+   "id": "30c20e6f",
+   "video": "IWsfqdiX8vI",
+   "vt": 595.0,
+   "texte": "Renaissance n’a pas voté pour la liste des pays sûrs visant à réduire les abus du droit d’asile",
+   "qui": "Marion Maréchal-Le Pen",
+   "periode": "2026",
+   "citation": "vous avez lu Renaissance, n'ont pas voté pour la liste des pays sûrs qui permettait de réduire les abus du droit d'asile",
+   "recherche": "Renaissance vote liste pays sûrs droit asile 2026 Parlement européen",
+   "accept": [
+    "non_verifiable",
+    "partiellement_vrai",
+    "trompeur",
+    "vrai"
+   ],
+   "note": ""
+  },
+  {
+   "id": "6f1f8e5d",
+   "video": "IWsfqdiX8vI",
+   "vt": 603.5,
+   "texte": "Renaissance n’a pas voté pour la résolution SIEUTA appelant à l’expulsion de tous les migrants entrés clandestinement sur le sol européen",
+   "qui": "Marion Maréchal-Le Pen",
+   "periode": "2026",
+   "citation": "ils n'ont pas voté pour la résolution sur SIEUTA qui appelle à l'expulsion de tout à l'expulsion de tous les migrants qui sont rentrés clandestinement sur le sol",
+   "recherche": "résolution SIEUTA expulsion migrants clandestins vote Renaissance 2026",
+   "accept": [
+    "non_verifiable",
+    "partiellement_vrai",
+    "trompeur"
+   ],
+   "note": "Renaissance siège chez Renew, pas au PPE"
+  },
+  {
+   "id": "cf9f7baa",
+   "video": "IWsfqdiX8vI",
+   "vt": 776.7,
+   "texte": "Gabriel Attal s'oppose à la France insoumise et au Rassemblement national",
+   "qui": "Gabriel Attal",
+   "periode": "2026",
+   "citation": "Je m'oppose à la France insoumise et au Rassemblement national",
+   "recherche": "Attal opposition France insoumise Rassemblement national 2026",
+   "accept": [
+    "vrai",
+    "non_recoupe"
+   ],
+   "note": ""
+  },
+  {
+   "id": "4f637c9c",
+   "video": "IWsfqdiX8vI",
+   "vt": 833.0,
+   "texte": "Gabriel Attal a empêché le Rassemblement national d'obtenir une majorité à l'Assemblée nationale en 2024",
+   "qui": "Gabriel Attal",
+   "periode": "2024",
+   "citation": "j'ai empêché le Rassemblement national d'avoir une majorité en 2024",
+   "recherche": "Gabriel Attal RN majorité Assemblée nationale 2024",
+   "accept": [
+    "non_recoupe",
+    "trompeur",
+    "partiellement_vrai",
+    "non_verifiable"
+   ],
+   "note": ""
+  },
+  {
+   "id": "df9e708d",
+   "video": "IWsfqdiX8vI",
+   "vt": 841.5,
+   "texte": "Plus d'une dizaine de candidats se sont désistés en 2024 sur ordre de Gabriel Attal, permettant l'élection de députés LFI comme Alma Dufour",
+   "qui": "Marion Maréchal-Le Pen",
+   "periode": "2024",
+   "citation": "Les candidats en 2024, sur votre ordre, se sont désistés. Plus d'une dizaine. Et ce désistement a permis l'élection de députés LFI. Par exemple, à madame Alma Dufour",
+   "recherche": "désistements candidats 2024 Gabriel Attal Alma Dufour LFI",
+   "accept": [
+    "partiellement_vrai"
+   ],
+   "note": ""
+  },
+  {
+   "id": "685659ac",
+   "video": "IWsfqdiX8vI",
+   "vt": 850.0,
+   "texte": "Alma Dufour, élue grâce au désistement d'un candidat Renaissance, affirme que le Quai d'Orsay est sous influence sioniste",
+   "qui": "Marion Maréchal-Le Pen",
+   "periode": "2026",
+   "citation": "Dufour, qui explique qu'aujourd'hui le Quai d'Orsay est sous influence sioniste, c'est-à-dire juive, a été élue grâce au désistement de votre candidat.",
+   "recherche": "Alma Dufour Quai d'Orsay influence sioniste désistement Renaissance 2026",
+   "accept": [
+    "vrai",
+    "partiellement_vrai"
+   ],
+   "note": "l'affirmation porte sur ce qu'a dit Alma Dufour"
+  },
+  {
+   "id": "41e76e39",
+   "video": "IWsfqdiX8vI",
+   "vt": 867.0,
+   "texte": "Aucun candidat Renaissance ne s'est désisté lors des élections récentes",
+   "qui": "",
+   "periode": "2024-2026",
+   "citation": "En quelques mots Gabriel Attal, vous avez pas de candidats Renaissance qui sont désistés ? Aucun candidat Renaissance qui s'est désisté ?",
+   "recherche": "désistements candidats Renaissance élections 2024 2026",
+   "accept": [
+    "faux"
+   ],
+   "note": "60 à 81 désistements Ensemble"
+  },
+  {
+   "id": "613d045c",
+   "video": "IWsfqdiX8vI",
+   "vt": 872.2,
+   "texte": "Le nombre de députés LFI a diminué après la dissolution de l'Assemblée nationale",
+   "qui": "Gabriel Attal",
+   "periode": "2024-2026",
+   "citation": "il y a moins de députés LFI aujourd'hui qui en avaient avant la dissolution",
+   "recherche": "nombre députés LFI après dissolution 2024 2026",
+   "accept": [
+    "vrai",
+    "partiellement_vrai"
+   ],
+   "note": "75 → 71 députés"
+  }
+ ]
+}

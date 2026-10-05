@@ -209,6 +209,18 @@ def self_sourced(explication: str, qui: str, claim: str = "") -> bool:
     return False
 
 
+def quoted_in(quote: str, text: str, min_words: int = 4) -> bool:
+    """La phrase citée figure mot pour mot dans le texte (casse, accents et
+    ponctuation ignorés) — même garde-fou que pour la citation d'un propos.
+    Une citation coupée par « … » est jugée sur son plus long morceau."""
+    words = lambda t: re.findall(r"\w+", _ascii(t).replace("’", "'"))  # noqa: E731
+    pieces = [words(p) for p in re.split(r"…|\.\.\.", str(quote or ""))]
+    longest = max(pieces, key=len, default=[])
+    if len(longest) < min_words:
+        return False
+    return f" {' '.join(longest)} " in f" {' '.join(words(text))} "
+
+
 _INAUDIBLE_RE = re.compile(r"\W*transcription\s+(?:douteuse|incomplete|incertaine|inaudible|erronee|confuse)")
 
 

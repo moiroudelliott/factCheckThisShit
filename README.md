@@ -54,6 +54,7 @@ et les autres fichiers de [`tests/`](tests/) — voir [ARCHITECTURE.md](ARCHITEC
 | `vocabulaire.txt` | Mots que Whisper doit s'attendre à entendre (sigles, partis, termes souvent mal transcrits) — modifiable |
 | `generate_session.py` | Génère une session de relecture à partir d'un simple lien YouTube, sans regarder la vidéo : même pipeline que le direct, minutage du direct (`--publish` pour la mettre sur le site) |
 | `publish_session.py` | Publie une session enregistrée (bouton ⏵ du récap) sur la page de relecture du site, et synchronise l'overlay du site avec l'extension |
+| `bench_verdicts.py` | Banc d'essai des verdicts : rejoue la vérification sur 103 affirmations aux preuves figées et compte les erreurs (« faux » à tort, parole validée, dérobades) |
 | `deploy_site.py` | Met le site en ligne par SSH (sauvegarde de l'ancien site sur le serveur, puis bascule ; `--dry-run` pour lister les fichiers) |
 | `purge_cache.py` | Purge les verdicts douteux ou signalés du cache de fact-checks (`--dry-run` d'abord ; sauvegarde automatique) |
 | `data/` | Données téléchargées et journaux locaux (gitignored) : open data de l'Assemblée nationale (~40 Mo, au premier démarrage), signalements de verdicts (`reports.jsonl`) |

@@ -128,9 +128,15 @@
     // le verdict est connu d'avance, la carte ne s'affiche donc jamais
     const inaudible = new Set(events.filter((e) => e.m.type === 'fact_check_result' && typeof isInaudible === 'function'
       && isInaudible(e.m)).map((e) => e.m.id));
+    // « Non recoupé » : au récap avec son verdict, jamais en carte
+    const nocard = new Set(events.filter((e) => e.m.type === 'fact_check_result' && e.m.verdict === 'non_recoupe')
+      .map((e) => e.m.id));
     for (const e of events) {
       if (e.m.type !== 'talking_points') continue;
-      for (const p of e.m.points || []) if (inaudible.has(p.id)) p.type = 'inaudible';
+      for (const p of e.m.points || []) {
+        if (inaudible.has(p.id)) p.type = 'inaudible';
+        if (nocard.has(p.id)) p.nocard = true;
+      }
     }
     const byId = new Map();
     for (const e of events) {

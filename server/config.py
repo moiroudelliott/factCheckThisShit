@@ -15,6 +15,14 @@ MISTRAL_MODEL = os.environ.get("MISTRAL_MODEL", "mistral-medium-latest")  # medi
 MISTRAL_FACTCHECK_MODEL = os.environ.get("MISTRAL_FACTCHECK_MODEL", MISTRAL_MODEL)
 MISTRAL_TIMEOUT_S = 20            # délai d'une réponse (extraction, identification des voix)
 MISTRAL_FACTCHECK_TIMEOUT_S = 40  # … d'un verdict : prompt long (preuves), modèle parfois plus lent
+# Contre-vérification d'un « faux » (second appel, sur ce seul verdict) : le
+# plus accusateur des verdicts, et celui qui se trompait le plus souvent
+FACTCHECK_RECHECK_FALSE = os.environ.get("FACTCHECK_RECHECK_FALSE", "1") != "0"
+
+# ── Lecture des articles (server/articles.py) ─────────────────────────────
+ARTICLE_FETCH_MAX = int(os.environ.get("ARTICLE_FETCH_MAX", "3"))  # articles ouverts par verdict (0 = extraits seuls)
+ARTICLE_FETCH_TIMEOUT_S = 2.5    # au-delà, l'article est ignoré (le verdict garde l'extrait du moteur)
+ARTICLE_PASSAGE_CHARS = 700      # passage gardé par article : les phrases qui parlent de l'affirmation
 MISTRAL_MAX_RETRIES = 3     # tentatives supplémentaires sur 429 (rate limit)
 MISTRAL_RETRY_BASE_S = 2.0  # backoff exponentiel: 2s, 4s, 8s (sauf Retry-After fourni par l'API)
 
@@ -190,4 +198,4 @@ CACHE_SIM_THRESHOLD = 0.75  # similarité (mots-clés) pour considérer deux cla
 # Version des règles de vérification : un verdict rendu sous des règles plus
 # anciennes n'est plus resservi (cas vécu : des « faux » appuyés sur une
 # autre année, resservis tels quels après la correction du prompt).
-FACTCHECK_RULES_VERSION = 3
+FACTCHECK_RULES_VERSION = 4

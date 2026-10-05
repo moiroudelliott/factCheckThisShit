@@ -208,7 +208,8 @@ cache.lookup(claim, année de la vidéo)  →  hit ?  → emit verdict instantan
         │ miss
         ▼
 EN PARALLÈLE (greenlets) :
-  web_search (SearxNG, 6 résultats, + année si replay, domaines exclus filtrés)
+  web_search (API Brave + Wikipédia, 6 résultats, + année si replay, domaines exclus filtrés)
+    puis les ARTICLE_FETCH_MAX=3 premiers articles ouverts en parallèle (articles.fetch_passage)
   scholar_search (HAL + OpenAlex, eux-mêmes en parallèle)
   datagouv_search (catalogue data.gouv.fr)
 ET EN LOCAL (en mémoire, instantané — jamais d'appel réseau) :
@@ -268,7 +269,7 @@ session_verdicts[sid] ← verdict (cohérence des vérifications suivantes)
 
 **Recherche web éteinte** — sans SearxNG (Docker éteint), presque aucun verdict n'a de source. `/health` renvoie `web_search` : la popup prévient avant le lancement, et `start_transcription` envoie un `server_warning` sur la puce (`factcheck.search_available`).
 
-**Propos exact** — quand la citation a été validée (§7), le prompt reçoit les mots prononcés à côté de la reformulation : Mistral juge ce qui a été dit, pas le résumé. Si l'affirmation contient manifestement une erreur de transcription (nom déformé, mot incompréhensible, chiffre invraisemblable pour le sujet), il répond `non_verifiable` avec une explication qui commence par « Transcription douteuse : » au lieu de conclure « faux ». `finalize_result` marque alors le verdict `inaudible: true` (`sources.is_inaudible` : « Transcription douteuse », « incomplète »…) : rien n'a été vérifié, il n'y a rien à montrer. L'extension retire la carte (sortie animée, carte suivante) et reclasse le point en `inaudible` — hors des affirmations vérifiées, des repères et des compteurs, visible seulement dans « tous les points » du récap. En relecture, le verdict est connu d'avance : la carte ne s'affiche jamais (`relecture.js`), et `publish_session.py` ne compte pas ces points comme vérifiés. Cas vécu : une carte « Transcription incomplète : l'affirmation ne précise pas quels travaux… » affichée sur la vidéo.
+**Propos exact** — quand la citation a été validée (§7), le prompt reçoit les mots prononcés à côté de la reformulation : Mistral juge ce qui a été dit, pas le résumé. Si l'affirmation contient manifestement une erreur de transcription (nom déformé, mot incompréhensible, chiffre invraisemblable pour le sujet), il répond `non_verifiable` avec une explication qui commence par « Transcription douteuse : » au lieu de conclure « faux ». `finalize_result` marque alors le verdict `inaudible: true` (`sources.is_inaudible` : « Transcription douteuse », « incomplète »…) : rien n'a été vérifié, il n'y a rien à montrer. L'extension retire la carte (sortie animée, carte suivante) et reclasse le point en `inaudible` — hors des affirmations vérifiées, des repères et des compteurs, visible seulement dans « tous les points » du récap. En relecture, le verdict est connu d'avance : la carte ne s'affiche jamais (`relecture.js`), et `publish_session.py` ne compte pas ces points comme vérifiés. De même, un verdict **« non recoupé »** (l'orateur parle de lui, de son ministère ou de son camp, et rien d'indépendant ne tranche) n'a pas de carte : il reste au récap avec son verdict (`point.nocard`). Cas vécu : une carte « Transcription incomplète : l'affirmation ne précise pas quels travaux… » affichée sur la vidéo.
 
 **Signalements** — le bouton ⚑ d'une carte ou du récap envoie `POST /report_verdict` (via le service worker : seule l'origine de l'extension est acceptée) avec un motif parmi `verdict_faux`, `mauvaise_source`, `pas_un_fait`, `transcription`, `locuteur`. Le signalement est ajouté à `data/reports.jsonl` et, sauf pour un mauvais locuteur, le verdict **sort du cache** (`cache.mark_reported`) : il n'est plus jamais resservi, et `purge_cache.py` le supprime.
 
@@ -285,6 +286,28 @@ Pour ajouter ou reclasser un site : modifier `config.py` **et** la page `site/so
 **Replays** : l'année de la vidéo (`sources.video_year`, depuis la date de publication) est ajoutée à la requête web, et le cache range chaque verdict sous cette année : un replay de 2024 et un direct de 2026 ne partagent pas leurs verdicts.
 
 Le cache (`factcheck_cache.db`, SQLite, colonnes `video_year`, `reported_at` et `rules` ajoutées par migration) est à **deux niveaux** : la table persiste entre redémarrages, `_cache_mem` en est une copie en RAM pour le matching flou (`claims_match`, `CACHE_SIM_THRESHOLD=0.75`, `CACHE_TTL_DAYS=30` vérifié à chaque lookup). Un verdict rendu sous des règles de vérification plus anciennes (`rules` ≠ `FACTCHECK_RULES_VERSION`) n'est plus rechargé : les « faux » appuyés sur une autre année auraient été resservis tels quels après la correction du prompt. Ne sont jamais mis en cache les verdicts non sourcés, les « non recoupé » (une source indépendante peut paraître le lendemain) ni ceux d'une affirmation datée par rapport au jour même (« ce soir », « actuellement », « il y a un an » — `text_utils.has_relative_time`). `purge_cache.py` applique ces mêmes règles aux verdicts déjà en base, plus une liste d'identifiants choisis à la main (sauvegarde automatique avant suppression).
+
+**Lecture des articles** (`articles.py`) — le verdict se jouait sur ~300 caractères d'extrait par résultat : trop peu pour voir qu'un chiffre porte sur une autre année, un autre périmètre ou un autre bâtiment (« 160 internes à l'intérieur » face à « aucun élève dans le bâtiment »). `gather_evidence` ouvre les 3 premiers résultats web en parallèle (délai `ARTICLE_FETCH_TIMEOUT_S`, PDF ignorés) ; `extract_text` garde le texte des paragraphes (sans menus, scripts ni pieds de page), `relevant_passage` les phrases qui parlent de l'affirmation — mêmes chiffres (poids fort), mots-clés, année — jusqu'à 700 caractères. Le passage est ajouté au résultat (« Extrait de l'article »), et le prompt le fait primer sur le résumé du moteur. Délai par article : 2,5 s. Environ deux articles sur trois s'ouvrent (les autres : délai, accès refusé, page sans paragraphes). `ARTICLE_FETCH_MAX=0` revient aux seuls extraits.
+
+**Contre-vérification des « faux »** (`recheck_false`, `FACTCHECK_RECHECK_FALSE`) — « faux » est le verdict le plus accusateur, et celui qui se trompait le plus. Avant de sortir, il passe un second examen, **à l'aveugle** : le modèle ne voit pas le verdict proposé (relu, un « faux » était presque toujours confirmé, même quand la source donnait raison à l'orateur). Il dit seulement si les sources **contredisent** le fait principal (même acteur, même mesure, même période, de sorte que les deux ne peuvent pas être vrais en même temps — et il doit dire pourquoi), le **confirment**, le **nuancent** ou **ne tranchent pas**, en recopiant mot pour mot la phrase de source sur laquelle il s'appuie. Cette phrase est vérifiée dans les preuves (`sources.quoted_in`, même garde-fou que la citation d'un propos) : tirée de la mémoire du modèle, elle ne vaut rien. « Faux » ne reste que si les deux examens concordent et que la phrase existe ; sinon le verdict devient « vrai » (confirme), « partiellement vrai » (nuance) ou « non vérifiable », puis repasse par `finalize_result`. Le coût ne porte que sur les « faux » (~10 % des verdicts) ; en cas d'erreur de l'appel, le premier verdict est gardé.
+
+Mesures sur le banc d'essai (ci-dessous ; deux essais par réglage, ±1 d'un essai à l'autre) :
+
+| Réglage | Acceptables /103 | « Faux » à tort | Dérobades |
+|---|---|---|---|
+| Règles d'avant, extraits seuls | 92 | 6 | 3 |
+| + articles | 94 | 6 | 2 |
+| + contre-vérification relue (voit le « faux » proposé) | 93-96 | 3-4 | 2-4 |
+| + phrase de source vérifiée | 93 | 3 | 5 |
+| + examen à l'aveugle | 94-95 | 2 | 5 |
+| + incompatibilité à expliquer (**réglage actuel**) | **96** | **1** | 5 |
+| réglage actuel sans les articles | 94-95 | 0 | 6-8 |
+
+Les articles ajoutent une ou deux réponses tranchées (moins de « non vérifiable ») pour un « faux » à tort de plus, au prix d'une à deux secondes par verdict ; ils restent activés (`ARTICLE_FETCH_MAX=0` pour s'en passer).
+
+**Découpage** — `call_mistral_factcheck` = `gather_evidence` (toutes les recherches) puis `judge` (prompt, `finalize_result`, contre-vérification). Le découpage sert au banc d'essai.
+
+**Banc d'essai** (`bench_verdicts.py`, `bench/verdicts_gold.json`) — régénérer un débat change aussi la transcription, l'extraction et les résultats de recherche : deux essais ne se comparaient qu'à l'œil. Le banc fige 103 affirmations des deux débats de la démonstration avec, pour chacune, les verdicts jugés acceptables (référence écrite à la main, notes comprises) ; `collect` réunit et fige leurs preuves une fois (`data/bench/evidence.json`, hors dépôt : extraits d'articles de presse) ; `run` rejoue seulement le jugement (appels Mistral réels, mémoire de session comprise) et compte : verdicts acceptables, **« faux » à tort**, **parole validée** (« vrai » là où la seule source est l'orateur), **dérobades** (« non vérifiable » là où une source tranchait). Options : `--sans-articles`, `--sans-contre-verification`, `--modele`, `--video`.
 
 **Modèle du verdict** — `MISTRAL_FACTCHECK_MODEL` (défaut : `MISTRAL_MODEL`, medium), délai de réponse `MISTRAL_FACTCHECK_TIMEOUT_S=40` (prompt long). Chaque appel journalise sa durée et ses tokens. Essai d'octobre 2026 sur les deux débats de la démonstration avec `mistral-large-latest` : 3,1 s contre 2,3 s par verdict (médianes, mêmes prompts), mais nettement moins fiable avec ces règles — sur Attal / Maréchal, 8 « faux » dont 7 à tort (contre 2 dont 1 à tort avec medium) : absence de source prise pour une contradiction, écart de 7 % jugé faux, chiffres repris du ministre jugés « vrais » parce que « la presse concorde ». Medium reste le défaut. Garde-fou ajouté à cette occasion : un « faux » dont le fait contraire ou l'explication commence par une absence (« aucune projection ne prévoit… », « les sources ne confirment pas… ») devient « non vérifiable ».
 
@@ -385,7 +408,7 @@ showCard (spinner)
 | `HOLD_REPLAY_MS` (relecture : durée fixe) / `CARD_MAX_MS` (durée max d'une carte, tout état confondu) | 12000 / 45000 | content.js |
 | `MAX_QUEUE` / `DUPE_MEMORY` / `PROBE_FRESH_MS` | 8 / 6 / 6000 | content.js |
 | `CHECKWORTHY_MIN` / `ENJEU_MIN` | 6 / 7 (sur 10) | server/config.py |
-| `FACTCHECK_RULES_VERSION` | 3 | server/config.py |
+| `FACTCHECK_RULES_VERSION` | 4 | server/config.py |
 | `MAX_HOTWORDS_CHARS` / `MAX_LEARNED` | 450 / 20 | server/vocabulary.py |
 | `FACTCHECK_FEEDS_REFRESH_S` / `AN_REFRESH_S` | 1h / 7j | server/config.py |
 | cache Eurostat / `MAX_PER_CLAIM` | 24h / 3 | server/indicators.py |
@@ -405,6 +428,8 @@ Aucun GPU, aucune clé ni aucun réseau nécessaires — chaque fichier se lance
 | `tests/test_transcript.py` | chevauchement entre chunks, transcript annoté |
 | `tests/test_voices.py` | comparaison de noms, stockage de la banque de voix |
 | `tests/test_vocabulary.py` | mots attendus par Whisper : priorités, noms propres, limite de taille, écho des hotwords |
+| `tests/test_recheck.py` | contre-vérification des « faux » (réponses simulées) : « faux » gardé seulement sur une contradiction appuyée par une phrase réellement présente dans les preuves ; phrase de source vérifiée mot pour mot |
+| `tests/test_articles.py` | texte d'une page (sans menus ni scripts), passage utile d'un article pour une affirmation |
 | `tests/test_points.py` | notes de vérifiabilité et d'importance, validation et datation de la citation exacte, orateur nommé dans sa propre citation |
 | `tests/test_known_factchecks.py` | lecture des flux RSS, correspondance affirmation ↔ fact-check publié |
 | `tests/test_official_data.py` | décodage JSON-stat Eurostat, déclencheurs d'indicateurs, jamais d'appel Eurostat pendant un fact-check (cache disque), parsing des scrutins et recherche de votes |

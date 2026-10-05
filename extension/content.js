@@ -1035,7 +1035,7 @@ function addPoint(point, { card = true } = {}) {
   if (S.recapOpen) renderRecap();
 
   // Seules les affirmations vérifiables méritent une carte ; le reste vit au récap
-  if (!card || point.type !== 'affirmation') return;
+  if (!card || point.type !== 'affirmation' || point.nocard) return;
   if (isNearDupeOfShown(sig)) return;
 
   if (S.queue.length >= MAX_QUEUE) S.queue.shift();
@@ -1193,6 +1193,14 @@ function onFactCheck(data) {
     scheduleSave();
     if (S.recapOpen) renderRecap();
     return;
+  }
+  // « Non recoupé » : l'orateur parle de lui, de son ministère ou de son
+  // camp, et rien d'indépendant ne le confirme ni ne le dément — au récap
+  // avec son verdict, pas de carte sur la vidéo
+  if (entry && data.verdict === 'non_recoupe') {
+    entry.point.nocard = true;
+    S.queue = S.queue.filter((id) => id !== data.id);
+    if (S.current?.id === data.id) exitCurrent();
   }
   if (entry) {
     entry.fc = {

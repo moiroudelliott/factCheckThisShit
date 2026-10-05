@@ -27,7 +27,7 @@ from server.factcheck import (
     VIDEO_ANALYSIS_PROMPT,
 )
 from server.notify import describe_error, warn_client
-from server.points import apply_checkworthiness, citation_time, speaker_named_in_citation, validate_citation
+from server.points import apply_checkworthiness, parse_guests, citation_time, speaker_named_in_citation, validate_citation
 from server.state import (
     session_history, session_starts, session_buffers, session_contexts, session_points, session_verdicts,
     session_dupe_index, session_flush_locks, session_chunk_locks, session_speakers,
@@ -78,7 +78,7 @@ def analyze_video():
         start = content.find('{')
         if start != -1:
             d, _ = json.JSONDecoder().raw_decode(content, start)
-            guests = [str(g).strip() for g in (d.get("intervenants") or [])
+            guests = [str(g).strip()[:120] for g in (d.get("intervenants") or [])
                       if isinstance(g, str) and str(g).strip()][:8]
             return {"guests": guests}
     except Exception as e:
@@ -183,10 +183,11 @@ def on_set_context(data):
     guests_raw = data.get("guests", "")
     if isinstance(guests_raw, list):
         guests_raw = "\n".join(str(g) for g in guests_raw)
-    guests = [g.strip()[:60] for g in str(guests_raw).replace(",", "\n").split("\n") if g.strip()][:12]
+    guests, roles = parse_guests(guests_raw)
     session_contexts[sid] = {
         "emission": str(data.get("emission", "")).strip()[:200],
         "guests": guests,
+        "roles": roles,  # { nom: fonction } — « Édouard Geffray (ministre de l'Éducation nationale) »
         "date": str(data.get("date", "")).strip()[:20],
         "description": clean_description(str(data.get("description", ""))),
         "learned": [],  # noms propres appris pendant le débat (vocabulary.learn)

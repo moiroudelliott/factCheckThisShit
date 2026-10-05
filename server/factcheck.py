@@ -136,6 +136,7 @@ RÈGLES DE RIGUEUR:
 - DÉCLARATION ≠ PREUVE : un article qui rapporte que l'auteur de l'affirmation l'a dite (« le ministre a annoncé 78 blessés », « X a dénoncé l'infiltration du mouvement ») prouve qu'il l'a dite, pas qu'elle est vraie — son ministère, son parti ou son camp ne comptent pas non plus comme source indépendante. Si c'est tout ce que disent les sources, réponds "non_recoupe" et nomme la source réelle du chiffre dans "explication" (« chiffre du ministère, non recoupé »). Sont des confirmations indépendantes : une enquête ou une vérification de presse, une donnée d'un service statistique (Insee, DEPP, Dares…), un bilan d'une autre autorité (préfecture, parquet, région). Exception : si l'affirmation porte sur ce que quelqu'un a dit (« Darmanin a déclaré sur RTL… », « Alma Dufour affirme que… ») ou cite elle-même sa source (« selon Laurent Nuñez »), l'article qui rapporte cette déclaration suffit : c'est le fait qu'il l'ait dit qu'on vérifie ("vrai" s'il l'a dit), pas l'exactitude de ce qu'il a dit.
 - Lis l'affirmation dans son sens le plus plausible dans le débat : « Attal a interdit l'abaya », dit à propos de l'école, veut dire à l'école — ne la juge pas fausse pour une portée qu'elle ne revendique pas.
 - Vérifie CHAQUE élément : chiffre, date, période, superlatif (« record », « première fois depuis 20 ans », « jamais »), et à qui l'action est attribuée. Recopie dans "inexact" tout élément que tes sources contredisent. Si le fait PRINCIPAL est vrai et que seul un détail est faux (superlatif, arrondi, date approchée) : "partiellement_vrai" — ex : « les entrées ont baissé en 2024, une première depuis 15 ans » alors que la baisse est réelle mais qu'il y en a eu une en 2020 → "partiellement_vrai". "faux" seulement si le fait principal est contredit. Si "inexact" n'est pas vide, le verdict ne peut pas être "vrai".
+- DERNIÈRE DONNÉE DISPONIBLE : un chiffre présenté comme actuel (« par an », « aujourd'hui ») se compare à la dernière donnée publiée par une source indépendante (Insee, Eurostat, DEPP…). Le seul fait que cette donnée date d'un an ou deux n'est pas une réserve : si elle concorde, "vrai" (« environ 350 000 entrées par an » face aux 347 000 de l'Insee pour 2023). Cette règle ne change rien aux autres : une inexactitude réelle (une note de service présentée comme une loi, un lieu, un chiffre faux) reste "partiellement_vrai", et un chiffre que seuls l'orateur ou son ministère avancent reste "non_recoupe".
 - Ne pinaille pas : un mot ou une préposition de différence (« discipline du combat » / « de combat »), un synonyme (LBD / flashball), un arrondi (« 1 600 » pour 1 588) ne rendent pas une affirmation inexacte.
 - Une hausse en euros courants inférieure à l'inflation est une baisse en euros constants : « des coupes dans le budget » face à un budget en hausse nominale mais inférieure à l'inflation est "trompeur" ou "partiellement_vrai", jamais "faux" ; « le budget est en hausse » dans ce cas est vrai en valeur, trompeur en volume.
 - Une mesure décidée ou annoncée par un ministre dans son domaine lui est attribuable (« X a interdit… » est vrai si X, ministre compétent, l'a décidée), même si le gouvernement est dirigé par un autre.
@@ -180,8 +181,9 @@ Date de publication: {publish_date}
 Description: {description}
 
 Liste les intervenants: les personnes qui PARLENT dans la vidéo (débatteurs, invités, journalistes ou animateurs identifiables). Pas les personnes seulement mentionnées comme sujet.
+Ajoute entre parenthèses la fonction ACTUELLE de chacun si le titre ou la description la donnent (« ministre de l'Éducation nationale », « député LFI », « présentateur ») ; sinon, le nom seul. N'invente pas de fonction.
 Réponds UNIQUEMENT avec un objet JSON, sans markdown:
-{{"intervenants": ["Prénom Nom", "Prénom Nom"]}}
+{{"intervenants": ["Prénom Nom (fonction)", "Prénom Nom"]}}
 Si aucun intervenant identifiable: {{"intervenants": []}}"""
 
 
@@ -209,6 +211,9 @@ def build_context_block(context: dict) -> str:
     if context.get("emission"):
         parts.append(f"Émission: {context['emission']}")
     if context.get("guests"):
+        # Noms seuls : avec leur fonction, le modèle tenait pour « non recoupé »
+        # tout ce que dit un ministre, même rapporté par la presse (banc
+        # d'essai : 95 → 92). La fonction ne sert qu'au garde-fou du code.
         parts.append(f"Intervenants: {', '.join(context['guests'])}")
     if context.get("date"):
         # Ancre temporelle : "hier", "cette année", "le dernier budget"… se
@@ -637,6 +642,9 @@ def judge(claim: str, evidence: dict, context: dict = None, sid: str = None, cit
     # Auteur : sans lui, « le ministre a annoncé 78 blessés » servait de
     # preuve à l'affirmation… du ministre
     named = qui if qui and not re.match(r"^Intervenant ([A-Z]|\d+)$", qui) else ""
+    # Fonction de l'auteur, pour le garde-fou du code seulement : sans elle,
+    # « confirmé par le gouvernement » validait le chiffre… du ministre lui-même
+    role = (context.get("roles") or {}).get(named, "")
     ev = evidence
     evidence_block = build_evidence_block(ev["results"], ev["academic"], ev["official"], ev["known"],
                                           ev["series"], ev["ballots"])
@@ -655,7 +663,8 @@ def judge(claim: str, evidence: dict, context: dict = None, sid: str = None, cit
         return {"verdict": "non_verifiable", "confiance": None, "explication": "Réponse du modèle illisible.",
                 "source": "", "url": "", "indisponible": True}
     finalize = lambda d: finalize_result(d, ev["results"], ev["academic"], ev["official"], ev["known"],  # noqa: E731
-                                         ev["series"] + ev["ballots"], claim=claim, qui=named, periode=periode)
+                                         ev["series"] + ev["ballots"], claim=claim, qui=named, periode=periode,
+                                         role=role)
     result = finalize(data)
     if result["verdict"] == "faux" and FACTCHECK_RECHECK_FALSE:
         result = recheck_false(claim, data, result, evidence_block, context, sid, named, periode, citation, finalize,

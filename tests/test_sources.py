@@ -160,6 +160,26 @@ def test_true_verdict_with_a_contradicted_element_is_partial():
     assert finalize_result({**data, "inexact": ""}, [], [], [])["verdict"] == "vrai"
 
 
+def test_minister_figure_confirmed_only_by_the_government():
+    """Cas vécu : « 170 lycéens blessés », chiffre du ministre de l'Éducation,
+    VRAI 95 % parce que « confirmé par le gouvernement »."""
+    web = [{"href": "https://www.20minutes.fr/x", "title": "t"}]
+    data = {"verdict": "vrai", "confiance": 95, "url": "https://www.20minutes.fr/x",
+            "explication": "Le chiffre de 170 lycéens blessés est confirmé par le gouvernement et repris par la presse."}
+    minister = "ministre de l'Éducation nationale"
+    r = finalize_result(data, web, [], [], claim="170 lycéens ont été blessés", qui="Édouard Geffray", role=minister)
+    assert r["verdict"] == "non_recoupe"
+    # l'orateur n'est pas au gouvernement : le ministère est une source extérieure
+    assert finalize_result(data, web, [], [], claim="170 lycéens ont été blessés", qui="Manuel Bompard",
+                           role="député LFI")["verdict"] == "vrai"
+    assert finalize_result(data, web, [], [], claim="170 lycéens ont été blessés", qui="Gabriel Attal",
+                           role="ancien Premier ministre")["verdict"] == "vrai"
+    # l'affirmation porte sur l'action d'un ministre : le citer est la preuve
+    consignes = {**data, "explication": "Le ministre de l'Intérieur a appelé à une stricte proportionnalité."}
+    assert finalize_result(consignes, web, [], [], claim="Le ministre de l'Intérieur a donné des consignes",
+                           qui="Édouard Geffray", role=minister)["verdict"] == "vrai"
+
+
 def test_unrecouped_verdict():
     assert normalize_verdict("non_recoupe") == "non_recoupe"
     assert normalize_verdict("Non recoupé") == "non_recoupe"

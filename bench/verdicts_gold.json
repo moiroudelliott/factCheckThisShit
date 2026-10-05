@@ -8,7 +8,11 @@
      "Manuel Bompard",
      "Édouard Geffray"
     ],
-    "date": "2026-10-04"
+    "date": "2026-10-04",
+    "roles": {
+     "Manuel Bompard": "coordinateur de La France insoumise, député",
+     "Édouard Geffray": "ministre de l'Éducation nationale"
+    }
    }
   },
   "IWsfqdiX8vI": {
@@ -19,7 +23,11 @@
      "Gabriel Attal",
      "Marion Maréchal"
     ],
-    "date": "2026-09-20"
+    "date": "2026-09-20",
+    "roles": {
+     "Gabriel Attal": "secrétaire général de Renaissance, député",
+     "Marion Maréchal": "eurodéputée, présidente d'Identité-Libertés"
+    }
    }
   }
  },
@@ -1284,10 +1292,9 @@
    "citation": "autour de 350 000 entrées légales par an",
    "recherche": "350 000 entrées légales par an immigration France 2026",
    "accept": [
-    "vrai",
-    "partiellement_vrai"
+    "vrai"
    ],
-   "note": "347 000 en 2023, 313 000 en 2024 (Insee)"
+   "note": "347 000 en 2023 (Insee), dernière donnée : « environ 350 000 par an » est vrai"
   },
   {
    "id": "0128f2ab",

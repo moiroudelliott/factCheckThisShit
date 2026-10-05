@@ -8,7 +8,8 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from server.points import (  # noqa: E402
-    apply_checkworthiness, citation_time, speaker_named_in_citation, validate_citation, verifiable_score,
+    apply_checkworthiness, citation_time, parse_guests, speaker_named_in_citation, validate_citation,
+    verifiable_score,
 )
 
 
@@ -31,6 +32,17 @@ def test_minor_affirmations_are_not_checked():
     # note absente : on vérifie quand même ; trop vague prime sur secondaire
     assert apply_checkworthiness({"type": "affirmation", "texte": "x", "verifiable": 9})["type"] == "affirmation"
     assert apply_checkworthiness({"type": "affirmation", "texte": "x", "verifiable": 2, "enjeu": 1})["type"] == "vague"
+
+
+def test_guests_with_their_role():
+    names, roles = parse_guests("Édouard Geffray (ministre de l'Éducation nationale)\nManuel Bompard")
+    assert names == ["Édouard Geffray", "Manuel Bompard"]
+    assert roles == {"Édouard Geffray": "ministre de l'Éducation nationale"}
+    # virgules : séparent les intervenants, sauf entre parenthèses
+    names, roles = parse_guests("Gabriel Attal, Marion Maréchal (eurodéputée, Identité-Libertés)")
+    assert names == ["Gabriel Attal", "Marion Maréchal"] and roles["Marion Maréchal"] == "eurodéputée, Identité-Libertés"
+    assert parse_guests(["Jordan Bardella"]) == (["Jordan Bardella"], {})
+    assert parse_guests("") == ([], {})
 
 
 def test_missing_or_bad_score_never_blocks_a_check():

@@ -248,8 +248,30 @@ def names_the_author(explication: str, qui: str) -> bool:
     return bool(_AUTHOR_SIDE_RE.search(said)) or any(re.search(rf"\b{n}\b", said) for n in names[1:] or names)
 
 
+_GOVERNMENT_ROLE_RE = re.compile(r"^(?!.*\bancien).*\b(?:ministre|secretaire d'etat|porte-parole du gouvernement)\b")
+_GOVERNMENT_SOURCE_RE = re.compile(r"\b(?:gouvernement|ministere|ministre|matignon|elysee)\b")
+
+
+def government_member(role: str) -> bool:
+    """Fonction d'un membre du gouvernement en exercice (« ministre de
+    l'Éducation nationale », pas « ancien Premier ministre »)."""
+    return bool(_GOVERNMENT_ROLE_RE.search(_ascii(role)))
+
+
+def government_vouches(explication: str, role: str, claim: str = "") -> bool:
+    """L'orateur est au gouvernement, et le verdict favorable repose sur « le
+    gouvernement » ou « le ministère » (cas vécu : « 170 lycéens blessés »,
+    chiffre du ministre, VRAI 95 % parce que « confirmé par le gouvernement et
+    repris par plusieurs médias »). Sauf si l'affirmation porte elle-même sur
+    l'action d'un ministre ou du gouvernement (« le ministre de l'Intérieur a
+    donné des consignes… »)."""
+    return (government_member(role) and bool(_GOVERNMENT_SOURCE_RE.search(_ascii(explication)))
+            and not _GOVERNMENT_SOURCE_RE.search(_ascii(claim)))
+
+
 def finalize_result(data: dict, results: list, academic: list, official: list, known: list = (),
-                    structured: list = (), claim: str = "", qui: str = "", periode: str = "") -> dict:
+                    structured: list = (), claim: str = "", qui: str = "", periode: str = "",
+                    role: str = "") -> dict:
     """Normalise la réponse Mistral : verdict connu, URL issue des résultats
     de recherche (jamais inventée ; http(s) uniquement — une URL javascript:
     serait un vecteur XSS), nom de source cohérent avec l'URL, confiance
@@ -263,7 +285,8 @@ def finalize_result(data: dict, results: list, academic: list, official: list, k
     if out["verdict"] == "vrai" and str(data.get("inexact") or "").strip():
         out["verdict"] = "partiellement_vrai"
     # Seule preuve : la parole de l'auteur lui-même
-    if out["verdict"] in ("vrai", "partiellement_vrai") and self_sourced(out["explication"], qui, claim):
+    if out["verdict"] in ("vrai", "partiellement_vrai") and (self_sourced(out["explication"], qui, claim)
+                                                            or government_vouches(out["explication"], role, claim)):
         out["verdict"] = "non_recoupe"
     # « faux » appuyé sur une autre année que celle dont parle l'affirmation
     # (cas vécus : « +1,2 milliard » pour le budget 2027 démenti par le budget

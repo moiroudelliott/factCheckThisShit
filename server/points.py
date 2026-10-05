@@ -97,3 +97,28 @@ def citation_time(citation: str, entries: list):
         if len(entry) > 2 and needle in " " + " ".join(norm_words(entry[1])) + " ":
             return entry[2]
     return None
+
+
+_GUEST_RE = re.compile(r"^\s*([^()]+?)\s*(?:\(([^()]*)\))?\s*$")
+
+
+def parse_guests(raw) -> tuple:
+    """Intervenants saisis dans la popup, un par ligne (ou séparés par des
+    virgules hors parenthèses) : « Prénom Nom » ou « Prénom Nom (fonction) ».
+    Renvoie (noms, {nom: fonction}) — les noms seuls servent partout ailleurs
+    (Whisper, identification des voix), la fonction à la vérification."""
+    if isinstance(raw, list):
+        raw = "\n".join(str(g) for g in raw)
+    lines = []
+    for line in str(raw or "").split("\n"):
+        lines += [p for p in re.split(r",(?![^()]*\))", line) if p.strip()]
+    names, roles = [], {}
+    for line in lines[:12]:
+        m = _GUEST_RE.match(line)
+        if not m:
+            continue
+        name = m.group(1).strip()[:60]
+        names.append(name)
+        if m.group(2) and m.group(2).strip():
+            roles[name] = m.group(2).strip()[:80]
+    return names, roles

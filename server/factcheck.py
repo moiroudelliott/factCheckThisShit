@@ -14,7 +14,7 @@ import requests
 from server.app import DIARIZATION, socketio
 from server.articles import fetch_passage
 from server.config import (
-    ARTICLE_FETCH_MAX, BRAVE_API_KEY, BRAVE_API_MIN_GAP_S, FACTCHECK_RECHECK_FALSE, MISTRAL_API_KEY,
+    PASSAGE_MAX_CHARS, ARTICLE_FETCH_MAX, BRAVE_API_KEY, BRAVE_API_MIN_GAP_S, FACTCHECK_RECHECK_FALSE, MISTRAL_API_KEY,
     MISTRAL_FACTCHECK_MODEL, MISTRAL_FACTCHECK_TIMEOUT_S, MISTRAL_MODEL, MISTRAL_MAX_RETRIES, MISTRAL_RETRY_BASE_S,
     MISTRAL_TIMEOUT_S, SEARXNG_URL,
 )
@@ -84,7 +84,8 @@ minorité de points seulement mérite une vérification, et la note doit les dis
 "periode" (affirmations) = l'année ou la période dont parle l'affirmation, déduite des mots prononcés et de la
 date du débat : « l'année prochaine » dit en octobre 2026 → "2027" ; « depuis 2017 » → "2017-2026". En automne,
 « le budget » sans autre précision désigne le projet de budget de l'année suivante. Chaîne vide si rien ne la
-précise. Mets aussi cette année dans "recherche".
+précise : ne mets JAMAIS l'année du débat par défaut (« la France compte 7 % de musulmans » → ""). Mets aussi cette
+année dans "recherche".
 "citation" (pour chaque point) = les mots EXACTS de la transcription où le point est dit (8 à 30 mots),
 recopiés sans rien changer ni corriger — pas de reformulation, pas de nom de locuteur.
 "recherche" (affirmations seulement) = 4 à 10 mots-clés pour trouver dans la presse ou les statistiques
@@ -611,19 +612,25 @@ def _json_object(content: str):
     return data if isinstance(data, dict) else None
 
 
-def _claim_blocks(qui: str, periode: str, citation: str) -> dict:
+def _claim_blocks(qui: str, periode: str, citation: str, passage: str = "") -> dict:
+    # Passage autour du propos : à quoi renvoie « selon les projections », de
+    # quoi parle « il va augmenter de 1,2 milliard » (cas vécus : sans lui, la
+    # source dont l'orateur venait de parler était invisible à la vérification)
+    passage = " ".join(str(passage or "").split())[:PASSAGE_MAX_CHARS]
     return {
         "speaker_block": f"Auteur de l'affirmation : {qui}\n" if qui else "",
         "periode_block": f"Période visée : {periode}\n" if periode else "",
         # Propos d'origine : l'affirmation est une reformulation, qui peut
         # durcir ou déformer ce qui a réellement été dit
-        "citation_block": (f"Propos exact (transcription automatique) : « {citation} » — juge ce qui a été "
-                           "réellement dit si la reformulation ci-dessus s'en écarte.\n") if citation else "",
+        "citation_block": ((f"Propos exact (transcription automatique) : « {citation} » — juge ce qui a été "
+                            "réellement dit si la reformulation ci-dessus s'en écarte.\n") if citation else "")
+                          + (f"Passage du débat autour de ce propos (contexte : de quoi parle l'orateur, quelle "
+                             f"source il cite) : « {passage} »\n" if passage else ""),
     }
 
 
 def judge(claim: str, evidence: dict, context: dict = None, sid: str = None, citation: str = "",
-          qui: str = "", periode: str = "", previous: list = ()) -> dict:
+          qui: str = "", periode: str = "", previous: list = (), passage: str = "") -> dict:
     """Verdict de Mistral sur des preuves déjà réunies, normalisé par
     finalize_result, puis contre-vérifié s'il conclut « faux »."""
     context = context or {}
@@ -639,7 +646,7 @@ def judge(claim: str, evidence: dict, context: dict = None, sid: str = None, cit
         claim=claim,
         evidence_block=evidence_block,
         session_block=build_session_block(list(previous)),
-        **_claim_blocks(named, periode, citation),
+        **_claim_blocks(named, periode, citation, passage),
     )
     content = call_mistral_api(prompt, sid=sid, model=MISTRAL_FACTCHECK_MODEL, timeout=MISTRAL_FACTCHECK_TIMEOUT_S)
     print(f"[FactCheck résultat] {content[:150]}")
@@ -651,12 +658,13 @@ def judge(claim: str, evidence: dict, context: dict = None, sid: str = None, cit
                                          ev["series"] + ev["ballots"], claim=claim, qui=named, periode=periode)
     result = finalize(data)
     if result["verdict"] == "faux" and FACTCHECK_RECHECK_FALSE:
-        result = recheck_false(claim, data, result, evidence_block, context, sid, named, periode, citation, finalize)
+        result = recheck_false(claim, data, result, evidence_block, context, sid, named, periode, citation, finalize,
+                               passage)
     return result
 
 
 def recheck_false(claim: str, data: dict, result: dict, evidence_block: str, context: dict, sid: str,
-                  qui: str, periode: str, citation: str, finalize) -> dict:
+                  qui: str, periode: str, citation: str, finalize, passage: str = "") -> dict:
     """Second examen d'un « faux », le verdict le plus accusateur, fait à
     l'aveugle : le modèle ne voit pas le verdict proposé (relu, un « faux »
     était presque toujours confirmé, même quand la source donnait raison à
@@ -670,7 +678,7 @@ def recheck_false(claim: str, data: dict, result: dict, evidence_block: str, con
         context_block=build_context_block(context),
         claim=claim,
         evidence_block=evidence_block,
-        **_claim_blocks(qui, periode, citation),
+        **_claim_blocks(qui, periode, citation, passage),
     )
     try:
         review = _json_object(call_mistral_api(prompt, sid=sid, model=MISTRAL_FACTCHECK_MODEL,
@@ -703,13 +711,14 @@ def recheck_false(claim: str, data: dict, result: dict, evidence_block: str, con
 
 
 def call_mistral_factcheck(claim: str, context: dict = None, sid: str = None, citation: str = "",
-                           query: str = "", qui: str = "", periode: str = "", previous: list = ()) -> dict:
+                           query: str = "", qui: str = "", periode: str = "", previous: list = (),
+                           passage: str = "") -> dict:
     evidence = gather_evidence(claim, context, query, periode)
-    return judge(claim, evidence, context, sid, citation, qui, periode, previous)
+    return judge(claim, evidence, context, sid, citation, qui, periode, previous, passage)
 
 
 def fact_check_affirmation(sid: str, claim_id: str, claim_text: str, citation: str = "", query: str = "",
-                           qui: str = "", periode: str = ""):
+                           qui: str = "", periode: str = "", passage: str = ""):
     print(f"[FactCheck] «{claim_text[:60]}»")
     context = session_contexts.get(sid, {})
     year = video_year(context)
@@ -718,17 +727,18 @@ def fact_check_affirmation(sid: str, claim_id: str, claim_text: str, citation: s
     cached = cache.lookup(claim_text, year)
     if cached:
         print(f"[FactCheck] cache hit → {cached['verdict']} ({cached.get('confiance')}%)")
-        done.append({"claim": claim_text, **cached})
+        done.append({"claim": claim_text, "qui": qui, **cached})
         socketio.emit("fact_check_result", {"id": claim_id, **cached}, to=sid)
         return
     try:
         started = time.monotonic()
         result = call_mistral_factcheck(claim_text, context=context, sid=sid, citation=citation, query=query,
-                                        qui=qui, periode=periode, previous=related_verdicts(claim_text, done))
+                                        qui=qui, periode=periode, previous=related_verdicts(claim_text, done, qui=qui),
+                                        passage=passage)
         print(f"[FactCheck] {result['verdict']} en {time.monotonic() - started:.1f} s")
         cache.store(claim_text, result, year)
         if not result.get("indisponible"):
-            done.append({"claim": claim_text, **result})
+            done.append({"claim": claim_text, "qui": qui, **result})
         socketio.emit("fact_check_result", {"id": claim_id, **result}, to=sid)
     except Exception as e:
         print(f"[FactCheck error] {type(e).__name__}: {e}")

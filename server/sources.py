@@ -326,16 +326,19 @@ def finalize_result(data: dict, results: list, academic: list, official: list, k
     return out
 
 
-def related_verdicts(claim: str, previous: list, max_n: int = 4) -> list:
+def related_verdicts(claim: str, previous: list, max_n: int = 4, qui: str = "") -> list:
     """Verdicts déjà rendus dans le débat sur un sujet proche (au moins deux
-    mots-clés communs hors noms propres), les plus récents d'abord."""
+    mots-clés communs hors noms propres), les plus récents d'abord — plus les
+    derniers verdicts du même orateur, même sans mot commun : c'est le fil de
+    son argument (cas vécu : « selon les projections… » juste après « le
+    Figaro Magazine publie cette semaine un dossier de l'OID »)."""
     words = key_words(claim) - key_words(" ".join(re.findall(r"\b[A-ZÀÂÇÉÈÊËÎÏÔÙÛÜ][\w'’-]*", claim)))
-    out = []
+    out = [v for v in previous[-3:][::-1] if qui and v.get("qui") == qui][:2]
     for v in reversed(previous):
-        if len(words & key_words(v.get("claim", ""))) >= 2:
+        if len(out) >= max_n:
+            break
+        if v not in out and len(words & key_words(v.get("claim", ""))) >= 2:
             out.append(v)
-            if len(out) >= max_n:
-                break
     return out
 
 

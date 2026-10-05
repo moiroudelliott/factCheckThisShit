@@ -108,8 +108,8 @@ def run(args):
                     r.pop("extrait", None)
             started = time.monotonic()
             res = fc.judge(c["texte"], ev, ctx, citation=c["citation"], qui=c["qui"], periode=c["periode"],
-                           previous=related_verdicts(c["texte"], done))
-            done.append({"claim": c["texte"], **res})
+                           previous=related_verdicts(c["texte"], done, qui=c["qui"]))
+            done.append({"claim": c["texte"], "qui": c["qui"], **res})
             rows.append({"id": c["id"], "texte": c["texte"], "verdict": res["verdict"], "accept": c["accept"],
                          "explication": res.get("explication", ""), "source": res.get("source", ""),
                          "note": c["note"], "s": round(time.monotonic() - started, 1)})

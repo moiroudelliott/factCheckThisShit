@@ -265,6 +265,12 @@ def test_related_verdicts_share_the_subject():
     got = related_verdicts("Le budget de l'Éducation nationale prévoit 650 millions de coupes", done)
     assert [v["verdict"] for v in got] == ["vrai"] and "budget" in got[0]["claim"]
     assert related_verdicts("Édouard Geffray était à Créteil lundi", done) == []
+    # le fil de l'orateur : ses derniers verdicts, même sans mot commun
+    done = [{"claim": "Le Figaro Magazine publie un dossier de l'OID cette semaine", "qui": "Marion Maréchal",
+             "verdict": "vrai"},
+            {"claim": "170 lycéens ont été blessés", "qui": "Édouard Geffray", "verdict": "non_recoupe"}]
+    got = related_verdicts("Les naissances non européennes seront majoritaires en 2045", done, qui="Marion Maréchal")
+    assert [v["claim"][:9] for v in got] == ["Le Figaro"]
 
 
 if __name__ == "__main__":

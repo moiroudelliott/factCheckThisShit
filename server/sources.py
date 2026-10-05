@@ -209,6 +209,15 @@ def self_sourced(explication: str, qui: str, claim: str = "") -> bool:
     return False
 
 
+_INAUDIBLE_RE = re.compile(r"\W*transcription\s+(?:douteuse|incomplete|incertaine|inaudible|erronee|confuse)")
+
+
+def is_inaudible(explication: str) -> bool:
+    """Explication d'un « non vérifiable » dû à la transcription (le prompt
+    demande de commencer par « Transcription douteuse : »)."""
+    return bool(_INAUDIBLE_RE.match(_ascii(explication)))
+
+
 _ABSENCE_RE = re.compile(
     r"\W*(?:rien ne|les sources ne|pas de source|aucune source"
     r"|aucune?\b[^.]*?\b(?:ne|n')\s*(?:\w+\s+)?(?:confirme|mentionne|prevoi|indique|evoque|montre|prouve|etabli"
@@ -281,6 +290,11 @@ def finalize_result(data: dict, results: list, academic: list, official: list, k
     # vérifiable » (cas vécu : un lien de cause à effet « non recoupé »)
     if out["verdict"] == "non_recoupe" and not (url and names_the_author(out["explication"], qui)):
         out["verdict"] = "non_verifiable"
+    # Propos mal transcrit (« Transcription douteuse : … ») : rien de vérifié,
+    # rien à montrer — l'extension retire la carte (cas vécu : une carte
+    # « Transcription incomplète » affichée sur la vidéo)
+    if out["verdict"] == "non_verifiable" and is_inaudible(out["explication"]):
+        out["inaudible"] = True
     # Fact-check déjà publié : on nomme la rédaction (connue), pas ce que dit Mistral
     out["source"] = outlets[url] if url in outlets else source_label(str(data.get("source") or ""), url, kinds.get(url, ""))
     conf = data.get("confiance")

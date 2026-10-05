@@ -215,6 +215,22 @@ def test_false_needs_a_source_on_the_same_period():
                            periode="2011")["verdict"] == "faux"
 
 
+def test_misheard_claims_are_flagged():
+    """Cas vécu : une carte « Transcription incomplète : l'affirmation ne précise
+    pas quels travaux… » affichée sur la vidéo — rien n'a été vérifié."""
+    nv = {"verdict": "non_verifiable", "confiance": 40, "url": ""}
+    for expl in ("Transcription incomplète : l'affirmation ne précise pas quels travaux sont concernés.",
+                 "Transcription douteuse : « vies sérielles » au lieu de « violences sérielles ».",
+                 "« Transcription douteuse » : chiffre invraisemblable."):
+        assert finalize_result({**nv, "explication": expl}, [], [], []).get("inaudible") is True, expl
+    assert "inaudible" not in finalize_result({**nv, "explication": "Aucune source ne traite du sujet."}, [], [], [])
+    # un vrai verdict qui parle de transcription n'est pas concerné
+    web = [{"href": "https://www.lemonde.fr/x", "title": "t"}]
+    assert "inaudible" not in finalize_result({**nv, "verdict": "faux", "contredit_par": "Le Monde : 12 %",
+                                               "url": "https://www.lemonde.fr/x",
+                                               "explication": "Transcription douteuse : x"}, web, [], [])
+
+
 def test_absence_of_source_is_not_a_contradiction():
     """Cas vécus (Mistral Large, Attal / Maréchal) : FAUX 85-90 % sur « aucune
     projection ne confirme », « aucun accord n'est mentionné »."""

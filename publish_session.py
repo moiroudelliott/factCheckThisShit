@@ -33,6 +33,8 @@ import re
 import shutil
 import sys
 
+from server.sources import is_inaudible as inaudible_explication
+
 ROOT = os.path.dirname(os.path.abspath(__file__))
 EXTENSION = os.path.join(ROOT, "extension")
 SITE = os.path.join(ROOT, "site")
@@ -68,7 +70,8 @@ _POINT_FIELDS = {"id": _STR, "type": _STR, "texte": _STR, "qui": _STR, "qui_labe
                  "citation": _STR, "verifiable": (int, float), "vt": (int, float, type(None))}
 _FIELDS = {
     "fact_check_result": {"id": _STR, "verdict": _STR, "confiance": (int, float, type(None)),
-                          "explication": _STR, "source": _STR, "url": _STR, "indisponible": (bool,)},
+                          "explication": _STR, "source": _STR, "url": _STR, "indisponible": (bool,),
+                          "inaudible": (bool,)},
     "speaker_map": {"map": (dict,), "enrolled": (list,), "enrollable": (list,)},
     "speaker_live": {"speaker": _STR},
     "transcript_segment": {"speaker": _STR},
@@ -142,12 +145,21 @@ def validate(data: dict, offset: float = 0.0) -> dict:
     }
 
 
+def is_inaudible(m: dict) -> bool:
+    """Verdict « non vérifiable » dû à la transcription (même règle que
+    l'overlay) : drapeau du backend, ou explication « Transcription douteuse »."""
+    return m.get("verdict") == "non_verifiable" and (m.get("inaudible") is True
+                                                     or inaudible_explication(m.get("explication") or ""))
+
+
 def stats(session: dict) -> dict:
     points = [p for e in session["events"] if e["m"].get("type") == "talking_points" for p in e["m"]["points"]]
-    verdicts = {e["m"]["id"] for e in session["events"] if e["m"].get("type") == "fact_check_result"
-                and not e["m"].get("indisponible")}
+    results = [e["m"] for e in session["events"] if e["m"].get("type") == "fact_check_result"]
+    # Propos mal transcrit : l'overlay retire la carte, il ne compte pas comme vérifié
+    inaudible = {m["id"] for m in results if is_inaudible(m)}
+    verdicts = {m["id"] for m in results if not m.get("indisponible")} - inaudible
     return {"points": len(points),
-            "affirmations": sum(p.get("type") == "affirmation" for p in points),
+            "affirmations": sum(p.get("type") == "affirmation" and p.get("id") not in inaudible for p in points),
             "verdicts": len(verdicts),
             "duration": session["events"][-1]["t"] if session["events"] else 0}
 

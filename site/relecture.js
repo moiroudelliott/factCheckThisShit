@@ -120,6 +120,14 @@
     const all = (s.events || []).filter((e) => Number.isFinite(e.t) && e.m && (e.m.type || e.m.action));
     events = all.filter((e) => !SPEAKER_TYPES.has(e.m.type));
     speakers = all.filter((e) => SPEAKER_TYPES.has(e.m.type));
+    // Propos mal transcrits : en direct, leur carte sort dès le verdict ; ici
+    // le verdict est connu d'avance, la carte ne s'affiche donc jamais
+    const inaudible = new Set(events.filter((e) => e.m.type === 'fact_check_result' && typeof isInaudible === 'function'
+      && isInaudible(e.m)).map((e) => e.m.id));
+    for (const e of events) {
+      if (e.m.type !== 'talking_points') continue;
+      for (const p of e.m.points || []) if (inaudible.has(p.id)) p.type = 'inaudible';
+    }
     const byId = new Map();
     for (const e of events) {
       if (e.m.type === 'talking_points') {

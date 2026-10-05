@@ -92,6 +92,27 @@ def test_invalid_exports_are_refused():
         raise AssertionError(f"accepté à tort : {bad}")
 
 
+def test_misheard_claims_are_not_counted():
+    """Un verdict « Transcription douteuse » : l'overlay retire la carte, la
+    page n'annonce pas l'affirmation comme vérifiée."""
+    def event(t, m):
+        return {"t": t, "m": m}
+    session = {"events": [
+        event(1.0, {"type": "talking_points", "points": [
+            {"id": "a", "type": "affirmation", "texte": "x"}, {"id": "b", "type": "affirmation", "texte": "y"}]}),
+        event(2.0, {"type": "fact_check_result", "id": "a", "verdict": "vrai", "explication": "ok"}),
+        event(3.0, {"type": "fact_check_result", "id": "b", "verdict": "non_verifiable",
+                    "explication": "Transcription incomplète : on ne sait pas de quels travaux il s'agit."}),
+    ]}
+    s = ps.stats(session)
+    assert (s["affirmations"], s["verdicts"]) == (1, 1)
+    flagged = {"type": "fact_check_result", "id": "b", "verdict": "non_verifiable", "explication": "e",
+               "inaudible": True}
+    kept = ps.validate({"format": "source-session", "version": 1, "video": {"youtube": "abcdefghijk"},
+                        "events": session["events"][:1] + [event(3.0, flagged)]})["events"]
+    assert kept[-1]["m"]["inaudible"] is True
+
+
 def test_published_sessions_are_valid():
     index = ps.load_index()
     for entry in index.get("sessions", []):

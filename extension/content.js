@@ -117,6 +117,8 @@ const TYPE_CFG = {
   // Affirmation sans enjeu (agenda, évidence, anecdote — note d'importance
   // basse, voir server/points.py) : ni fact-check ni carte, visible au récap
   secondaire:  { tag: 'SECONDAIRE',  accent: 'oklch(0.62 0.03 255)' },
+  // Affirmation dont la vérification a conclu à une transcription douteuse
+  inaudible:   { tag: 'INAUDIBLE',   accent: 'oklch(0.62 0.03 255)' },
 };
 
 // ── State ──────────────────────────────────────────────────────────────────────
@@ -1167,8 +1169,27 @@ function onVoiceNotInBank({ labels }) {
   }
 }
 
+// Verdict « non vérifiable » dû à la transcription (propos mal entendu) :
+// rien n'a été vérifié, il n'y a rien à montrer sur la vidéo. Le drapeau vient
+// du backend ; l'explication sert de repli pour les sessions enregistrées avant.
+const INAUDIBLE_RE = /^\W*transcription\s+(douteuse|incompl[eè]te|incertaine|inaudible|erron[eé]e|confuse)/i;
+function isInaudible(data) {
+  return data?.verdict === 'non_verifiable' && (data.inaudible === true || INAUDIBLE_RE.test(data.explication || ''));
+}
+
 function onFactCheck(data) {
   const entry = S.points.get(data.id);
+  if (entry && isInaudible(data)) {
+    // Plus une affirmation vérifiée : ni carte, ni repère, ni compteur — le
+    // point reste visible dans « tous les points » du récap
+    entry.point.type = 'inaudible';
+    entry.fc = null;
+    S.queue = S.queue.filter((id) => id !== data.id);
+    if (S.current?.id === data.id) exitCurrent(); // sortie animée, puis carte suivante
+    scheduleSave();
+    if (S.recapOpen) renderRecap();
+    return;
+  }
   if (entry) {
     entry.fc = {
       verdict: data.verdict,
@@ -1590,7 +1611,9 @@ function renderStats() {
   let affirmations = 0;
   for (const { point, fc } of S.points.values()) {
     if (point.type === 'affirmation') affirmations++;
-    if (fc && !fc.pending && !fc.indisponible) counts[VERDICT_CFG[fc.verdict] ? fc.verdict : 'non_verifiable']++;
+    if (point.type === 'affirmation' && fc && !fc.pending && !fc.indisponible) {
+      counts[VERDICT_CFG[fc.verdict] ? fc.verdict : 'non_verifiable']++;
+    }
   }
   const parts = [`${S.points.size} point${S.points.size > 1 ? 's' : ''}`, `${affirmations} vérifiable${affirmations > 1 ? 's' : ''}`];
   for (const [verdict, n] of Object.entries(counts)) {

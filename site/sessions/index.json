@@ -1,3 +1,22 @@
 {
-  "sessions": []
+  "sessions": [
+    {
+      "id": "IWsfqdiX8vI",
+      "title": "Gabriel Attal face à Marion Maréchal — Franc-jeu",
+      "date": "2026-09-27",
+      "points": 89,
+      "affirmations": 18,
+      "verdicts": 18,
+      "duration": 893.8
+    },
+    {
+      "id": "Np12sKLLYro",
+      "title": "Manuel Bompard face à Édouard Geffray — Franc-jeu",
+      "date": "2026-10-05",
+      "points": 168,
+      "affirmations": 81,
+      "verdicts": 81,
+      "duration": 2302.2
+    }
+  ]
 }

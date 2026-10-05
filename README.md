@@ -49,11 +49,12 @@ et les autres fichiers de [`tests/`](tests/) — voir [ARCHITECTURE.md](ARCHITEC
 | `server/` | Logique du serveur : Whisper, diarisation, Mistral, sources, cache — voir [ARCHITECTURE.md](ARCHITECTURE.md) |
 | `tests/` | Tests unitaires et test de fumée du backend complet (sans GPU ni réseau) |
 | `searxng/` | Instance SearxNG auto-hébergée (recherche web sans dépendance à un moteur tiers) |
-| `site/` | Site statique du projet : page vitrine, et page de relecture (`relecture.html`) qui rejoue une analyse enregistrée sur un débat YouTube, sans GPU ni backend |
+| `site/` | Site statique du projet : accueil, méthode, politique des sources, à propos, et démonstration (`relecture.html`) qui rejoue des analyses enregistrées sur des débats YouTube, sans GPU ni backend |
 | `enroll.py`, `harvest_voices.py`, `remove_voice.py` | Outils CLI pour peupler/retirer des voix dans `voices/` (banque d'empreintes vocales) |
 | `vocabulaire.txt` | Mots que Whisper doit s'attendre à entendre (sigles, partis, termes souvent mal transcrits) — modifiable |
 | `generate_session.py` | Génère une session de relecture à partir d'un simple lien YouTube, sans regarder la vidéo : même pipeline que le direct, minutage du direct (`--publish` pour la mettre sur le site) |
 | `publish_session.py` | Publie une session enregistrée (bouton ⏵ du récap) sur la page de relecture du site, et synchronise l'overlay du site avec l'extension |
+| `deploy_site.py` | Met le site en ligne par SSH (sauvegarde de l'ancien site sur le serveur, puis bascule ; `--dry-run` pour lister les fichiers) |
 | `purge_cache.py` | Purge les verdicts douteux ou signalés du cache de fact-checks (`--dry-run` d'abord ; sauvegarde automatique) |
 | `data/` | Données téléchargées et journaux locaux (gitignored) : open data de l'Assemblée nationale (~40 Mo, au premier démarrage), signalements de verdicts (`reports.jsonl`) |
 | `voices/` | Empreintes vocales enregistrées (gitignored, générées localement) |

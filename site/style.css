@@ -1,0 +1,209 @@
+/* SOURCÉ — feuille de style commune à toutes les pages.
+   Sobre, lisible, sur fond blanc : une colonne de texte, des titres à
+   empattements, un seul rouge pour les liens et la marque. Polices
+   hébergées ici (licences OFL dans fonts/licenses) : aucune requête vers
+   un service tiers. */
+
+@font-face { font-family: 'Newsreader'; font-style: normal; font-weight: 400 600; font-display: swap; src: url('fonts/newsreader-latin.woff2') format('woff2'); }
+@font-face { font-family: 'Newsreader'; font-style: italic; font-weight: 400 500; font-display: swap; src: url('fonts/newsreader-italic-latin.woff2') format('woff2'); }
+@font-face { font-family: 'Archivo'; font-style: normal; font-weight: 400 700; font-display: swap; src: url('fonts/archivo-latin.woff2') format('woff2'); }
+@font-face { font-family: 'IBM Plex Mono'; font-style: normal; font-weight: 400; font-display: swap; src: url('fonts/ibm-plex-mono-400-latin.woff2') format('woff2'); }
+
+:root {
+  --bg: #ffffff;
+  --surface: #f6f5f1;
+  --text: #1c1c1c;
+  --muted: #5e5e5e;
+  --rule: #e2e0da;
+  --accent: #a3172c;
+  --accent-hover: #7d1021;
+  --serif: 'Newsreader', Georgia, 'Times New Roman', serif;
+  --sans: 'Archivo', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --mono: 'IBM Plex Mono', ui-monospace, Consolas, monospace;
+  --measure: 44rem;
+  /* Verdicts, foncés pour rester lisibles sur fond blanc */
+  --v-vrai: #2e7a3b;
+  --v-partiel: #8a6200;
+  --v-trompeur: #a65200;
+  --v-faux: #b0261c;
+  --v-nv: #5b6270;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+[hidden] { display: none !important; }
+
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--serif);
+  font-size: 1.0625rem;
+  line-height: 1.65;
+  text-rendering: optimizeLegibility;
+}
+
+a { color: var(--accent); text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 0.18em; }
+a:hover { color: var(--accent-hover); }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+
+/* ── En-tête et navigation ─────────────────────────────────────────────── */
+
+.site-header { border-bottom: 1px solid var(--rule); }
+.site-header .inner {
+  max-width: 62rem; margin: 0 auto; padding: 1.1rem 1.5rem;
+  display: flex; align-items: baseline; justify-content: space-between; gap: 0.5rem 2rem; flex-wrap: wrap;
+}
+.wordmark {
+  font-family: var(--serif); font-style: italic; font-weight: 500; font-size: 1.45rem;
+  color: var(--text); text-decoration: none; letter-spacing: 0.01em;
+}
+.wordmark span { color: var(--accent); }
+.site-nav { display: flex; flex-wrap: wrap; gap: 0.25rem 1.6rem; font-family: var(--sans); font-size: 0.9rem; }
+.site-nav a { color: var(--text); text-decoration: none; padding: 0.2rem 0; border-bottom: 1px solid transparent; }
+.site-nav a:hover { color: var(--accent); }
+.site-nav a[aria-current="page"] { border-bottom-color: var(--accent); }
+
+/* ── Contenu ───────────────────────────────────────────────────────────── */
+
+main { max-width: var(--measure); margin: 0 auto; padding: 3rem 1.5rem 4rem; }
+main.wide { max-width: 62rem; }
+
+h1, h2, h3 { font-family: var(--serif); font-weight: 500; line-height: 1.25; color: var(--text); }
+h1 { font-size: clamp(1.9rem, 4.5vw, 2.5rem); margin: 0 0 1rem; letter-spacing: -0.005em; }
+h2 { font-size: 1.45rem; margin: 2.8rem 0 0.8rem; padding-top: 1.6rem; border-top: 1px solid var(--rule); }
+h2:first-of-type { border-top: 0; padding-top: 0; }
+h3 { font-size: 1.15rem; margin: 1.8rem 0 0.5rem; }
+p, ul, ol, dl, table, figure { margin: 0 0 1.1rem; }
+ul, ol { padding-left: 1.3rem; }
+li + li { margin-top: 0.3rem; }
+strong { font-weight: 600; }
+
+.lede { font-size: 1.2rem; line-height: 1.55; color: #333; margin-bottom: 1.6rem; }
+.kicker {
+  font-family: var(--sans); font-size: 0.75rem; letter-spacing: 0.09em; text-transform: uppercase;
+  color: var(--muted); margin: 0 0 0.6rem;
+}
+.muted { color: var(--muted); }
+.small { font-size: 0.9rem; }
+.more { font-family: var(--sans); font-size: 0.95rem; }
+
+/* Bouton principal (un seul par page, au plus) */
+.button {
+  display: inline-block; font-family: var(--sans); font-size: 0.95rem; font-weight: 600;
+  color: #fff; background: var(--accent); padding: 0.65rem 1.3rem; border-radius: 2px; text-decoration: none;
+}
+.button:hover { background: var(--accent-hover); color: #fff; }
+
+/* Étapes numérotées */
+.steps { list-style: none; padding: 0; counter-reset: step; margin: 1.4rem 0 1.4rem; }
+.steps li { counter-increment: step; position: relative; padding-left: 2.6rem; margin: 0 0 1rem; }
+.steps li::before {
+  content: counter(step); position: absolute; left: 0; top: 0.05rem;
+  font-family: var(--sans); font-size: 0.85rem; font-weight: 600; color: var(--accent);
+  width: 1.7rem; height: 1.7rem; border: 1px solid var(--accent); border-radius: 50%;
+  display: grid; place-items: center;
+}
+.steps strong { display: block; }
+
+/* Encadré : exemple de vérification */
+.example {
+  background: var(--surface); border-left: 3px solid var(--rule); padding: 1.1rem 1.3rem; margin: 1.6rem 0 1.8rem;
+}
+.example .meta { font-family: var(--sans); font-size: 0.8rem; color: var(--muted); margin: 0 0 0.5rem; }
+.example blockquote { margin: 0 0 0.7rem; font-size: 1.15rem; font-style: italic; }
+.example p { margin: 0; }
+
+/* Étiquettes de verdict */
+.verdict {
+  display: inline-block; font-family: var(--sans); font-size: 0.72rem; font-weight: 700;
+  letter-spacing: 0.07em; text-transform: uppercase; padding: 0.1rem 0.45rem; border: 1px solid currentColor;
+  border-radius: 2px; vertical-align: 0.1em;
+}
+.v-vrai { color: var(--v-vrai); }
+.v-partiel { color: var(--v-partiel); }
+.v-trompeur { color: var(--v-trompeur); }
+.v-faux { color: var(--v-faux); }
+.v-nv { color: var(--v-nv); }
+
+/* Tableaux */
+table { width: 100%; border-collapse: collapse; font-size: 0.98rem; }
+th, td { text-align: left; vertical-align: top; padding: 0.55rem 0.7rem 0.55rem 0; border-bottom: 1px solid var(--rule); }
+th { font-family: var(--sans); font-size: 0.78rem; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; color: var(--muted); }
+td:first-child { white-space: nowrap; }
+
+/* Listes de domaines (politique des sources) */
+.domains { list-style: none; padding: 0; display: flex; flex-wrap: wrap; gap: 0.35rem; margin: 0.4rem 0 1.4rem; }
+.domains li { margin: 0; font-family: var(--mono); font-size: 0.82rem; background: var(--surface); border: 1px solid var(--rule); padding: 0.1rem 0.45rem; }
+
+/* Notes et sommaire */
+.toc { font-family: var(--sans); font-size: 0.92rem; background: var(--surface); padding: 0.9rem 1.2rem; margin: 0 0 2rem; }
+.toc ol { margin: 0.3rem 0 0; }
+.note { font-size: 0.92rem; color: var(--muted); border-top: 1px solid var(--rule); padding-top: 0.8rem; }
+
+/* ── Démonstration (relecture.html) ────────────────────────────────────── */
+
+.intro { max-width: var(--measure); }
+.debates { list-style: none; padding: 0; margin: 1.6rem 0 1.2rem; display: grid; gap: 0.6rem; grid-template-columns: repeat(auto-fit, minmax(17rem, 1fr)); }
+.debates li { margin: 0; }
+.debates a {
+  display: block; height: 100%; padding: 0.75rem 1rem; border: 1px solid var(--rule); border-radius: 2px;
+  color: var(--text); text-decoration: none; background: var(--bg);
+}
+.debates a:hover { border-color: var(--muted); }
+.debates a[aria-current] { border-color: var(--accent); box-shadow: inset 3px 0 0 var(--accent); }
+.debate-title { display: block; font-size: 1.02rem; line-height: 1.35; }
+.debate-meta { display: block; font-family: var(--sans); font-size: 0.8rem; color: var(--muted); margin-top: 0.25rem; }
+
+/* Lecteur YouTube, et l'overlay de l'extension par-dessus */
+#stage { position: relative; width: 100%; aspect-ratio: 16 / 9; background: #111; }
+#stage:fullscreen { width: 100vw; height: 100vh; aspect-ratio: auto; }
+#stage iframe, #player { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+#facade {
+  position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.8rem;
+  background: #161616; border: 0; color: #f3f3f3; cursor: pointer; font: inherit; padding: 1.5rem; text-align: center;
+}
+#facade:disabled { cursor: default; }
+#facade .play {
+  width: 3.6rem; height: 3.6rem; border-radius: 50%; border: 1.5px solid #f3f3f3;
+  display: grid; place-items: center; font-size: 1.2rem; padding-left: 0.2rem;
+}
+#facade:hover:not(:disabled) .play { background: var(--accent); border-color: var(--accent); }
+#facade:disabled .play { display: none; }
+.facade-label { font-family: var(--sans); font-size: 1.05rem; font-weight: 600; }
+.facade-note { font-family: var(--sans); font-size: 0.85rem; color: #b5b5b5; max-width: 34rem; }
+
+#controls { display: flex; flex-wrap: wrap; align-items: center; gap: 0.6rem 1rem; margin: 0.8rem 0 0; font-family: var(--sans); }
+#controls button {
+  font: inherit; font-size: 0.88rem; color: var(--text); background: var(--bg);
+  border: 1px solid var(--rule); border-radius: 2px; padding: 0.35rem 0.9rem; cursor: pointer;
+}
+#controls button:hover { border-color: var(--muted); }
+#progress { font-size: 0.85rem; color: var(--muted); margin-left: auto; }
+
+/* Frise : un repère par affirmation vérifiée, à la couleur du verdict */
+#timeline { position: relative; height: 1.6rem; margin: 0.8rem 0 0.4rem; }
+#timeline::before { content: ''; position: absolute; left: 0; right: 0; top: 0.75rem; height: 2px; background: var(--rule); }
+#playhead { position: absolute; top: 0.25rem; width: 2px; height: 1.1rem; background: var(--text); margin-left: -1px; pointer-events: none; }
+.marker { position: absolute; top: 0.3rem; width: 6px; height: 1rem; margin-left: -3px; border: 0; border-radius: 1px; padding: 0; cursor: pointer; }
+.marker:hover { transform: scaleY(1.3); }
+#legend { display: flex; flex-wrap: wrap; gap: 0.3rem 1.2rem; font-family: var(--sans); font-size: 0.8rem; color: var(--muted); margin: 0 0 2rem; }
+#legend i { display: inline-block; width: 0.55rem; height: 0.55rem; border-radius: 1px; margin-right: 0.4rem; }
+
+/* Interface de l'extension : ce qui n'a pas de sens en relecture */
+#fct-stop-btn, .fct-report, #fct-recap-session { display: none !important; }
+
+/* ── Pied de page ──────────────────────────────────────────────────────── */
+
+.site-footer { border-top: 1px solid var(--rule); font-family: var(--sans); font-size: 0.85rem; color: var(--muted); }
+.site-footer .inner { max-width: 62rem; margin: 0 auto; padding: 1.4rem 1.5rem 2.4rem; display: flex; flex-wrap: wrap; justify-content: space-between; gap: 0.6rem 2rem; }
+.site-footer a { color: var(--muted); }
+.site-footer a:hover { color: var(--accent); }
+
+@media (max-width: 640px) {
+  body { font-size: 1rem; }
+  main { padding: 2rem 1rem 3rem; }
+  .site-header .inner, .site-footer .inner { padding-left: 1rem; padding-right: 1rem; }
+  .site-nav { gap: 0.2rem 1.1rem; }
+  td:first-child { white-space: normal; }
+}

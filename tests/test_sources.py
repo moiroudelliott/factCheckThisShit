@@ -58,8 +58,8 @@ def test_low_reliability_proof_never_settles_alone():
 
 
 def test_published_policy_matches_the_code():
-    """La section « Sources » du site liste exactement les domaines du code."""
-    with open(os.path.join(ROOT, "site", "index.html"), encoding="utf-8") as f:
+    """La page « Sources » du site liste exactement les domaines du code."""
+    with open(os.path.join(ROOT, "site", "sources.html"), encoding="utf-8") as f:
         html = f.read()
     published = {name: set(re.findall(r"<li>([^<]+)</li>", body))
                  for name, body in re.findall(r'<ul class="domains" data-list="(\w+)">(.*?)</ul>', html, re.S)}

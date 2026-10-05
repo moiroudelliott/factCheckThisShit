@@ -76,8 +76,8 @@
       return;
     }
     const wanted = new URLSearchParams(location.search).get('s');
-    const current = list.find((s) => s.id === wanted) || list[list.length - 1];
-    renderPicker(list, current);
+    const current = list.find((s) => s.id === wanted) || list[0];
+    renderDebates(list, current);
     try {
       // no-cache : une session régénérée sous le même identifiant remplace l'ancienne
       session = await fetch(`sessions/${current.id}.json`, { cache: 'no-cache' }).then((r) => r.json());
@@ -86,31 +86,34 @@
       return;
     }
     prepare(session);
-    $('session-title').textContent = session.video.title || current.title || '';
-    $('session-meta').textContent = describe(current);
     setFacade('Lancer la relecture', true);
   }
 
   function describe(s) {
     const parts = [];
     if (s.duration) parts.push(`${Math.round(s.duration / 60)} min`);
-    if (s.affirmations) parts.push(`${s.affirmations} affirmation${s.affirmations > 1 ? 's' : ''} vérifiable${s.affirmations > 1 ? 's' : ''}`);
-    if (s.date) parts.push(`analysée le ${new Date(s.date).toLocaleDateString('fr-FR')}`);
+    if (s.affirmations) parts.push(`${s.affirmations} affirmation${s.affirmations > 1 ? 's' : ''} vérifiée${s.affirmations > 1 ? 's' : ''}`);
     return parts.join(' · ');
   }
 
-  function renderPicker(list, current) {
-    if (list.length < 2) return;
-    const sel = $('picker');
+  // Liste des débats disponibles : un lien par débat, le débat affiché est marqué
+  function renderDebates(list, current) {
+    const ul = $('debates');
     for (const s of list) {
-      const opt = document.createElement('option');
-      opt.value = s.id;
-      opt.textContent = s.title || s.id;
-      opt.selected = s === current;
-      sel.appendChild(opt);
+      const li = document.createElement('li');
+      const a = document.createElement('a');
+      a.href = `?s=${encodeURIComponent(s.id)}`;
+      if (s === current) a.setAttribute('aria-current', 'true');
+      const title = document.createElement('span');
+      title.className = 'debate-title';
+      title.textContent = s.title || s.id;
+      const meta = document.createElement('span');
+      meta.className = 'debate-meta';
+      meta.textContent = describe(s);
+      a.append(title, meta);
+      li.appendChild(a);
+      ul.appendChild(li);
     }
-    sel.hidden = false;
-    sel.addEventListener('change', () => { location.search = `?s=${encodeURIComponent(sel.value)}`; });
   }
 
   function prepare(s) {

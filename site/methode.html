@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Méthode — SOURCÉ</title>
+  <meta name="description" content="Comment SOURCÉ transcrit un débat, repère les affirmations vérifiables, les confronte aux sources et rend un verdict ; définitions des verdicts et limites connues.">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="canonical" href="https://source.codeminds.fr/methode.html">
+  <link rel="stylesheet" href="style.css?v=2b02d4c243">
+</head>
+<body>
+  <header class="site-header">
+    <div class="inner">
+      <a class="wordmark" href="index.html">SOURC<span>É</span></a>
+      <nav class="site-nav" aria-label="Navigation principale">
+        <a href="relecture.html">Démonstration</a>
+        <a href="methode.html" aria-current="page">Méthode</a>
+        <a href="sources.html">Sources</a>
+        <a href="a-propos.html">À propos</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <p class="kicker">Méthode</p>
+    <h1>Du son du débat au verdict</h1>
+    <p class="lede">SOURCÉ enchaîne quatre étapes automatiques. Cette page décrit chacune d'elles, la signification des verdicts et les limites du prototype.</p>
+
+    <nav class="toc" aria-label="Sommaire">
+      <strong>Sommaire</strong>
+      <ol>
+        <li><a href="#transcription">Transcription et intervenants</a></li>
+        <li><a href="#reperage">Repérage des affirmations</a></li>
+        <li><a href="#verification">Vérification</a></li>
+        <li><a href="#verdicts">Verdicts et confiance</a></li>
+        <li><a href="#limites">Limites connues</a></li>
+        <li><a href="#donnees">Données et confidentialité</a></li>
+      </ol>
+    </nav>
+
+    <h2 id="transcription">1. Transcription et intervenants</h2>
+    <p>Une extension du navigateur capte le son de l'onglet où le débat est diffusé, par tranches de dix secondes qui se chevauchent légèrement pour ne couper aucun mot. Le son est transcrit sur l'ordinateur de l'utilisateur par le modèle de reconnaissance vocale Whisper ; il n'est jamais envoyé ailleurs.</p>
+    <p>Chaque phrase est rattachée à une voix. Les voix sont distinguées par leur empreinte acoustique, puis associées à un nom de deux façons : par comparaison avec des empreintes déjà enregistrées, ou par recoupement du contenu (un intervenant interpellé par son nom, un sujet qu'il défend). Tant qu'aucun nom n'est confirmé, l'intervenant reste « non identifié ».</p>
+
+    <h2 id="reperage">2. Repérage des affirmations</h2>
+    <p>Environ toutes les vingt secondes de parole, le texte transcrit est soumis à un modèle de langue (Mistral). Il relève les points du passage et les classe :</p>
+    <ul>
+      <li><strong>affirmation</strong> : un fait précis et vérifiable — chiffre, date, vote, événement ;</li>
+      <li><strong>opinion, argument, question, remarque</strong> : conservés au récapitulatif, mais pas vérifiés ;</li>
+      <li><strong>trop vague</strong> : une affirmation qui ne contient rien de vérifiable (« il existe des fractures en France »).</li>
+    </ul>
+    <p>Pour chaque affirmation, le modèle relève aussi les mots exacts prononcés : l'affirmation est reformulée pour être lisible, mais c'est le propos réel qui est vérifié.</p>
+
+    <h2 id="verification">3. Vérification</h2>
+    <p>Chaque affirmation est comparée aux sources suivantes, interrogées en parallèle :</p>
+    <ul>
+      <li>les <strong>vérifications déjà publiées</strong> par les rédactions spécialisées (Les Décodeurs, CheckNews, Vrai ou fake, Fake off, Les Surligneurs) ;</li>
+      <li>les <strong>statistiques officielles</strong> : séries d'Eurostat (chômage, dette, déficit, inflation, immigration…) et jeux de données publics de data.gouv.fr ;</li>
+      <li>les <strong>scrutins publics de l'Assemblée nationale</strong>, pour savoir qui a voté quoi ;</li>
+      <li>la <strong>recherche web</strong> — presse, sites officiels, Wikipédia — sans passer par Google ni Bing ;</li>
+      <li>la <strong>recherche académique</strong> (HAL, OpenAlex), pour les affirmations sur des causes ou des effets.</li>
+    </ul>
+    <p>Le modèle de langue rédige ensuite le verdict à partir de ces seuls documents, annotés selon leur fiabilité (voir la <a href="sources.html">politique des sources</a>). Plusieurs règles sont contrôlées par le programme lui-même, et non laissées au modèle :</p>
+    <ul>
+      <li>le lien cité doit figurer parmi les documents fournis — jamais un lien inventé ;</li>
+      <li>un verdict « faux » doit s'appuyer sur un fait précis tiré d'une source ; à défaut, il devient « non vérifiable » ;</li>
+      <li>un verdict sans source affiche une confiance d'au plus 50 % ;</li>
+      <li>un verdict déjà rendu est réutilisé pendant trente jours pour la même affirmation.</li>
+    </ul>
+    <p>La carte de l'affirmation apparaît sur la vidéo une quinzaine de secondes après la phrase, et le verdict quelques secondes plus tard.</p>
+
+    <h2 id="verdicts">4. Verdicts et confiance</h2>
+    <table>
+      <thead><tr><th>Verdict</th><th>Signification</th></tr></thead>
+      <tbody>
+        <tr><td><span class="verdict v-vrai">Vrai</span></td><td>Les sources confirment l'affirmation.</td></tr>
+        <tr><td><span class="verdict v-partiel">Partiellement vrai</span></td><td>Le fait principal est exact, mais un détail ne l'est pas : un chiffre approché, une date, un superlatif.</td></tr>
+        <tr><td><span class="verdict v-trompeur">Trompeur</span></td><td>Exact à la lettre, mais présenté de façon à donner une impression fausse.</td></tr>
+        <tr><td><span class="verdict v-faux">Faux</span></td><td>Une source contredit le fait principal (autre chiffre, autre date, autre fait).</td></tr>
+        <tr><td><span class="verdict v-nv">Non vérifiable</span></td><td>Aucune source consultée ne traite du sujet de l'affirmation.</td></tr>
+      </tbody>
+    </table>
+    <p>La <strong>confiance</strong> (de 0 à 100 %) mesure la solidité du verdict : autour de 90 % lorsque des sources officielles concordent, autour de 70 % avec une seule source fiable, 50 % au plus sans source.</p>
+
+    <h2 id="limites">5. Limites connues</h2>
+    <ul>
+      <li><strong>Transcription</strong> : certains mots rares ou noms propres sont mal entendus (« abaya » transcrit « la baille »). Une affirmation mal transcrite peut être mal vérifiée.</li>
+      <li><strong>Attribution</strong> : quand plusieurs personnes parlent en même temps, ou quand deux voix se ressemblent, une phrase peut être attribuée au mauvais intervenant ; le présentateur est parfois confondu avec un invité.</li>
+      <li><strong>Verdicts</strong> : le modèle de langue peut mal lire une source ou juger trop strictement une affirmation formulée de façon approximative. Chaque verdict cite sa source pour pouvoir être contrôlé, et peut être signalé depuis l'extension.</li>
+      <li><strong>Couverture</strong> : un fait très récent, ou absent des sources consultées, reste « non vérifiable ».</li>
+    </ul>
+
+    <h2 id="donnees">6. Données et confidentialité</h2>
+    <p>Le son du débat est traité sur l'ordinateur de l'utilisateur et n'en sort pas. Le texte transcrit est envoyé à l'API de Mistral AI (entreprise française) pour le repérage et la rédaction des verdicts ; les mots-clés de recherche sont envoyés à l'API de Brave Search et à Wikipédia. Aucune donnée ne concerne la personne qui regarde le débat.</p>
+    <p class="note">Le détail technique (seuils, formats de données, tests) est documenté dans le dépôt du projet.</p>
+  </main>
+
+  <footer class="site-footer">
+    <div class="inner">
+      <span>SOURCÉ — prototype de recherche, Université Savoie Mont Blanc</span>
+      <span><a href="a-propos.html#mentions">Mentions légales</a> · Aucun cookie ni traceur</span>
+    </div>
+  </footer>
+</body>
+</html>

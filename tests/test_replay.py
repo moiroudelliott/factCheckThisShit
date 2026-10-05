@@ -31,12 +31,14 @@ def test_site_overlay_is_in_sync_with_the_extension():
             assert a.read() == b.read(), f"{os.path.relpath(dst, ROOT)} en retard — lancer publish_session.py"
 
 
-def test_relecture_page_loads_current_versions():
+def test_pages_load_current_versions():
     """Sinon les visiteurs gardent l'ancienne version en cache — python publish_session.py"""
-    with open(ps.RELECTURE_HTML, encoding="utf-8") as f:
-        html = f.read()
-    for rel in ps.VERSIONED:
-        assert f"{rel}?v={ps.asset_version(rel)}" in html, f"{rel} : version périmée — lancer publish_session.py"
+    for page in ps.site_pages():
+        with open(page, encoding="utf-8") as f:
+            html = f.read()
+        for rel in ps.VERSIONED:
+            if f'"{rel}' in html:
+                assert f"{rel}?v={ps.asset_version(rel)}" in html,                     f"{os.path.basename(page)} : {rel} périmé — lancer publish_session.py"
 
 
 def test_session_is_cleaned_and_sorted():

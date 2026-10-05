@@ -17,7 +17,7 @@ os.environ["FACTCHECK_CACHE_DB"] = os.path.join(tempfile.mkdtemp(prefix="fct_tes
 
 from server import cache  # noqa: E402
 from server.dedup import dupe_index_add, is_duplicate_indexed, repeats_figures_indexed  # noqa: E402
-from server.text_utils import claim_signature, figures, same_figures  # noqa: E402
+from server.text_utils import claim_signature, figures, same_figures, same_idea  # noqa: E402
 
 DIFFERENT = [
     ("Marine Le Pen a voté contre la réforme des retraites",
@@ -93,6 +93,17 @@ def test_same_figures_on_the_same_subject_are_one_claim():
     assert not same_figures("10 % des heures ne sont pas remplacées, soit 20 millions d'heures",
                             "Un dixième des heures de cours ne sont pas remplacées")
     assert not same_figures("Le chômage a baissé en 2024", "Le chômage a baissé en 2024")  # sans chiffre : autre règle
+
+
+def test_variants_of_one_idea_in_a_passage():
+    """Cas vécu (Maréchal, Franc-jeu) : une phrase découpée en deux points,
+    vérifiés en parallèle — l'un « trompeur », l'autre « non vérifiable »."""
+    assert same_idea("Les naissances de personnes non européennes seront majoritaires en 2045 selon les projections de l'INED",
+                     "Les personnes immigrées d'origine non européenne seront majoritaires dans la population selon les projections")
+    assert not same_idea("Le budget de l'éducation nationale prévoit 650 millions d'euros de coupes",
+                         "Le budget de l'enseignement supérieur prévoit 150 millions d'euros de coupes")
+    assert not same_idea("Louis Boyard a publié des tweets encourageant les lycéens à bloquer",
+                         "Des députés LFI ont fait le tour d'établissements pour inciter au blocage")
 
 
 def test_repeated_figures_are_skipped_only_for_claims():

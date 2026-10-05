@@ -115,6 +115,21 @@ def same_figures(a: str, b: str) -> bool:
     return sa.polar == sb.polar and bool(sa.words & sb.words)
 
 
+def same_idea(a: str, b: str, threshold: float = 0.5) -> bool:
+    """Deux affirmations tirées du MÊME passage, par le même orateur, qui
+    disent la même chose en variantes (« les naissances non européennes
+    seront majoritaires en 2045 » / « les immigrés non européens seront
+    majoritaires dans la population ») : mêmes chiffres hors années (souvent
+    aucun), et la moitié des mots-clés en commun. Vérifiées en parallèle,
+    elles recevaient des verdicts différents."""
+    if figures(a) != figures(b):
+        return False
+    wa, wb = key_words(a), key_words(b)
+    if len(wa) < 3 or len(wb) < 3:
+        return False
+    return len(wa & wb) / min(len(wa), len(wb)) >= threshold
+
+
 def claims_match(a: ClaimSig, b: ClaimSig, threshold: float) -> bool:
     """Vrai si a et b disent la même chose (reformulation), faux dès qu'un
     nombre, la négation ou un mot de sens diffère."""

@@ -34,7 +34,9 @@ from server.state import (
     session_excerpts, session_speaker_map, session_map_votes, session_map_state,
     session_voice_locked, session_bank_miss, session_pending, session_warned,
 )
-from server.text_utils import claim_signature, clean_description, build_transcript, is_hallucination, strip_overlap
+from server.text_utils import (
+    claim_signature, clean_description, build_transcript, is_hallucination, same_idea, strip_overlap,
+)
 from server.vocabulary import build_hotwords, is_hotword_echo, learn
 from server.voices import (
     SpeakerTracker, speaker_label, probe_speaker, apply_speaker_map,
@@ -425,7 +427,14 @@ def flush_to_mistral(sid: str, text: str, ts: float = None, entries: list = ()):
         combined = list(all_points)
         unique: list = []
         for p in raw_points:
-            if is_duplicate_indexed(p['texte'], combined, index) or (
+            # Même idée en variantes, dans ce passage et du même orateur (« les
+            # naissances seront majoritaires en 2045 » / « les immigrés seront
+            # majoritaires ») : vérifiées en parallèle, elles recevaient des
+            # verdicts différents
+            variant = p['type'] == 'affirmation' and any(
+                u['type'] == 'affirmation' and u.get('qui') == p.get('qui') and same_idea(p['texte'], u['texte'])
+                for u in unique)
+            if variant or is_duplicate_indexed(p['texte'], combined, index) or (
                     p['type'] == 'affirmation' and repeats_figures_indexed(p['texte'], combined, index)):
                 print(f"[Dedup] ignoré: {p['texte'][:70]}")
             else:

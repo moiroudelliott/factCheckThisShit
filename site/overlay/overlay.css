@@ -989,3 +989,41 @@ a.fct-recap-src:hover { color: #fff; }
 @container fct (max-height: 300px) {
   #fct-card-slot { display: none; }
 }
+
+/* ── Fiche de fin de débat (onglet du récap) ───────────────────────────────── */
+
+.fct-fiche { display: flex; flex-direction: column; gap: 8px; }
+.fct-fiche-h {
+  margin: 8px 0 0;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.5);
+}
+.fct-fiche-resume {
+  margin: 0;
+  font-family: 'FCT Newsreader', serif;
+  font-size: 14px;
+  line-height: 1.45;
+  color: rgba(255, 255, 255, 0.88);
+}
+.fct-fiche-note { margin: 0; font-size: 11px; line-height: 1.45; color: rgba(255, 255, 255, 0.55); }
+.fct-fiche-deb {
+  padding: 9px 12px 10px;
+  background: rgba(22, 24, 30, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 10px;
+  flex-shrink: 0;
+}
+.fct-fiche-deb-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin-bottom: 6px; }
+.fct-fiche-name { font-size: 13px; font-weight: 600; color: rgba(255, 255, 255, 0.9); }
+.fct-fiche-idx { font-size: 13px; font-weight: 700; color: #fff; white-space: nowrap; }
+.fct-fiche-idx small { font-size: 10.5px; font-weight: 500; color: rgba(255, 255, 255, 0.55); }
+.fct-fiche-idx--na { font-size: 10.5px; font-weight: 500; color: rgba(255, 255, 255, 0.5); }
+.fct-fiche-bar { display: flex; height: 6px; border-radius: 3px; overflow: hidden; gap: 1px; margin-bottom: 6px; }
+.fct-fiche-bar i { display: block; min-width: 2px; }
+.fct-fiche-counts { font-size: 10.5px; line-height: 1.5; color: rgba(255, 255, 255, 0.6); }
+.fct-fiche-themes { list-style: none; margin: 0; padding: 0; font-size: 11.5px; }
+.fct-fiche-themes li { display: flex; justify-content: space-between; gap: 8px; padding: 4px 0; border-bottom: 1px solid rgba(255, 255, 255, 0.06); }
+.fct-fiche-themes li span:last-child { color: rgba(255, 255, 255, 0.55); white-space: nowrap; }

@@ -20,4 +20,5 @@ session_map_state: dict[str, dict] = {}      # { sid: {"flushes": int, "inflight
 session_voice_locked: dict[str, set] = {}    # { sid: labels identifiés ACOUSTIQUEMENT — définitifs, les votes LLM ne peuvent pas les changer }
 session_bank_miss: dict[str, set] = {}       # { sid: labels déjà comparés à la banque sans correspondance (évite de réémettre voice_not_in_bank en boucle) }
 session_pending: dict[str, int] = {}         # { sid: analyses Mistral / fact-checks encore en vol } — l'arrêt propre attend qu'il retombe à 0
+session_speech: dict[str, list] = {}         # { sid: [(début s, durée s, label)] } — temps de parole, pour la fiche de fin de débat
 session_warned: dict[str, dict] = {}         # { sid: {message: horodatage} } — anti-répétition des server_warning

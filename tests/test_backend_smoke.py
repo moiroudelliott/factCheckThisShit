@@ -229,6 +229,23 @@ def test_full_session():
 
     done = next(m["args"][0] for m in got if m["name"] == "session_done")
     assert done["complete"] is True
+
+    # Fiche de fin de débat : les chiffres avant session_done, puis la version
+    # rédigée — session_done annonce qu'elle suit
+    first = next(m["args"][0] for m in got if m["name"] == "debate_summary")
+    assert first["final"] is False and done["fiche"] is True
+    assert first["fiche"]["totaux"]["affirmations"] >= 1 and "affirmations" not in first["fiche"]  # version compacte
+    for _ in range(100):
+        got += client.get_received()
+        if any(m["name"] == "debate_summary" and m["args"][0]["final"] for m in got):
+            break
+        eventlet.sleep(0.1)
+    final = next(m["args"][0] for m in got if m["name"] == "debate_summary" and m["args"][0]["final"])
+    # Voix jamais identifiée ici : ses affirmations ne comptent pour personne,
+    # et sans débatteur, rien à rédiger (aucun appel à Mistral pour la fiche)
+    assert final["fiche"]["debatteurs"] == [] and final["fiche"]["non_identifies"] == 2
+    assert final["fiche"]["redaction"] is None
+    assert not any("fiche de synthèse" in p for p in PROMPTS)
     client.disconnect()
 
 

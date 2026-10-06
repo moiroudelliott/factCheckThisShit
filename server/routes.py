@@ -20,7 +20,7 @@ from server.config import (
     BACKEND_TOKEN, MISTRAL_API_KEY, FLUSH_INTERVAL, MIN_WORDS, MAX_BUFFER_WORDS, PROBE_MATCH_T,
     MIN_WORDS_ON_PAUSE, MIN_WORDS_ON_STOP, FINISH_TIMEOUT_S, CHUNK_OVERLAP_S, CHUNK_S, REPORTS_FILE,
 )
-from server import cache, indicators, known_factchecks, votes
+from server import cache, indicators, known_factchecks, summary, votes
 from server.dedup import dupe_index_add, is_duplicate_indexed, repeats_figures_indexed
 from server.factcheck import (
     SEARCH_DOWN_MESSAGE, call_mistral, call_mistral_api, fact_check_affirmation, search_available,
@@ -32,8 +32,9 @@ from server.state import (
     session_history, session_starts, session_buffers, session_contexts, session_points, session_verdicts,
     session_dupe_index, session_flush_locks, session_chunk_locks, session_speakers,
     session_excerpts, session_speaker_map, session_map_votes, session_map_state,
-    session_voice_locked, session_bank_miss, session_pending, session_warned,
+    session_voice_locked, session_bank_miss, session_pending, session_warned, session_speech,
 )
+from server.themes import normalize_theme
 from server.text_utils import (
     claim_signature, clean_description, build_transcript, is_hallucination, same_idea, strip_overlap,
 )
@@ -141,6 +142,7 @@ def on_connect(auth=None):
     session_map_state[sid] = {"flushes": 0, "inflight": False}
     session_voice_locked[sid] = set()
     session_pending[sid] = 0
+    session_speech[sid] = []
     # Recharger la banque : des voix ont pu être ajoutées (harvest_voices.py,
     # enroll.py, auto-enrôlement) depuis le démarrage du serveur
     load_voice_bank(verbose=False)
@@ -173,6 +175,7 @@ def on_disconnect():
     session_bank_miss.pop(sid, None)
     session_pending.pop(sid, None)
     session_warned.pop(sid, None)
+    session_speech.pop(sid, None)
     print(f"Client déconnecté: {sid}")
 
 
@@ -244,7 +247,41 @@ def _finish_session(sid: str):
     deadline = time.time() + FINISH_TIMEOUT_S
     while session_pending.get(sid, 0) > 0 and time.time() < deadline:
         eventlet.sleep(0.5)
-    socketio.emit("session_done", {"complete": session_pending.get(sid, 0) == 0}, to=sid)
+    # Fiche de fin de débat (server/summary.py) : les chiffres tout de suite,
+    # puis la rédaction de Mistral — session_done annonce qu'elle suivra, pour
+    # que le client reste connecté jusque-là
+    fiche, inputs = None, None
+    try:
+        inputs = _fiche_inputs(sid)
+        if inputs["points"]:
+            fiche = summary.build_fiche(**inputs)
+            socketio.emit("debate_summary", {"fiche": summary.compact(fiche), "final": not MISTRAL_API_KEY}, to=sid)
+    except Exception as e:
+        print(f"[Fiche error] {type(e).__name__}: {e}")
+    socketio.emit("session_done", {"complete": session_pending.get(sid, 0) == 0,
+                                   "fiche": bool(fiche and MISTRAL_API_KEY)}, to=sid)
+    if fiche and MISTRAL_API_KEY:
+        try:
+            fiche["redaction"] = summary.write_redaction(fiche, inputs["points"])
+        except Exception as e:
+            print(f"[Fiche error] rédaction : {type(e).__name__}: {e}")
+        socketio.emit("debate_summary", {"fiche": summary.compact(fiche), "final": True}, to=sid)
+
+
+def _fiche_inputs(sid: str) -> dict:
+    """Instantané de la session pour la fiche (l'état est purgé à la
+    déconnexion). Points sans thème (réponse incomplète de Mistral) : classés
+    en un appel s'ils sont nombreux."""
+    ctx = session_contexts.get(sid, {})
+    started = session_starts.get(sid, time.time())
+    inputs = summary.inputs_from_live(list(session_points.get(sid, [])), list(session_verdicts.get(sid, [])),
+                                      list(session_speech.get(sid, [])), dict(session_speaker_map.get(sid, {})),
+                                      started, time.time())
+    missing = sum(1 for p in inputs["points"] if not p["theme"])
+    if MISTRAL_API_KEY and missing > 0.2 * max(1, len(inputs["points"])):
+        summary.ensure_themes(inputs["points"])
+    inputs.update(titre=ctx.get("emission", ""), date=ctx.get("date", ""))
+    return inputs
 
 
 def _spawn_tracked(sid: str, fn, *args):
@@ -411,6 +448,9 @@ def flush_to_mistral(sid: str, text: str, ts: float = None, entries: list = ()):
         smap = session_speaker_map.get(sid, {})
         for p in raw_points:
             apply_checkworthiness(p)  # affirmation trop vague → « vague », pas de fact-check
+            # Frise et tableau de la fiche de fin de débat ; sans thème : classé
+            # à la fin du débat (_fiche_inputs)
+            p["theme"] = normalize_theme(p["theme"]) if p.get("theme") else ""
             # Mots exacts du propos : gardés seulement s'ils sont vraiment dans
             # la transcription ; ils datent aussi le propos plus finement que
             # le début du buffer
@@ -510,9 +550,12 @@ def handle_audio_chunk(data):
         print(f"[Whisper] {len(results)} segment(s) émis")
 
         emitted = []  # [(label_locuteur, texte, instant prononcé)]
+        speech = session_speech.get(sid)
         for r in results:
             emitted.append((r["speaker"], r["text"], r["said_at"]))
             emit("transcript_segment", r)
+            if speech is not None and r["speaker"]:
+                speech.append((r["said_at"] - session_start, r["end"] - r["start"], r["speaker"]))
 
         if emitted:
             match_clusters_to_bank(sid)

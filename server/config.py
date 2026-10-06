@@ -19,6 +19,11 @@ MISTRAL_FACTCHECK_TIMEOUT_S = 40  # … d'un verdict : prompt long (preuves), mo
 # plus accusateur des verdicts, et celui qui se trompait le plus souvent
 FACTCHECK_RECHECK_FALSE = os.environ.get("FACTCHECK_RECHECK_FALSE", "1") != "0"
 PASSAGE_MAX_CHARS = 1200  # passage de transcription autour du propos, passé à la vérification (contexte)
+# Fiche de fin de débat (server/summary.py) : un seul appel, une fois le débat
+# fini — la lenteur ne gêne pas, un modèle plus grand peut s'y justifier
+MISTRAL_FICHE_MODEL = os.environ.get("MISTRAL_FICHE_MODEL", MISTRAL_MODEL)
+MISTRAL_FICHE_TIMEOUT_S = 150
+FICHE_MIN_VERDICTS = 15  # verdicts tranchés en dessous desquels un débatteur n'a pas d'indice d'exactitude
 
 # ── Lecture des articles (server/articles.py) ─────────────────────────────
 ARTICLE_FETCH_MAX = int(os.environ.get("ARTICLE_FETCH_MAX", "3"))  # articles ouverts par verdict (0 = extraits seuls)

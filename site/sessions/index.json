@@ -7,7 +7,9 @@
       "points": 80,
       "affirmations": 18,
       "verdicts": 18,
-      "duration": 891.7
+      "duration": 891.7,
+      "fiche": true,
+      "debat": "2026-09-20"
     },
     {
       "id": "Np12sKLLYro",
@@ -16,7 +18,9 @@
       "points": 184,
       "affirmations": 75,
       "verdicts": 75,
-      "duration": 2302.2
+      "duration": 2302.2,
+      "fiche": true,
+      "debat": "2026-10-04"
     },
     {
       "id": "2V70R8-Om7c",
@@ -25,7 +29,9 @@
       "points": 517,
       "affirmations": 195,
       "verdicts": 195,
-      "duration": 7090.9
+      "duration": 7090.9,
+      "fiche": true,
+      "debat": "2024-06-27"
     }
   ]
 }

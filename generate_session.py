@@ -58,12 +58,14 @@ MAX_PENDING = 3          # analyses / fact-checks en vol avant d'envoyer la suit
 SEARCH_GAP_S = 5.0       # écart mini entre deux vérifications sans API Brave : au-delà, Brave bloque SearxNG
 SEARCH_GAP_API_S = 1.2   # avec l'API Brave (1 requête/s, offre gratuite)
 DONE_TIMEOUT_S = 180     # attente max de la fin des dernières vérifications
+FICHE_TIMEOUT_S = 200    # puis de la fiche de fin de débat rédigée (un appel Mistral, borné à 150 s)
 CHECKPOINT_CHUNKS = 50   # sauvegarde de la bande partielle tous les 50 morceaux (~7 min de vidéo)
 
 # Ce que l'extension enregistre (content.js → TAPE_TYPES), sauf les messages
 # de limite de débit : ici ce sont des artefacts du traitement accéléré
 TAPE_EVENTS = {"talking_points", "fact_check_result", "speaker_map", "speaker_live", "transcript_segment",
-               "voice_enrolled", "voice_not_in_bank", "session_reset", "server_warning", "session_done"}
+               "voice_enrolled", "voice_not_in_bank", "session_reset", "server_warning", "session_done",
+               "debate_summary"}
 
 
 # ── Horloge de la vidéo ─────────────────────────────────────────────────────
@@ -222,6 +224,9 @@ def to_message(event: str, data: dict, origin: float):
         return {"type": event, "message": data["message"]} if data.get("message") else None
     if event == "session_done":
         return {"type": event, "complete": bool(data.get("complete"))}
+    if event == "debate_summary":
+        return {"type": event, "fiche": data["fiche"], "final": bool(data.get("final"))} \
+            if isinstance(data.get("fiche"), dict) else None
     return {"type": event}
 
 
@@ -296,13 +301,16 @@ def main():
     eio.start_background_task = lambda target, *a, **k: _spawn(clock.inherit(target), *a, **k)
     socketio.server.async_handlers = False  # un morceau est traité avant l'envoi du suivant
 
-    tape, done = [], []
+    tape, done, fiche = [], [], {"attendue": False, "finale": False}
 
     def record(event, data):
         if event not in TAPE_EVENTS:
             return
         if event == "session_done":
             done.append(True)
+            fiche["attendue"] = bool((data or {}).get("fiche"))
+        if event == "debate_summary" and (data or {}).get("final"):
+            fiche["finale"] = True
         m = to_message(event, copy.deepcopy(data), clock.origin)
         if m:
             tape.append({"t": round(max(0.0, clock.video_now()), 1), "m": m})
@@ -389,6 +397,12 @@ def main():
     while not done and time.monotonic() < deadline:
         eventlet.sleep(0.5)
         client.get_received()
+    if fiche["attendue"]:
+        print("📝 Fiche du débat…")
+        deadline = time.monotonic() + FICHE_TIMEOUT_S
+        while not fiche["finale"] and time.monotonic() < deadline:
+            eventlet.sleep(0.5)
+            client.get_received()
     client.disconnect()
     reader.close()
 

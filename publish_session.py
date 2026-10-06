@@ -19,7 +19,11 @@ cartes arrivent 12 s trop tôt, --offset 12.
 
 Le fichier publié est nettoyé (seuls les champs affichés sont gardés) et
 rangé dans site/sessions/<id YouTube>.json, avec une entrée dans
-site/sessions/index.json. Synchronisation : site/overlay/ reçoit une copie
+site/sessions/index.json. La fiche du débat (server/summary.py) est
+recalculée sur la session publiée — positions de la vidéo, décalage compris
+— et rangée dans site/sessions/<id>.fiche.json pour la page fiche.html ; sa
+rédaction (résumé, moments forts) vient de la session, et doit avoir été
+écrite avant (en direct, ou python fiche_session.py). Synchronisation : site/overlay/ reçoit une copie
 de extension/content.js et overlay.css, site/fonts/ les polices de
 l'extension (tests/test_replay.py vérifie que les copies sont à jour).
 Ensuite : redéployer le dossier site/.
@@ -33,6 +37,7 @@ import re
 import shutil
 import sys
 
+from server import summary
 from server.sources import is_inaudible as inaudible_explication
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
@@ -50,12 +55,12 @@ SYNCED = [
     for f in sorted(os.listdir(os.path.join(EXTENSION, "fonts"))) if f.endswith(".woff2")
 ]
 
-# Fichiers chargés par site/relecture.html : un numéro de version (empreinte
+# Fichiers chargés par les pages du site : un numéro de version (empreinte
 # du contenu) dans leur adresse force le navigateur à recharger une version
 # modifiée — sans lui, les visiteurs gardaient l'ancienne en cache (cas vécu :
 # une correction du lecteur invisible après rechargement de la page)
 RELECTURE_HTML = os.path.join(SITE, "relecture.html")
-VERSIONED = ("style.css", "relecture.js", "overlay/content.js", "overlay/overlay.css")
+VERSIONED = ("style.css", "relecture.js", "fiche.js", "overlay/content.js", "overlay/overlay.css")
 
 
 def site_pages() -> list:
@@ -67,7 +72,7 @@ YOUTUBE_ID_RE = re.compile(r"^[\w-]{11}$")
 # direct, champs internes) est retiré avant publication
 _STR = (str,)
 _POINT_FIELDS = {"id": _STR, "type": _STR, "texte": _STR, "qui": _STR, "qui_label": _STR,
-                 "citation": _STR, "verifiable": (int, float), "vt": (int, float, type(None))}
+                 "citation": _STR, "verifiable": (int, float), "vt": (int, float, type(None)), "theme": _STR}
 _FIELDS = {
     "fact_check_result": {"id": _STR, "verdict": _STR, "confiance": (int, float, type(None)),
                           "explication": _STR, "source": _STR, "url": _STR, "indisponible": (bool,),
@@ -83,6 +88,7 @@ _FIELDS = {
     "mistral_rate_limited": {"attempt": (int, float), "max": (int, float), "wait": (int, float)},
     "finalizing": {},
     "session_done": {"complete": (bool,)},
+    "debate_summary": {"fiche": (dict,), "final": (bool,)},
 }
 # Messages envoyés par le service worker (clé « action » et non « type »)
 _ACTIONS = {"captureEnded": {"reason": _STR}}
@@ -212,6 +218,16 @@ def load_index() -> dict:
         return json.load(f)
 
 
+def build_fiche(session: dict):
+    """Fiche du débat recalculée sur la session publiée ; None si ses points
+    n'ont pas de thème (session antérieure : python fiche_session.py)."""
+    inputs = summary.inputs_from_tape(session)
+    points = inputs["points"]
+    if not points or sum(1 for p in points if p["theme"]) < 0.5 * len(points):
+        return None
+    return summary.build_fiche(**{**inputs, "titre": session["video"]["title"] or inputs["titre"]})
+
+
 def publish(path: str, title: str = "", offset: float = 0.0) -> dict:
     with open(path, encoding="utf-8") as f:
         session = validate(json.load(f), offset)
@@ -219,10 +235,25 @@ def publish(path: str, title: str = "", offset: float = 0.0) -> dict:
         session["video"]["title"] = title
     vid = session["video"]["youtube"]
     os.makedirs(SESSIONS, exist_ok=True)
+    # Fiche : complète dans son propre fichier ; dans la relecture, la version
+    # du récap (sans la liste des affirmations, que l'overlay a déjà)
+    fiche = build_fiche(session)
+    fiche_path = os.path.join(SESSIONS, f"{vid}.fiche.json")
+    session["events"] = [e for e in session["events"] if e["m"].get("type") != "debate_summary"]
+    if fiche:
+        end = max((e["t"] for e in session["events"]), default=0.0)
+        session["events"].append({"t": end, "m": {"type": "debate_summary", "fiche": summary.compact(fiche), "final": True}})
+        with open(fiche_path, "w", encoding="utf-8", newline="\n") as f:
+            json.dump(fiche, f, ensure_ascii=False, separators=(",", ":"))
+    elif os.path.exists(fiche_path):
+        os.remove(fiche_path)
     with open(os.path.join(SESSIONS, f"{vid}.json"), "w", encoding="utf-8", newline="\n") as f:
         json.dump(session, f, ensure_ascii=False, separators=(",", ":"))
     index = load_index()
-    entry = {"id": vid, "title": session["video"]["title"], "date": session["exported"], **stats(session)}
+    entry = {"id": vid, "title": session["video"]["title"], "date": session["exported"], **stats(session),
+             "fiche": bool(fiche)}
+    if fiche and fiche.get("date"):
+        entry["debat"] = fiche["date"]  # date du débat (≠ date de l'analyse)
     index["sessions"] = [s for s in index.get("sessions", []) if s.get("id") != vid] + [entry]
     with open(INDEX, "w", encoding="utf-8", newline="\n") as f:
         json.dump(index, f, ensure_ascii=False, indent=2)
@@ -253,6 +284,10 @@ def main():
     print(f"  {entry['points']} points, {entry['affirmations']} affirmations, {entry['verdicts']} verdicts, "
           f"{int(entry['duration'] // 60)} min")
     print(f"  Relecture : site/relecture.html?s={entry['id']} — redéployer le dossier site/")
+    if entry["fiche"]:
+        print(f"  Fiche : site/fiche.html?s={entry['id']}")
+    else:
+        print(f"  Pas de fiche (points sans thème) : python fiche_session.py {args.session}, puis republier")
 
 
 if __name__ == "__main__":

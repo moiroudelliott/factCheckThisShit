@@ -5,8 +5,9 @@
 //
 // Une « session » = une capture. À l'arrêt, l'audio est coupé tout de suite
 // mais la session garde sa connexion le temps que le backend analyse la fin
-// du débat (stop_transcription → session_done) : une nouvelle capture peut
-// démarrer pendant ce temps, sur sa propre connexion.
+// du débat (stop_transcription → session_done), puis rédige la fiche de fin
+// de débat (debate_summary) : une nouvelle capture peut démarrer pendant ce
+// temps, sur sa propre connexion.
 // ══════════════════════════════════════════════════════════════════════════════
 
 const BACKEND_URL = 'http://localhost:5000';
@@ -14,6 +15,7 @@ const CHUNK_MS   = 10000; // plus long = plus de contexte pour Whisper, moins de
 const OVERLAP_MS = 1500;  // chevauchement entre chunks : ne perd pas les mots coupés à la frontière (= CHUNK_OVERLAP_S côté backend)
 const PROBE_MS   = 2500;  // sondes "qui parle" : courtes = badge réactif (~3 s de latence)
 const FINAL_WAIT_MS = 60000; // arrêt : attente max de session_done (le backend borne lui-même à 45 s)
+const FICHE_WAIT_MS = 180000; // puis attente max de la fiche rédigée (un appel Mistral, borné à 150 s)
 
 let current = null; // session en cours de capture (null si aucune)
 let adActive = false; // pub YouTube en cours (signalée par le content script)
@@ -127,6 +129,11 @@ function startSession({ streamId, emission, guests, description, videoDate, toke
       if (Array.isArray(d.labels) && d.labels.length) forward({ type: 'voice_not_in_bank', labels: d.labels });
     });
 
+    // Fiche de fin de débat : chiffres d'abord, puis la version rédigée (final)
+    socket.on('debate_summary', (d) => {
+      if (d?.fiche && typeof d.fiche === 'object') forward({ type: 'debate_summary', fiche: d.fiche, final: Boolean(d.final) });
+    });
+
     socket.on('fact_check_result', (d) => {
       forward({
         type: 'fact_check_result',
@@ -220,17 +227,25 @@ async function stopSession(sess) {
 
   // …puis laisser le backend analyser la fin du débat avant de se déconnecter
   const socket = sess.socket;
-  let complete = false;
+  let complete = false, fiche = false;
   if (socket?.connected) {
     sess.forward({ type: 'finalizing' });
     socket.emit('stop_transcription');
     complete = await new Promise((resolve) => {
-      socket.once('session_done', (d) => resolve(Boolean(d?.complete)));
+      socket.once('session_done', (d) => { fiche = Boolean(d?.fiche); resolve(Boolean(d?.complete)); });
       socket.once('disconnect', () => resolve(false));
       setTimeout(() => resolve(false), FINAL_WAIT_MS);
     });
   }
-  socket?.disconnect();
   sess.forward({ type: 'session_done', complete });
+  // La fiche rédigée arrive après : rester connecté jusque-là
+  if (fiche && socket?.connected) {
+    await new Promise((resolve) => {
+      socket.on('debate_summary', (d) => { if (d?.final) resolve(); });
+      socket.once('disconnect', resolve);
+      setTimeout(resolve, FICHE_WAIT_MS);
+    });
+  }
+  socket?.disconnect();
   chrome.runtime.sendMessage({ action: 'offscreenDone' }).catch(() => {});
 }

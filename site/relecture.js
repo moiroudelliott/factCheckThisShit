@@ -51,6 +51,8 @@
   let player = null;
   let idx = 0, spkIdx = 0, lastCur = 0, ended = false, overlayOn = false, tickTimer = null;
   let recordedEnd = false; // la session contient l'arrêt réel de l'analyse
+  // Position de départ demandée (?t=…, liens « ▶ » de la fiche du débat)
+  const startAt = Math.max(0, Number(new URLSearchParams(location.search).get('t')) || 0);
 
   document.addEventListener('DOMContentLoaded', init);
 
@@ -82,6 +84,10 @@
     const wanted = new URLSearchParams(location.search).get('s');
     const current = list.find((s) => s.id === wanted) || list[0];
     renderDebates(list, current);
+    if (current.fiche) {
+      $('fiche-link').querySelector('a').href = `fiche.html?s=${encodeURIComponent(current.id)}`;
+      $('fiche-link').hidden = false;
+    }
     try {
       // no-cache : une session régénérée sous le même identifiant remplace l'ancienne
       session = await fetch(`sessions/${current.id}.json`, { cache: 'no-cache' }).then((r) => r.json());
@@ -90,7 +96,7 @@
       return;
     }
     prepare(session);
-    setFacade('Lancer la relecture', true);
+    setFacade(startAt ? `Lancer la relecture à ${fmtT(startAt)}` : 'Lancer la relecture', true);
   }
 
   function describe(s) {
@@ -221,7 +227,16 @@
       get seekable() { const d = player.getDuration() || 0; return { length: 1, start: () => 0, end: () => d }; },
     };
     start();
+    // Saut demandé : la relecture le traite comme un saut en avant (ce qui
+    // précède passe au récap, sans carte)
+    if (startAt) player.seekTo(startAt, true);
     player.playVideo();
+  }
+
+  function fmtT(t) {
+    t = Math.floor(t);
+    const h = Math.floor(t / 3600), m = Math.floor((t % 3600) / 60), s = t % 60;
+    return (h ? `${h}:${String(m).padStart(2, '0')}` : `${m}`) + `:${String(s).padStart(2, '0')}`;
   }
 
   function onStateChange(e) {

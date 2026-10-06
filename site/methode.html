@@ -7,13 +7,14 @@
   <meta name="description" content="Comment SOURCÉ transcrit un débat, repère les affirmations vérifiables, les confronte aux sources et rend un verdict ; définitions des verdicts et limites connues.">
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
   <link rel="canonical" href="https://source.codeminds.fr/methode.html">
-  <link rel="stylesheet" href="style.css?v=c189f69551">
+  <link rel="stylesheet" href="style.css?v=a2d0481b01">
 </head>
 <body>
   <header class="site-header">
     <div class="inner">
       <a class="wordmark" href="index.html">SOURC<span>É</span></a>
       <nav class="site-nav" aria-label="Navigation principale">
+        <a href="fiche.html">Débats</a>
         <a href="relecture.html">Démonstration</a>
         <a href="methode.html" aria-current="page">Méthode</a>
         <a href="sources.html">Sources</a>
@@ -25,7 +26,7 @@
   <main>
     <p class="kicker">Méthode</p>
     <h1>Du son du débat au verdict</h1>
-    <p class="lede">SOURCÉ enchaîne quatre étapes automatiques. Cette page décrit chacune d'elles, la signification des verdicts et les limites du prototype.</p>
+    <p class="lede">SOURCÉ enchaîne quatre étapes automatiques. Cette page décrit chacune d'elles, la signification des verdicts, la fiche rédigée à la fin de chaque débat et les limites du prototype.</p>
 
     <nav class="toc" aria-label="Sommaire">
       <strong>Sommaire</strong>
@@ -34,6 +35,7 @@
         <li><a href="#reperage">Repérage des affirmations</a></li>
         <li><a href="#verification">Vérification</a></li>
         <li><a href="#verdicts">Verdicts et confiance</a></li>
+        <li><a href="#fiche">La fiche du débat</a></li>
         <li><a href="#limites">Limites connues</a></li>
         <li><a href="#donnees">Données et confidentialité</a></li>
       </ol>
@@ -87,7 +89,13 @@
     </table>
     <p>La <strong>confiance</strong> (de 0 à 100 %) mesure la solidité du verdict : autour de 90 % lorsque des sources officielles concordent, autour de 70 % avec une seule source fiable, 50 % au plus sans source.</p>
 
-    <h2 id="limites">5. Limites connues</h2>
+    <h2 id="fiche">5. La fiche du débat</h2>
+    <p>À la fin de chaque débat, SOURCÉ rédige une <a href="fiche.html">fiche</a> lisible sans la vidéo : ce que chaque débatteur a affirmé, ce qui était exact, les thèmes abordés et le temps passé sur chacun.</p>
+    <p><strong>Les chiffres sont calculés par le programme, pas par l'IA.</strong> Pour chaque débatteur, l'<strong>indice d'exactitude</strong> est la moyenne de ses verdicts tranchés : vrai compte 1, partiellement vrai ½, trompeur et faux 0 ; les affirmations non vérifiables ou non recoupées n'y entrent pas. Il est accompagné de sa <strong>marge d'erreur</strong> statistique (à 95 %), et n'est affiché qu'à partir de 15 verdicts tranchés. Quand deux débatteurs sont comparés, la fiche dit si l'écart dépasse la marge ou non. Les débatteurs apparaissent dans l'ordre de leur temps de parole, jamais classés par leur indice.</p>
+    <p><strong>L'IA rédige, sous contrôle.</strong> Le modèle de langue écrit le résumé, choisit les moments forts, relève les chiffres contestés, les contradictions et les propositions. Il ne peut désigner que des affirmations déjà vérifiées, et chaque choix est contrôlé par le programme : un moment fort est une erreur ou un chiffre exact déjà jugé comme tel, au plus deux erreurs et un chiffre exact par débatteur ; un chiffre « annoncé » doit figurer dans le propos et le chiffre « selon la source » dans l'explication du verdict ; une contradiction oppose deux débatteurs que les verdicts départagent.</p>
+    <p>L'indice mesure l'exactitude de ce qui a pu être vérifié, pas l'honnêteté d'une personne : un débatteur qui avance beaucoup de chiffres précis s'expose davantage qu'un autre qui reste général. Il hérite aussi des erreurs des verdicts et de l'attribution des voix, que la marge statistique ne couvre pas.</p>
+
+    <h2 id="limites">6. Limites connues</h2>
     <ul>
       <li><strong>Transcription</strong> : certains mots rares ou noms propres sont mal entendus (« abaya » transcrit « la baille »). Quand la vérification conclut qu'une phrase a été mal transcrite, aucune carte n'est affichée ; une erreur qui passe inaperçue peut en revanche fausser un verdict.</li>
       <li><strong>Attribution</strong> : quand plusieurs personnes parlent en même temps, ou quand deux voix se ressemblent, une phrase peut être attribuée au mauvais intervenant ; le présentateur est parfois confondu avec un invité.</li>
@@ -95,7 +103,7 @@
       <li><strong>Couverture</strong> : un fait très récent, ou absent des sources consultées, reste « non vérifiable ».</li>
     </ul>
 
-    <h2 id="donnees">6. Données et confidentialité</h2>
+    <h2 id="donnees">7. Données et confidentialité</h2>
     <p>Le son du débat est traité sur l'ordinateur de l'utilisateur et n'en sort pas. Le texte transcrit est envoyé à l'API de Mistral AI (entreprise française) pour le repérage et la rédaction des verdicts ; les mots-clés de recherche sont envoyés à l'API de Brave Search et à Wikipédia. Aucune donnée ne concerne la personne qui regarde le débat.</p>
     <p class="note">Le détail technique (seuils, formats de données, tests) est documenté dans le dépôt du projet.</p>
   </main>

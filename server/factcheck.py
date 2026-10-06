@@ -19,6 +19,7 @@ from server.config import (
     MISTRAL_TIMEOUT_S, SEARXNG_URL,
 )
 from server.text_utils import _STOPWORDS
+from server.themes import themes_prompt_list
 from server import cache, indicators, known_factchecks, votes
 from server.notify import describe_error, warn_client
 from server.sources import (
@@ -39,7 +40,7 @@ MISSION: un passage de débat contient presque toujours 1 à 3 talking points. E
 Ne retourne [] QUE si le passage est réellement vide de contenu politique (politesses, gestion de parole, phrases incompréhensibles). Un tableau vide doit rester RARE.
 
 Réponds UNIQUEMENT avec un tableau JSON valide, sans markdown:
-[{{"type": "TYPE", "texte": "le point condensé en une phrase claire", "qui": "qui l'a dit, ou chaîne vide", "verifiable": 8, "enjeu": 7, "periode": "année ou période visée (affirmations), ou chaîne vide", "citation": "les mots exacts du passage", "recherche": "mots-clés de recherche (affirmations)"}}]
+[{{"type": "TYPE", "texte": "le point condensé en une phrase claire", "qui": "qui l'a dit, ou chaîne vide", "verifiable": 8, "enjeu": 7, "periode": "année ou période visée (affirmations), ou chaîne vide", "citation": "les mots exacts du passage", "recherche": "mots-clés de recherche (affirmations)", "theme": "budget"}}]
 
 Types:
 - "affirmation" = fait PRÉCIS et VÉRIFIABLE: chiffre, date, événement, vote, citation, fait historique ou économique.
@@ -88,6 +89,7 @@ précise : ne mets JAMAIS l'année du débat par défaut (« la France compte 7 
 année dans "recherche".
 "citation" (pour chaque point) = les mots EXACTS de la transcription où le point est dit (8 à 30 mots),
 recopiés sans rien changer ni corriger — pas de reformulation, pas de nom de locuteur.
+"theme" (pour chaque point) = le thème principal du point, UN identifiant parmi : {themes}.
 "recherche" (affirmations seulement) = 4 à 10 mots-clés pour trouver dans la presse ou les statistiques
 de quoi vérifier ce point : sujet, chiffre, noms, période — pas une phrase.
 Ex: "entrées immigrés France 2024 baisse Insee", "Attal déclaration politique générale accueillir moins mieux".
@@ -301,6 +303,7 @@ def call_mistral(text: str, context: dict = None, recent_points: list = None, si
         text=text,
         history_block=build_history_block(recent_points or []),
         attribution_rule=ATTRIBUTION_RULE_DIAR if DIARIZATION else ATTRIBUTION_RULE_NODIAR,
+        themes=themes_prompt_list(),
     )
     content = call_mistral_api(prompt, sid=sid)
     print(f"[Mistral talking points] {content[:200]}")
@@ -763,7 +766,7 @@ def fact_check_affirmation(sid: str, claim_id: str, claim_text: str, citation: s
     cached = cache.lookup(claim_text, year)
     if cached:
         print(f"[FactCheck] cache hit → {cached['verdict']} ({cached.get('confiance')}%)")
-        done.append({"claim": claim_text, "qui": qui, **cached})
+        done.append({"id": claim_id, "claim": claim_text, "qui": qui, **cached})
         socketio.emit("fact_check_result", {"id": claim_id, **cached}, to=sid)
         return
     try:
@@ -774,7 +777,7 @@ def fact_check_affirmation(sid: str, claim_id: str, claim_text: str, citation: s
         print(f"[FactCheck] {result['verdict']} en {time.monotonic() - started:.1f} s")
         cache.store(claim_text, result, year)
         if not result.get("indisponible"):
-            done.append({"claim": claim_text, "qui": qui, **result})
+            done.append({"id": claim_id, "claim": claim_text, "qui": qui, **result})
         socketio.emit("fact_check_result", {"id": claim_id, **result}, to=sid)
     except Exception as e:
         print(f"[FactCheck error] {type(e).__name__}: {e}")

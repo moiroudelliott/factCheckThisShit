@@ -155,6 +155,9 @@ const S = {
   lastProbeAt: 0,    // Date.now() de la dernière sonde "qui parle"
   recapOpen: false,
   showAll: true,     // filtre récap : true = tout voir (défaut)
+  recapFiche: false, // onglet « Fiche » du récap affiché
+  fiche: null,       // fiche de fin de débat (server/summary.py), une fois l'analyse finie
+  ficheFinal: false, // la version rédigée est arrivée (sinon : chiffres seuls, rédaction en cours)
   lastStatus: 'connected', // dernier statut de connexion connu
   flash: null,       // { text, cls } — message temporaire sur la chip (rate limit, avertissement backend)
   flashTimer: null,
@@ -485,6 +488,7 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     if (msg.type === 'session_reset')     onSessionReset();
     if (msg.type === 'finalizing')        onFinalizing();
     if (msg.type === 'session_done')      onSessionDone(msg);
+    if (msg.type === 'debate_summary')    onDebateSummary(msg);
     if (snapshot) record(snapshot);
   } catch (e) {
     // Un message malformé ne doit jamais tuer le pipeline d'affichage
@@ -539,7 +543,7 @@ function teardown() {
     shownSigs: [], speakerMap: {}, speakerFirstSeen: {}, bankMissLabels: new Set(),
     enrolledNames: new Set(), enrollableNames: new Set(), nameFirstSeen: {}, enrollDisplayed: new Set(),
     pendingEnrollSuccess: new Set(), enrollShownAt: null, badgeTimer: null, lastProbeAt: 0,
-    recapOpen: false, showAll: true, lastStatus: 'connected', flash: null, flashTimer: null, notes: {},
+    recapOpen: false, showAll: true, recapFiche: false, fiche: null, ficheFinal: false, lastStatus: 'connected', flash: null, flashTimer: null, notes: {},
     samples: [], samplerTimer: null, lastAd: false, saveTimer: null, tape: [], tapeStart: null,
   });
   ['fct-layer', 'fct-chip', 'fct-card-slot', 'fct-recap', 'fct-speaker-badge', 'fct-markers'].forEach(id => document.getElementById(id)?.remove());
@@ -1425,7 +1429,11 @@ async function restoreRecap() {
   }
   S.speakerMap = { ...(data.speakerMap || {}), ...S.speakerMap };
   S.epoch = Math.max(S.epoch, data.epoch || 0);
-  if (Array.isArray(data.tape)) S.tape = [...data.tape, ...S.tape];
+  if (Array.isArray(data.tape)) {
+    S.tape = [...data.tape, ...S.tape];
+    const last = [...data.tape].reverse().find((e) => e?.m?.type === 'debate_summary');
+    if (last && !S.fiche) onDebateSummary(last.m);
+  }
   if (Number.isFinite(data.tapeStart)) S.tapeStart = data.tapeStart;
   updateCount();
   if (S.recapOpen) renderRecap();
@@ -1507,7 +1515,7 @@ function downloadFile(content, type, prefix, ext) {
 const TAPE_TYPES = new Set([
   'talking_points', 'fact_check_result', 'speaker_map', 'speaker_live', 'transcript_segment',
   'voice_enrolled', 'voice_not_in_bank', 'session_reset', 'connection_status', 'server_warning',
-  'mistral_rate_limited', 'captureEnded', 'finalizing', 'session_done',
+  'mistral_rate_limited', 'captureEnded', 'finalizing', 'session_done', 'debate_summary',
 ]);
 const MAX_TAPE = 20000; // ~3 h de débat (une sonde « qui parle » toutes les 2,5 s)
 
@@ -1540,6 +1548,89 @@ function exportSession() {
   downloadFile(JSON.stringify(data), 'application/json', 'source-session', 'json');
 }
 
+// ── Fiche de fin de débat ─────────────────────────────────────────────────────
+// Envoyée par le backend une fois l'analyse finie (server/summary.py) : les
+// chiffres, calculés par le code, d'abord ; puis la version rédigée par
+// Mistral (final : résumé, moments forts). Onglet « Fiche » du récap — la
+// version complète (frise, tableau par thème, toutes les affirmations) est
+// la page fiche du site, pour une session publiée.
+
+function onDebateSummary({ fiche, final }) {
+  if (!S.active || !fiche || typeof fiche !== 'object' || !Array.isArray(fiche.debatteurs)) return;
+  S.fiche = fiche;
+  S.ficheFinal = Boolean(final);
+  if (final && S.phase === 'ended' && !/fiche/.test(S.endText)) {
+    S.endText = `${S.endText || 'analyse terminée'} · fiche au récap`;
+    renderStatus();
+  }
+  document.querySelector('#fct-recap .fct-seg [data-filter="fiche"]')?.removeAttribute('hidden');
+  if (S.recapOpen) renderRecap();
+}
+
+function fmtDuration(s) {
+  const m = Math.round((Number(s) || 0) / 60);
+  return m >= 60 ? `${Math.floor(m / 60)} h ${String(m % 60).padStart(2, '0')}` : `${m} min`;
+}
+
+const FICHE_ORDER = ['vrai', 'partiellement_vrai', 'trompeur', 'faux'];
+
+function ficheBar(counts) {
+  const total = FICHE_ORDER.reduce((n, v) => n + (counts?.[v] || 0), 0);
+  if (!total) return '';
+  return `<div class="fct-fiche-bar">${FICHE_ORDER.filter(v => counts[v]).map(v =>
+    `<i style="flex:${Number(counts[v])};background:${VERDICT_CFG[v].accent}" title="${Number(counts[v])} ${VERDICT_CFG[v].tag.toLowerCase()}"></i>`).join('')}</div>`;
+}
+
+function ficheHtml(f) {
+  const red = f.redaction || null;
+  const parts = [];
+  if (red?.resume) parts.push(`<p class="fct-fiche-resume">${esc(red.resume)}</p>`);
+  else if (!S.ficheFinal) parts.push('<p class="fct-fiche-note">Rédaction du résumé et des moments forts en cours…</p>');
+
+  parts.push('<h4 class="fct-fiche-h">Débatteurs</h4>');
+  for (const d of f.debatteurs || []) {
+    const c = d.verdicts || {};
+    const other = (Number(c.non_recoupe) || 0) + (Number(c.non_verifiable) || 0);
+    const idx = d.suffisant && d.exactitude != null
+      ? `<span class="fct-fiche-idx" title="Indice d'exactitude ± marge d'erreur à 95 %">${Number(d.exactitude)} % <small>± ${Number(d.marge)}</small></span>`
+      : '<span class="fct-fiche-idx fct-fiche-idx--na">trop peu de verdicts</span>';
+    const counts = FICHE_ORDER.filter(v => c[v]).map(v =>
+      `<span style="color:${VERDICT_CFG[v].accent}">${Number(c[v])} ${VERDICT_CFG[v].tag.toLowerCase()}</span>`);
+    if (other) counts.push(`${other} non tranché${other > 1 ? 's' : ''}`);
+    if (d.temps_parole) counts.push(`${fmtDuration(d.temps_parole)} de parole`);
+    parts.push(`<div class="fct-fiche-deb"><div class="fct-fiche-deb-head"><span class="fct-fiche-name">${esc(d.nom)}</span>${idx}</div>
+      ${ficheBar(c)}<div class="fct-fiche-counts">${counts.join(' · ')}</div></div>`);
+  }
+  const comps = f.comparaisons || [];
+  const sig = comps.filter(c => c.significatif);
+  if (comps.length) {
+    parts.push(`<p class="fct-fiche-note">${sig.length
+      ? `Écart au-delà de la marge d'erreur : ${sig.map(c => `${esc(c.a)} / ${esc(c.b)}`).join(', ')}.`
+      : "Aucun écart entre débatteurs ne dépasse la marge d'erreur."}</p>`);
+  }
+
+  const moments = (red?.moments || []).map((m) => {
+    const entry = S.points.get(m.id);
+    if (!entry) return '';
+    const cfg = verdictCfg(entry.fc) || VERDICT_CFG.non_verifiable;
+    return `<div class="fct-recap-card" style="--accent:${cfg.accent}"><div class="fct-recap-bar"></div>
+      <div class="fct-recap-card-inner"><div class="fct-recap-row"><span class="fct-recap-badge">${esc(cfg.tag)}</span>
+      <span class="fct-recap-speaker">${esc(m.qui || '')}</span>${tsButton('fct-recap-ts', entry.point.vt)}</div>
+      <p class="fct-recap-claim">« ${esc(entry.point.texte)} »</p>
+      ${m.pourquoi ? `<p class="fct-recap-explanation">${esc(m.pourquoi)}</p>` : ''}</div></div>`;
+  }).join('');
+  if (moments) parts.push('<h4 class="fct-fiche-h">Moments forts</h4>', moments);
+
+  const themes = (f.themes || []).filter(t => t.duree >= 60 && t.id !== 'autre');
+  if (themes.length) {
+    parts.push('<h4 class="fct-fiche-h">Thèmes</h4><ul class="fct-fiche-themes">'
+      + themes.map(t => `<li><span>${esc(t.label)}</span><span>${fmtDuration(t.duree)} · ${Number(t.affirmations)} vérif.</span></li>`).join('')
+      + '</ul>');
+  }
+  parts.push(`<p class="fct-fiche-note">Indice d'exactitude : vrai = 1, partiel = ½, trompeur et faux = 0, sur les verdicts tranchés (${Number(f.min_verdicts) || 15} au moins) ; ± : marge d'erreur statistique. Calculé par le programme, pas par l'IA — les verdicts automatiques peuvent eux-mêmes se tromper.</p>`);
+  return `<div class="fct-fiche">${parts.join('')}</div>`;
+}
+
 // ── Recap panel ────────────────────────────────────────────────────────────────
 
 function toggleRecap() { S.recapOpen ? closeRecap() : openRecap(); }
@@ -1566,6 +1657,7 @@ function openRecap() {
         <span class="fct-seg" role="group" aria-label="Filtrer le récapitulatif">
           <button type="button" data-filter="all">Tout</button>
           <button type="button" data-filter="aff">Affirmations</button>
+          <button type="button" data-filter="fiche"${S.fiche ? '' : ' hidden'}>Fiche</button>
         </span>
         <button class="fct-recap-filter" id="fct-recap-export" title="Exporter en Markdown" aria-label="Exporter en Markdown">⬇</button>
         <button class="fct-recap-filter" id="fct-recap-session" title="Exporter la session pour la relecture sur le site" aria-label="Exporter la session pour la relecture sur le site">⏵</button>
@@ -1592,9 +1684,11 @@ function openRecap() {
   });
 
   const segButtons = panel.querySelectorAll('.fct-seg button');
-  const syncFilter = () => segButtons.forEach(b => b.setAttribute('aria-pressed', String((b.dataset.filter === 'all') === S.showAll)));
+  const syncFilter = () => segButtons.forEach(b => b.setAttribute('aria-pressed', String(
+    b.dataset.filter === 'fiche' ? S.recapFiche : !S.recapFiche && (b.dataset.filter === 'all') === S.showAll)));
   segButtons.forEach(b => b.addEventListener('click', () => {
-    S.showAll = b.dataset.filter === 'all';
+    S.recapFiche = b.dataset.filter === 'fiche';
+    if (!S.recapFiche) S.showAll = b.dataset.filter === 'all';
     syncFilter();
     renderRecap();
   }));
@@ -1646,6 +1740,10 @@ function renderRecap() {
   renderStats();
   const body = document.getElementById('fct-recap-body');
   if (!body) return;
+  if (S.recapFiche && S.fiche) {
+    body.innerHTML = ficheHtml(S.fiche);
+    return;
+  }
   const entries = [...S.points.values()];
   const visible = S.showAll ? entries : entries.filter(e => e.point.type === 'affirmation');
 

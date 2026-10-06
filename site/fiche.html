@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Fiches des débats — SOURCÉ</title>
+  <meta name="description" content="Fiche de chaque débat analysé par SOURCÉ : ce que chaque débatteur a affirmé, ce qui était exact, les moments forts et les thèmes abordés — sans avoir à regarder la vidéo.">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="canonical" href="https://source.codeminds.fr/fiche.html">
+  <link rel="stylesheet" href="style.css?v=a2d0481b01">
+</head>
+<body>
+  <header class="site-header">
+    <div class="inner">
+      <a class="wordmark" href="index.html">SOURC<span>É</span></a>
+      <nav class="site-nav" aria-label="Navigation principale">
+        <a href="fiche.html" aria-current="page">Débats</a>
+        <a href="relecture.html">Démonstration</a>
+        <a href="methode.html">Méthode</a>
+        <a href="sources.html">Sources</a>
+        <a href="a-propos.html">À propos</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="wide">
+    <!-- Sans débat choisi : la liste des fiches -->
+    <section id="fiche-list" hidden>
+      <div class="intro">
+        <p class="kicker">Débats analysés</p>
+        <h1>Fiches des débats</h1>
+        <p class="lede">Pour chaque débat analysé : ce que chaque débatteur a affirmé, ce qui était exact, les moments forts et les thèmes abordés. Pas besoin de regarder la vidéo.</p>
+        <p id="list-error" class="note" hidden></p>
+      </div>
+      <ul id="fiches" class="debates" aria-label="Fiches disponibles"></ul>
+      <p class="more">Pour voir les verdicts apparaître sur la vidéo, au moment où ils sont tombés : <a href="relecture.html">la démonstration</a>.</p>
+    </section>
+
+    <!-- Fiche d'un débat -->
+    <article id="fiche" hidden>
+      <div class="intro">
+        <p class="kicker">Fiche du débat</p>
+        <h1 id="f-title"></h1>
+        <p id="f-meta" class="f-meta"></p>
+        <div id="f-resume"></div>
+        <p class="f-actions"><a id="f-replay" class="button" href="relecture.html">Rejouer avec la vidéo</a> <a href="fiche.html">Autres débats</a></p>
+      </div>
+      <nav id="f-toc" class="f-toc" aria-label="Sections de la fiche"></nav>
+
+      <section id="debatteurs" aria-labelledby="h-debatteurs">
+        <h2 id="h-debatteurs">Les débatteurs</h2>
+        <div id="f-debs" class="f-debs"></div>
+        <ul id="f-comps" class="f-comps"></ul>
+        <p id="f-unknown" class="small muted" hidden></p>
+        <details class="f-howto">
+          <summary>Comment lire ces chiffres</summary>
+          <ul>
+            <li>L'<strong>indice d'exactitude</strong> est la moyenne des verdicts tranchés d'un débatteur : vrai compte 1, partiellement vrai ½, trompeur et faux 0. Les affirmations non vérifiables ou non recoupées n'y entrent pas.</li>
+            <li>La <strong>marge</strong> (±) est l'incertitude statistique, à 95 % : avec peu d'affirmations, elle est large. En dessous de <span id="f-min">15</span> verdicts tranchés, pas d'indice : il ne voudrait rien dire.</li>
+            <li>Elle ne couvre pas les erreurs de l'outil lui-même : les verdicts sont automatiques et se trompent parfois. Chacun est consultable plus bas, avec sa source.</li>
+            <li>Un débatteur qui avance beaucoup de chiffres précis s'expose plus qu'un autre qui reste général : l'indice mesure l'exactitude de ce qui a pu être vérifié, pas l'honnêteté d'une personne.</li>
+            <li>Les chiffres de cette fiche sont calculés par le programme à partir des verdicts, pas par l'IA. L'IA rédige seulement le résumé, choisit les moments forts et relève les propositions, et chacun de ses choix est contrôlé (voir la <a href="methode.html#fiche">méthode</a>).</li>
+          </ul>
+        </details>
+      </section>
+
+      <section id="moments" aria-labelledby="h-moments" hidden>
+        <h2 id="h-moments">Moments forts</h2>
+        <p class="small muted">Pour chaque débatteur, ses erreurs les plus importantes et un chiffre exact marquant.</p>
+        <div id="f-moments"></div>
+      </section>
+
+      <section id="themes" aria-labelledby="h-themes">
+        <h2 id="h-themes">Le débat, thème par thème</h2>
+        <div id="f-frise" class="f-frise" role="list" aria-label="Déroulé du débat par thème"></div>
+        <div id="f-axis" class="f-axis" aria-hidden="true"></div>
+        <div id="f-legend" class="f-legend"></div>
+        <h3>Qui a appuyé quoi</h3>
+        <p class="small muted">Par thème : les verdicts des affirmations de chaque débatteur, et son temps de parole. ★ : le plus d'affirmations vraies sur ce thème.</p>
+        <div class="table-scroll"><table id="f-matrix" class="f-matrix"></table></div>
+        <h3>Déroulé</h3>
+        <ol id="f-chapters" class="f-chapters"></ol>
+      </section>
+
+      <section id="chiffres" aria-labelledby="h-chiffres" hidden>
+        <h2 id="h-chiffres">Les chiffres du débat</h2>
+        <p class="small muted">Chiffres avancés pendant le débat, face à ceux des sources.</p>
+        <div class="table-scroll"><table id="f-chiffres" class="f-chiffres"></table></div>
+      </section>
+
+      <section id="contradictions" aria-labelledby="h-contradictions" hidden>
+        <h2 id="h-contradictions">Quand ils se contredisent</h2>
+        <p class="small muted">Deux débatteurs affirment l'inverse l'un de l'autre, et les sources les départagent.</p>
+        <div id="f-contras"></div>
+      </section>
+
+      <section id="propositions" aria-labelledby="h-propositions" hidden>
+        <h2 id="h-propositions">Ce qu'ils proposent</h2>
+        <p class="small muted">Mesures annoncées pendant le débat, relevées automatiquement. Une proposition n'est ni vraie ni fausse : elle n'est pas vérifiée.</p>
+        <div id="f-props" class="f-props-grid"></div>
+      </section>
+
+      <section id="affirmations" aria-labelledby="h-affirmations">
+        <h2 id="h-affirmations">Toutes les affirmations vérifiées</h2>
+        <div class="f-filters">
+          <label>Débatteur <select id="flt-qui"></select></label>
+          <label>Verdict <select id="flt-verdict"></select></label>
+          <label>Thème <select id="flt-theme"></select></label>
+          <span id="f-count" aria-live="polite"></span>
+        </div>
+        <ol id="f-affs" class="f-affs"></ol>
+      </section>
+
+      <section id="sources-utilisees" aria-labelledby="h-sources" hidden>
+        <h2 id="h-sources">Sources les plus citées</h2>
+        <p id="f-sources" class="f-sources"></p>
+      </section>
+
+      <p class="note">Verdicts produits automatiquement pendant le débat, qui peuvent se tromper : la <a href="methode.html">méthode</a> en détaille le fonctionnement et les <a href="methode.html#limites">limites</a>. Fiche générée le <span id="f-generated"></span>.</p>
+    </article>
+  </main>
+
+  <footer class="site-footer">
+    <div class="inner">
+      <span>SOURCÉ — prototype de recherche, Université Savoie Mont Blanc</span>
+      <span><a href="a-propos.html#mentions">Mentions légales</a> · Aucun cookie ni traceur</span>
+    </div>
+  </footer>
+
+  <script src="fiche.js?v=c40a170332"></script>
+</body>
+</html>

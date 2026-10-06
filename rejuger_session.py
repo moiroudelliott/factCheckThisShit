@@ -17,6 +17,11 @@ affirmations).
 
 Le passage de transcription autour de chaque propos n'est pas enregistré
 dans la bande : la revérification ne l'a pas, contrairement au direct.
+
+La fiche de fin de débat enregistrée garde sa rédaction (résumé, moments
+forts), écrite avec les anciens verdicts : la publication en recalcule les
+chiffres et en écarte ce que les nouveaux verdicts démentent, mais mieux vaut
+la rédiger de nouveau (python fiche_session.py <sortie>).
 """
 
 import argparse
@@ -112,6 +117,8 @@ def main():
     print(f"✓ {out}")
     print("  avant :", dict(before))
     print("  après :", dict(after))
+    if any(e["m"].get("type") == "debate_summary" for e in session["events"]):
+        print(f"  fiche du débat rédigée avec les anciens verdicts : python fiche_session.py {out}")
 
 
 if __name__ == "__main__":

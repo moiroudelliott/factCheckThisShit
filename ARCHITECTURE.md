@@ -14,10 +14,11 @@ Les références pointent vers des **fonctions** (`fichier` → `fonction`) plut
 6. [Buffer → Mistral (flush) et arrêt propre](#6-buffer--mistral--la-logique-de-flush)
 7. [Extraction → déduplication → dispatch](#7-extraction-mistral--déduplication--dispatch)
 8. [Fact-check](#8-fact-check--cache--recherche--verdict)
-9. [Événements socket.io](#9-table-complète-des-événements-socketio)
-10. [Affichage (content.js)](#10-machine-à-états-daffichage-contentjs)
-11. [Constantes du pipeline](#11-toutes-les-constantes-numériques-du-pipeline)
-12. [Tests](#12-tests)
+9. [Fiche de fin de débat](#9-fiche-de-fin-de-débat)
+10. [Événements socket.io](#10-table-complète-des-événements-socketio)
+11. [Affichage (content.js)](#11-machine-à-états-daffichage-contentjs)
+12. [Constantes du pipeline](#12-toutes-les-constantes-numériques-du-pipeline)
+13. [Tests](#13-tests)
 
 ---
 
@@ -33,7 +34,7 @@ Quatre composants, trois frontières réseau :
 [content.js : state machine + DOM, calque dans le lecteur vidéo]
 ```
 
-L'onglet vidéo est YouTube (support complet : calque dans `#movie_player`, pubs, repères sur la barre de progression) ou n'importe quel autre site avec un lecteur — france.tv, LCP, Public Sénat, Twitch, Dailymotion… (§10).
+L'onglet vidéo est YouTube (support complet : calque dans `#movie_player`, pubs, repères sur la barre de progression) ou n'importe quel autre site avec un lecteur — france.tv, LCP, Public Sénat, Twitch, Dailymotion… (§11).
 
 - **`extension/background.js`** — service worker MV3, **sans état mémoire** (Chrome le tue après ~30 s d'inactivité) : tout vit dans `chrome.storage.session` (`getState`). Il orchestre : injecter `content.js`, créer le document offscreen, relayer les messages, transmettre les signalements de verdict (`reportVerdict` → `POST /report_verdict`), et **arrêter la capture** si l'onglet est fermé, change de vidéo (navigation SPA, autre page du site) ou quitte le site (`tabs.onUpdated`). Identifiant de ce qu'on analyse (`videoIdFromUrl`) : l'id de la vidéo YouTube, sinon origine + chemin de la page.
 - **`extension/offscreen.js`** — le seul endroit où l'audio existe. Un document offscreen a accès à `MediaRecorder`/`AudioContext`, ce qu'un service worker n'a pas. Une **session** par capture (`startSession`) : connexion, tabId, timers. À l'arrêt, l'audio est coupé tout de suite mais la session attend que le backend ait fini d'analyser (`stopSession`).
@@ -107,7 +108,7 @@ Pipeline interne par segment :
 4. **Filtre doublon local** — comparaison au texte exact des 5 derniers segments (`session_history[sid]`).
 5. **Diarisation** (`voices.speaker_label`) — découpe l'échantillon audio du segment (`seg.start:seg.end` en samples 16 kHz), encode via ECAPA-TDNN → embedding 192-d → `SpeakerTracker.assign()`.
 
-Chaque segment part immédiatement en `emit("transcript_segment", r)` — **avant** tout traitement Mistral. Côté extension, seul `speaker` est utilisé (l'offscreen ne relaie pas le texte), et seulement si aucune sonde n'est arrivée récemment (voir §10).
+Chaque segment part immédiatement en `emit("transcript_segment", r)` — **avant** tout traitement Mistral. Côté extension, seul `speaker` est utilisé (l'offscreen ne relaie pas le texte), et seulement si aucune sonde n'est arrivée récemment (voir §11).
 
 **Mots attendus (`hotwords`)** — `vocabulary.build_hotwords`, recalculé à `set_context` et après chaque extraction (`_refresh_hotwords`). Par priorité, jusqu'à `MAX_HOTWORDS_CHARS=450` caractères (≈ 180 tokens, sous la limite de 223 du prompt Whisper) :
 
@@ -166,7 +167,7 @@ paused = not new_text_in_this_chunk and word_count >= MIN_WORDS_ON_PAUSE(12) and
 
 Le texte accumulé passe par `build_transcript()` qui fusionne les tours de parole consécutifs du même locuteur en un bloc `"Intervenant A: ... \nIntervenant B: ..."` — c'est **ce texte annoté** qui devient le prompt Mistral.
 
-`ts = buf["start_abs"]` — l'horodatage unix du **premier** chunk du buffer. Côté extension, il est converti en position vidéo **à la réception du point** grâce à l'échantillonnage de la lecture (voir §10).
+`ts = buf["start_abs"]` — l'horodatage unix du **premier** chunk du buffer. Côté extension, il est converti en position vidéo **à la réception du point** grâce à l'échantillonnage de la lecture (voir §11).
 
 ---
 
@@ -325,7 +326,34 @@ Les articles ajoutent une ou deux réponses tranchées (moins de « non vérifia
 
 ---
 
-## 9. Table complète des événements socket.io
+## 9. Fiche de fin de débat
+
+Ce que chaque débatteur a affirmé, ce qui était exact, sur quels thèmes — lisible sans revoir la vidéo. Fichiers : `server/summary.py`, `server/themes.py`, `fiche_session.py`, `site/fiche.html` + `site/fiche.js`.
+
+**Thèmes** — liste FIXE (`server/themes.py` : 13 thèmes + « autre »), la même pour tous les débats : des thèmes inventés à chaque fois ne se compareraient pas. Mistral range chaque point dès l'extraction (champ `theme`, aucun appel en plus), normalisé par `normalize_theme` (libellé accepté, inconnu → « autre »). Points sans thème (sessions antérieures, réponse incomplète) : `ensure_themes`, un appel par 150 points.
+
+**Deux parties, séparées à dessein.**
+
+- *Les chiffres*, calculés par le code (`build_fiche`) — jamais par le modèle, dont une note ne se vérifierait pas :
+  - par débatteur (ordre : temps de parole, jamais le score) : verdicts, **indice d'exactitude** = moyenne sur les verdicts tranchés (vrai 1, partiel ½, trompeur et faux 0), **marge à 95 %** (variance calculée avec deux observations fictives, un 0 et un 1 : sinon 15 « vrai » sur 15 donneraient « 100 % ± 0 »), affichés seulement à partir de `FICHE_MIN_VERDICTS=15` verdicts tranchés ; comparaisons deux à deux (« au-delà de la marge » si l'écart dépasse la marge combinée) ;
+  - affirmations « transcription douteuse » exclues partout ; non attribuées (voix jamais identifiée) comptées à part, pour personne ;
+  - frise : thème des points dans l'ordre, lissé (thème majoritaire d'une fenêtre de 5 points), chapitres de moins de `FRISE_MIN_S=90` s fondus dans le précédent ;
+  - tableau débatteur × thème : verdicts, temps de parole (relevés « qui parle », rapportés au chapitre en cours), « ★ » au débatteur qui a le plus d'affirmations vraies sur le thème (au moins 2, sans ex æquo) ; sources les plus citées.
+- *La rédaction*, un appel Mistral (`write_redaction`, `MISTRAL_FICHE_MODEL`, délai `MISTRAL_FICHE_TIMEOUT_S=150`) : résumé neutre, moments forts, chiffres annoncés face aux sources, contradictions, propositions. Le modèle ne désigne que des identifiants, et `validate_redaction` vérifie chaque choix :
+  - moment fort : une erreur présélectionnée par le code (faux ou trompeur ; enjeu puis confiance ; 6 par débatteur) ou un chiffre exact (vrai, avec un chiffre, pas la description d'un programme) ; au plus 2 erreurs et 1 chiffre exact par débatteur ; son genre est enregistré : une erreur devenue vraie après revérification perd son moment ;
+  - chiffre : le chiffre « annoncé » figure dans le propos, celui « selon la source » dans l'explication du verdict, et l'écart dépasse 5 % (`ARRONDI` : « 350 000 » pour 347 000 n'est pas une erreur de chiffre) ;
+  - contradiction : deux débatteurs différents, que les verdicts départagent (l'un vrai ou partiel, l'autre faux ou trompeur), sur le même fait (au moins un mot-clé commun : une hausse de l'électricité n'est pas « contredite » par une taxe sur le gaz) ;
+  - proposition : un propos d'un débatteur identifié que ses mots exacts présentent comme sa mesure — première personne ou « il faut » (« j'entends baisser la TVA », « on propose, nous… ») — et jamais une affirmation jugée fausse ; au plus 6 par débatteur. Cas vécus écartés : « vous avez proposé la CSG progressive » (Gabriel Attal décrivant le programme adverse, devenu « sa » proposition), « il a retiré 10 milliards » (un constat). Le prix : des propositions réelles dites sans « je » ni « nous » manquent.
+
+**Quand.** En direct, `_finish_session` : après les derniers verdicts, `debate_summary` (chiffres seuls, `final: false`), puis `session_done {complete, fiche: true}`, puis la rédaction et `debate_summary` (`final: true`). L'offscreen reste connecté jusqu'à la fiche finale (`FICHE_WAIT_MS=180000`) ; l'extension l'affiche dans l'onglet « Fiche » du récap et l'enregistre dans la bande. `generate_session.py` attend aussi la fiche (`FICHE_TIMEOUT_S=200`). Session enregistrée avant la fiche, ou revérifiée : `fiche_session.py`. Publication : `publish_session.py` recalcule les chiffres sur la session publiée (positions de la vidéo, décalage compris) et reprend la rédaction en la revérifiant → `site/sessions/<id>.fiche.json` (lu par `fiche.html`), `fiche: true` et la date du débat dans l'index ; la relecture garde la version compacte (sans la liste des affirmations, que l'overlay a déjà). Les liens « ▶ » de la fiche ouvrent la relecture à la bonne position (`relecture.html?s=…&t=…`).
+
+**Modèle de la rédaction** — essai d'octobre 2026 sur les trois débats publiés : `mistral-large-latest` (26 s au plus) ne rédige pas mieux que medium (20 s) — « pourquoi » plus génériques, deux propositions prêtées au mauvais débatteur (le SMIC à 1 600 € du NFP attribué à Gabriel Attal, qui le décrivait), contradictions entre deux erreurs de même sens. Medium reste le défaut. Consignes resserrées après l'essai : une proposition est une mesure que le débatteur propose lui-même ; une contradiction se tranche par les verdicts ; un « pourquoi » ne répète pas l'explication affichée à côté.
+
+**Limites** — l'indice hérite des erreurs des verdicts et de l'attribution des voix, que la marge statistique ne couvre pas ; il mesure l'exactitude de ce qui a été vérifié — un débatteur qui avance beaucoup de chiffres précis s'expose plus qu'un autre qui reste général. Les moments forts reprennent les verdicts tels quels : un « faux » discutable peut y figurer.
+
+---
+
+## 10. Table complète des événements socket.io
 
 | Event | Sens | Payload | Effet côté extension |
 |---|---|---|---|
@@ -333,7 +361,7 @@ Les articles ajoutent une ou deux réponses tranchées (moins de « non vérifia
 | `start_transcription` | C→S | — | `session_starts[sid] = now` |
 | `audio_chunk` | C→S | `ArrayBuffer` (WebM) | pipeline complet §3-7 |
 | `speaker_probe` | C→S | `ArrayBuffer` (WebM, 2.5 s) | badge live |
-| `stop_transcription` | C→S | — | dernier buffer analysé, puis `session_done` |
+| `stop_transcription` | C→S | — | dernier buffer analysé, puis `session_done` et la fiche (§9) |
 | `transcript_segment` | S→C | `{text, speaker, start, end, abs_time, said_at}` | badge, seulement sans sonde récente |
 | `speaker_live` | S→C | `{speaker}` | badge (fait foi) |
 | `talking_points` | S→C | `{points: [{id, ts, type, texte, qui, qui_label, verifiable?, citation, said_at}]}` | `addPoint()` par point |
@@ -343,7 +371,8 @@ Les articles ajoutent une ou deux réponses tranchées (moins de « non vérifia
 | `voice_not_in_bank` | S→C | `{labels: [...]}` | « Locuteur non identifié » tout de suite |
 | `mistral_rate_limited` | S→C | `{attempt, max, wait}` | message temporaire sur la puce |
 | `server_warning` | S→C | `{message}` | message temporaire sur la puce (anti-répétition 60 s) |
-| `session_done` | S→C | `{complete}` | fin de la finalisation |
+| `session_done` | S→C | `{complete, fiche}` | fin de la finalisation ; `fiche` : la fiche rédigée suivra, rester connecté |
+| `debate_summary` | S→C | `{fiche, final}` | fiche de fin de débat (§9) : chiffres d'abord, puis la version rédigée (`final`) — onglet « Fiche » du récap |
 
 Messages internes à l'extension (offscreen → content, via background) en plus des relais ci-dessus : `connection_status`, `session_reset` (reconnexion = nouvelle session backend, les labels repartent de zéro), `finalizing`, `session_done`. Background → content : `showOverlay`, `captureEnded` (`reason` : `user`, `navigation`, `tab_closed`). Content → background : `contentReady` (restauration après F5), `adState`, `stopCapture`, `reportVerdict`.
 
@@ -351,7 +380,7 @@ Routes HTTP (extension uniquement, `X-Backend-Token` si `BACKEND_TOKEN` est déf
 
 ---
 
-## 10. Machine à états d'affichage (content.js)
+## 11. Machine à états d'affichage (content.js)
 
 Un seul objet `S` porte tout l'état : `points` (Map id→{point, fc}, ordre d'insertion = ordre du récap), `queue` (ids en attente de carte), `current` (la carte affichée), `phase` (`live` → `stopping` → `ended`) et **`gen`** — un compteur incrémenté à chaque `teardown()` qui invalide tous les `setTimeout` en vol (`later()` vérifie `g === S.gen`).
 
@@ -396,7 +425,7 @@ showCard (spinner)
 
 ---
 
-## 11. Toutes les constantes numériques du pipeline
+## 12. Toutes les constantes numériques du pipeline
 
 | Constante | Valeur | Fichier |
 |---|---|---|
@@ -422,10 +451,13 @@ showCard (spinner)
 | `MAX_HOTWORDS_CHARS` / `MAX_LEARNED` | 450 / 20 | server/vocabulary.py |
 | `FACTCHECK_FEEDS_REFRESH_S` / `AN_REFRESH_S` | 1h / 7j | server/config.py |
 | cache Eurostat / `MAX_PER_CLAIM` | 24h / 3 | server/indicators.py |
+| `FICHE_MIN_VERDICTS` / `MISTRAL_FICHE_TIMEOUT_S` | 15 verdicts tranchés / 150s | server/config.py |
+| `FRISE_MIN_S` / `ARRONDI` / moments forts par débatteur | 90s / 5 % / 2 erreurs + 1 chiffre exact | server/summary.py |
+| `FICHE_WAIT_MS` (attente de la fiche rédigée) | 180000 | offscreen.js |
 
 ---
 
-## 12. Tests
+## 13. Tests
 
 Aucun GPU, aucune clé ni aucun réseau nécessaires — chaque fichier se lance seul (`python tests/<fichier>.py`) ou via `python -m pytest tests` :
 
@@ -440,6 +472,7 @@ Aucun GPU, aucune clé ni aucun réseau nécessaires — chaque fichier se lance
 | `tests/test_vocabulary.py` | mots attendus par Whisper : priorités, noms propres, limite de taille, écho des hotwords |
 | `tests/test_recheck.py` | contre-vérification des « faux » (réponses simulées) : « faux » gardé seulement sur une contradiction appuyée par une phrase réellement présente dans les preuves ; phrase de source vérifiée mot pour mot |
 | `tests/test_articles.py` | texte d'une page (sans menus ni scripts), passage utile d'un article pour une affirmation |
+| `tests/test_summary.py` | fiche de fin de débat : thèmes fixes, indice d'exactitude et sa marge, seuil de verdicts, ordre des débatteurs, frise lissée, entrées depuis une bande ou le direct ; rédaction de Mistral simulée et passée au crible (identifiants inconnus, moments hors présélection, chiffres absents des sources, arrondis, contradictions non tranchées, moment devenu caduc après revérification) |
 | `tests/test_points.py` | notes de vérifiabilité et d'importance, validation et datation de la citation exacte, orateur nommé dans sa propre citation |
 | `tests/test_known_factchecks.py` | lecture des flux RSS, correspondance affirmation ↔ fact-check publié |
 | `tests/test_official_data.py` | décodage JSON-stat Eurostat, déclencheurs d'indicateurs, jamais d'appel Eurostat pendant un fact-check (cache disque), parsing des scrutins et recherche de votes |

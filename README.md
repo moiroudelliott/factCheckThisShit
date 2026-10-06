@@ -49,11 +49,12 @@ et les autres fichiers de [`tests/`](tests/) — voir [ARCHITECTURE.md](ARCHITEC
 | `server/` | Logique du serveur : Whisper, diarisation, Mistral, sources, cache — voir [ARCHITECTURE.md](ARCHITECTURE.md) |
 | `tests/` | Tests unitaires et test de fumée du backend complet (sans GPU ni réseau) |
 | `searxng/` | Instance SearxNG auto-hébergée (recherche web sans dépendance à un moteur tiers) |
-| `site/` | Site statique du projet : accueil, méthode, politique des sources, à propos, et démonstration (`relecture.html`) qui rejoue des analyses enregistrées sur des débats YouTube, sans GPU ni backend |
+| `site/` | Site statique du projet : accueil, méthode, politique des sources, à propos, fiches des débats analysés (`fiche.html` : ce que chacun a affirmé, ce qui était exact, par thème — sans la vidéo) et démonstration (`relecture.html`) qui rejoue des analyses enregistrées sur des débats YouTube, sans GPU ni backend |
 | `enroll.py`, `harvest_voices.py`, `remove_voice.py` | Outils CLI pour peupler/retirer des voix dans `voices/` (banque d'empreintes vocales) |
 | `vocabulaire.txt` | Mots que Whisper doit s'attendre à entendre (sigles, partis, termes souvent mal transcrits) — modifiable |
 | `generate_session.py` | Génère une session de relecture à partir d'un simple lien YouTube, sans regarder la vidéo : même pipeline que le direct, minutage du direct (`--publish` pour la mettre sur le site) |
-| `publish_session.py` | Publie une session enregistrée (bouton ⏵ du récap) sur la page de relecture du site, et synchronise l'overlay du site avec l'extension |
+| `publish_session.py` | Publie une session enregistrée (bouton ⏵ du récap) sur la page de relecture du site avec sa fiche de débat, et synchronise l'overlay du site avec l'extension |
+| `fiche_session.py` | Rédige la fiche de fin de débat d'une session enregistrée (thèmes manquants, résumé, moments forts, propositions) : pour une session antérieure à la fiche, ou après une revérification ; en direct, le backend la rédige lui-même |
 | `rejuger_session.py` | Revérifie les affirmations d'une session déjà générée (à partir d'un moment, par identifiant ou toutes), sans refaire transcription ni extraction : après un quota de recherche épuisé en cours de route, ou pour appliquer une règle corrigée |
 | `bench_verdicts.py` | Banc d'essai des verdicts : rejoue la vérification sur 103 affirmations aux preuves figées et compte les erreurs (« faux » à tort, parole validée, dérobades) |
 | `deploy_site.py` | Met le site en ligne par SSH (sauvegarde de l'ancien site sur le serveur, puis bascule ; `--dry-run` pour lister les fichiers) |

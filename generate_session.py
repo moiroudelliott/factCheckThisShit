@@ -58,6 +58,7 @@ MAX_PENDING = 3          # analyses / fact-checks en vol avant d'envoyer la suit
 SEARCH_GAP_S = 5.0       # écart mini entre deux vérifications sans API Brave : au-delà, Brave bloque SearxNG
 SEARCH_GAP_API_S = 1.2   # avec l'API Brave (1 requête/s, offre gratuite)
 DONE_TIMEOUT_S = 180     # attente max de la fin des dernières vérifications
+CHECKPOINT_CHUNKS = 50   # sauvegarde de la bande partielle tous les 50 morceaux (~7 min de vidéo)
 
 # Ce que l'extension enregistre (content.js → TAPE_TYPES), sauf les messages
 # de limite de débit : ici ce sont des artefacts du traitement accéléré
@@ -338,6 +339,18 @@ def main():
 
     items = schedule(duration)
     total = sum(1 for i in items if i[1] == "audio_chunk")
+    out = args.out or os.path.join(ROOT, f"source-session_{time.strftime('%Y-%m-%d')}_{vid}.json")
+    partial = out.replace(".json", ".partiel.json")
+
+    def build_session(events: list) -> dict:
+        return {
+            "format": "source-session", "version": 1,
+            "video": {"youtube": vid, "title": title},
+            "exported": time.strftime("%Y-%m-%d"),
+            "offset": 0, "started": 0,
+            "events": sorted(events, key=lambda e: e["t"]),
+        }
+
     sent = 0
     chunk_free = 0.0       # position où le chunk précédent a fini d'être traité
     real_start = time.monotonic()
@@ -356,6 +369,11 @@ def main():
             if sent % 10 == 0 or sent == total:
                 print(f"  {sent}/{total} morceaux — {int(arrival // 60)}:{int(arrival % 60):02d} de vidéo "
                       f"en {int(time.monotonic() - real_start)} s")
+            # Sauvegarde régulière : une génération coupée (cas vécu à 107 min
+            # sur 118) ne perd plus tout — la bande partielle se publie telle quelle
+            if sent % CHECKPOINT_CHUNKS == 0:
+                with open(partial, "w", encoding="utf-8") as f:
+                    json.dump(build_session(list(tape)), f, ensure_ascii=False)
         else:
             clock.at(arrival)  # les sondes tournent en parallèle des chunks, en direct
             client.emit("speaker_probe", wav_slice(reader, start, end))
@@ -375,16 +393,10 @@ def main():
     reader.close()
 
     tape.sort(key=lambda e: e["t"])
-    session = {
-        "format": "source-session", "version": 1,
-        "video": {"youtube": vid, "title": title},
-        "exported": time.strftime("%Y-%m-%d"),
-        "offset": 0, "started": 0,
-        "events": tape,
-    }
-    out = args.out or os.path.join(ROOT, f"source-session_{time.strftime('%Y-%m-%d')}_{vid}.json")
     with open(out, "w", encoding="utf-8") as f:
-        json.dump(session, f, ensure_ascii=False)
+        json.dump(build_session(tape), f, ensure_ascii=False)
+    if os.path.exists(partial):
+        os.remove(partial)
     points = sum(len(e["m"].get("points", [])) for e in tape if e["m"].get("type") == "talking_points")
     verdicts = sum(1 for e in tape if e["m"].get("type") == "fact_check_result")
     print(f"✓ {out}\n  {points} points, {verdicts} verdicts, en {int(time.monotonic() - real_start)} s "

@@ -68,6 +68,14 @@ def test_other_verdicts_are_not_rechecked():
     assert len(calls) == 1
 
 
+def test_replays_are_judged_at_the_debate_date():
+    """Cas vécu : un débat de juin 2024 jugé « au 6 octobre 2026 »."""
+    import time
+    assert factcheck.judgement_date({"date": "2024-06-27"}) == "27/06/2024"
+    assert factcheck.judgement_date({}) == time.strftime("%d/%m/%Y")
+    assert factcheck.judgement_date({"date": "2999-01-01"}) == time.strftime("%d/%m/%Y")
+
+
 if __name__ == "__main__":
     for name, fn in list(globals().items()):
         if name.startswith("test_") and callable(fn):

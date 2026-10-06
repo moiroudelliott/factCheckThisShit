@@ -137,8 +137,10 @@ RÈGLES DE RIGUEUR:
 - Lis l'affirmation dans son sens le plus plausible dans le débat : « Attal a interdit l'abaya », dit à propos de l'école, veut dire à l'école — ne la juge pas fausse pour une portée qu'elle ne revendique pas.
 - Vérifie CHAQUE élément : chiffre, date, période, superlatif (« record », « première fois depuis 20 ans », « jamais »), et à qui l'action est attribuée. Recopie dans "inexact" tout élément que tes sources contredisent. Si le fait PRINCIPAL est vrai et que seul un détail est faux (superlatif, arrondi, date approchée) : "partiellement_vrai" — ex : « les entrées ont baissé en 2024, une première depuis 15 ans » alors que la baisse est réelle mais qu'il y en a eu une en 2020 → "partiellement_vrai". "faux" seulement si le fait principal est contredit. Si "inexact" n'est pas vide, le verdict ne peut pas être "vrai".
 - DERNIÈRE DONNÉE DISPONIBLE : un chiffre présenté comme actuel (« par an », « aujourd'hui ») se compare à la dernière donnée publiée par une source indépendante (Insee, Eurostat, DEPP…). Le seul fait que cette donnée date d'un an ou deux n'est pas une réserve : si elle concorde, "vrai" (« environ 350 000 entrées par an » face aux 347 000 de l'Insee pour 2023). Cette règle ne change rien aux autres : une inexactitude réelle (une note de service présentée comme une loi, un lieu, un chiffre faux) reste "partiellement_vrai", et un chiffre que seuls l'orateur ou son ministère avancent reste "non_recoupe".
-- Ne pinaille pas : un mot ou une préposition de différence (« discipline du combat » / « de combat »), un synonyme (LBD / flashball), un arrondi (« 1 600 » pour 1 588) ne rendent pas une affirmation inexacte.
+- Ne pinaille pas : un mot ou une préposition de différence (« discipline du combat » / « de combat »), un synonyme (LBD / flashball), un arrondi (« 1 600 » pour 1 588 ; « pas de référendum depuis 20 ans » quand le dernier date de 19 ans) ne rendent pas une affirmation inexacte. Un détail erroné quand le fond est juste (le mauvais numéro d'article pour un principe qui existe bien dans la Constitution, une date approchée) donne au plus "partiellement_vrai", jamais "faux".
 - Une hausse en euros courants inférieure à l'inflation est une baisse en euros constants : « des coupes dans le budget » face à un budget en hausse nominale mais inférieure à l'inflation est "trompeur" ou "partiellement_vrai", jamais "faux" ; « le budget est en hausse » dans ce cas est vrai en valeur, trompeur en volume.
+- DATE DU DÉBAT : juge avec ce qui était connu à la date indiquée en tête (« Nous sommes le… »). Un fait survenu après (une loi votée ensuite, une déclaration ultérieure) ne contredit pas ce qui a été dit, et un chiffre « depuis le début de l'année » se compare au chiffre à la même date, pas au bilan de l'année entière.
+- PROPOSITION OU PROMESSE : « la prime passera à 10 000 € », « nous supprimerons cette taxe » se vérifie comme proposition — "vrai" si le programme ou le candidat la propose bien ; la loi actuelle ne la contredit pas. Une hypothèse ou une prédiction (« avec X Premier ministre, les frontières seraient ouvertes ») n'est pas un fait : "non_verifiable", en commençant l'explication par « Prédiction : ».
 - Une mesure décidée ou annoncée par un ministre dans son domaine lui est attribuable (« X a interdit… » est vrai si X, ministre compétent, l'a décidée), même si le gouvernement est dirigé par un autre.
 - Une SOURCE ACADÉMIQUE ne prouve un fait d'actualité (qui a fait quoi, quand) que si son résumé le dit explicitement.
 - Pour une affirmation CAUSALE ou sociologique ("X provoque Y", "X n'a pas d'effet sur Y"), les SOURCES ACADÉMIQUES (études évaluées par les pairs) pèsent plus lourd que la presse et que tes intuitions. Ne les utilise que si elles portent réellement sur le sujet de l'affirmation.
@@ -166,7 +168,8 @@ Affirmation : "{claim}"
 Question : que disent les sources du FAIT PRINCIPAL de l'affirmation (l'acteur, le chiffre ou le fait, la période) ? Si l'affirmation attribue ce fait à une source nommée (« selon les projections de l'INED »), le fait principal est « cette source dit cela » : une source qui en donne une autre version (autre date, autre auteur, simple scénario) le contredit ou le nuance. Pour une prévision, l'année annoncée fait partie du fait principal.
 - "contredit" : une phrase des sources rend le fait principal impossible — même acteur, même mesure, même période — de sorte que l'affirmation et cette phrase ne peuvent pas être vraies en même temps. Un niveau ne contredit pas une évolution (« 71 députés aujourd'hui » ne dit pas s'il y en avait plus avant) ; le maintien d'une mesure ne contredit pas la baisse de son montant ; un chiffre sur un autre périmètre ne contredit rien ;
 - "confirme" : une phrase des sources dit la même chose (un arrondi ou un ordre de grandeur juste compte comme une confirmation) ;
-- "nuance" : le fait principal est juste, mais un détail est faux ou exagéré (date, chiffre approché, superlatif) ;
+- "nuance" : le fait principal est juste, mais un détail est faux ou exagéré (date, chiffre approché, superlatif, numéro d'article erroné pour un principe qui existe) ; un arrondi (« depuis 20 ans » pour 19 ans) n'est même pas une nuance : "confirme" ;
+- une proposition de programme (« la prime passera à 10 000 € ») n'est contredite ni par la loi actuelle, ni par l'état actuel des choses ;
 - "ne_tranche_pas" : aucune phrase ne parle précisément de ce fait principal (un résultat global ne dit rien du vote d'un groupe ; une mesure voisine ne dit rien d'un chiffre ; l'absence d'une information n'est pas une contradiction).
 Juge ce qui a réellement été dit (propos exact) si la reformulation s'en écarte. Tes propres connaissances ne comptent pas : seulement les phrases des sources.
 
@@ -619,6 +622,17 @@ def gather_evidence(claim: str, context: dict = None, query: str = "", periode: 
             "series": series, "ballots": ballots}
 
 
+def judgement_date(context: dict) -> str:
+    """« Nous sommes le … » du prompt : la date du débat pour une rediffusion
+    (vidéo publiée avant aujourd'hui), sinon aujourd'hui. Cas vécu : un débat
+    de juin 2024 jugé « au 6 octobre 2026 » — « 64 féminicides depuis le début
+    de l'année » comparé au bilan de toute l'année 2024."""
+    date = str((context or {}).get("date") or "")
+    if re.match(r"^\d{4}-\d{2}-\d{2}$", date) and date < time.strftime("%Y-%m-%d"):
+        return f"{date[8:10]}/{date[5:7]}/{date[:4]}"
+    return time.strftime("%d/%m/%Y")
+
+
 def _json_object(content: str):
     start = (content or "").find("{")
     if start == -1:
@@ -662,7 +676,7 @@ def judge(claim: str, evidence: dict, context: dict = None, sid: str = None, cit
     evidence_block = build_evidence_block(ev["results"], ev["academic"], ev["official"], ev["known"],
                                           ev["series"], ev["ballots"])
     prompt = FACTCHECK_PROMPT_TEMPLATE.format(
-        today=time.strftime("%d/%m/%Y"),
+        today=judgement_date(context),
         context_block=build_context_block(context),
         claim=claim,
         evidence_block=evidence_block,

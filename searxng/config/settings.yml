@@ -3,19 +3,24 @@
 
 # Moteurs volontairement limités : ni Google ni Bing/Yahoo (ni aucun moteur qui
 # leur sous-traite son index) — cf. ARCHITECTURE.md. Tous à index propre :
-# - Brave : le plus complet, mais suspendu au moindre excès de requêtes ;
+# - Brave (scraping) : suspendu au moindre excès de requêtes — la recherche
+#   principale passe par l'API officielle de Brave (clé BRAVE_API_KEY) ;
+# - Yep (index d'Ahrefs) et Seznam (index tchèque, bonne couverture de la
+#   presse française) : relais quand l'API Brave ne répond pas (crédit
+#   épuisé, cas vécu en plein débat) ;
 # - Wikipédia en français, recherche plein texte : faits datés, fonctions,
-#   chronologies — et un relais quand Brave est suspendu.
-# Un seul moteur, c'était une seule panne pour toute la recherche web : cas
-# vécu, Brave suspendu = plus aucune source jusqu'à la fin du débat.
-# Retirés : Qwant (CAPTCHA systématique contre SearxNG), Mojeek (CAPTCHA à
-# preuve de travail, marqué inactif par SearxNG), Yep (API hors service,
-# 503), Mwmbl (index trop petit). Le moteur « wikipedia » fourni ne cherche
-# qu'un titre d'article exact : inutile pour une affirmation.
+#   chronologies.
+# Retirés (essai d'octobre 2026) : Qwant (CAPTCHA), DuckDuckGo (CAPTCHA dès
+# la deuxième requête, et index Bing), Mojeek, Startpage, Marginalia, Stract,
+# Presearch (aucun résultat), Mwmbl (index trop petit), Google (accès refusé).
+# Le moteur « wikipedia » fourni ne cherche qu'un titre d'article exact :
+# inutile pour une affirmation.
 use_default_settings:
   engines:
     keep_only:
       - brave
+      - yep
+      - seznam
 
 engines:
   - name: wikipedia fr

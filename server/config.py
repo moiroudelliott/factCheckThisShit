@@ -111,7 +111,7 @@ FACTCHECK_INDEX_DB = os.environ.get("FACTCHECK_INDEX_DB") or os.path.join(
 # du chemin) : annotées « FACT-CHECK PUBLIÉ », au-dessus de la presse
 FACTCHECK_SECTIONS = (
     "factuel.afp.com", "lemonde.fr/les-decodeurs", "liberation.fr/checknews",
-    "francetvinfo.fr/vrai-ou-fake", "20minutes.fr/fake-off", "lessurligneurs.eu",
+    "francetvinfo.fr/vrai-ou-fake", "franceinfo.fr/vrai-ou-fake", "20minutes.fr/fake-off", "lessurligneurs.eu",
     "tf1info.fr/politique/les-verificateurs", "tf1info.fr/societe/les-verificateurs",
 )
 

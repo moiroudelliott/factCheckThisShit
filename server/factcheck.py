@@ -344,11 +344,15 @@ _brave_last = [0.0]
 _brave_warned = set()
 
 
+_brave_out_until = [0.0]  # crédit Brave épuisé : on ne l'interroge plus jusqu'à cette heure (monotonic)
+BRAVE_OUT_RETRY_S = 3600
+
+
 def brave_api_search(query: str, max_results: int = 4) -> list:
     """API officielle de Brave Search (clé BRAVE_API_KEY) : au plus une
     requête par seconde (offre gratuite), les appels simultanés attendent
-    leur tour. [] en cas d'erreur — la recherche continue avec Wikipédia."""
-    if not BRAVE_API_KEY:
+    leur tour. [] en cas d'erreur — web_search passe alors au relais."""
+    if not BRAVE_API_KEY or time.monotonic() < _brave_out_until[0]:
         return []
     with _brave_lock:
         wait = _brave_last[0] + BRAVE_API_MIN_GAP_S - time.monotonic()
@@ -363,6 +367,12 @@ def brave_api_search(query: str, max_results: int = 4) -> list:
             headers={"Accept": "application/json", "X-Subscription-Token": BRAVE_API_KEY},
             timeout=8,
         )
+        if r.status_code == 402:
+            # Crédit prépayé épuisé (cas vécu, en plein débat) : inutile de
+            # réessayer à chaque affirmation — relais SearxNG pendant une heure
+            _brave_out_until[0] = time.monotonic() + BRAVE_OUT_RETRY_S
+            print("[Brave API] crédit épuisé (HTTP 402) — recherche par le relais SearxNG (Yep, Seznam, Wikipédia)")
+            return []
         if r.status_code in (401, 403, 422, 429):
             kind = "limite de requêtes atteinte" if r.status_code == 429 else "clé refusée (BRAVE_API_KEY dans .env)"
             if kind not in _brave_warned or r.status_code == 429:
@@ -386,9 +396,12 @@ def web_search(query: str, max_results: int = 6) -> list:
     d'atteindre le prompt."""
     if BRAVE_API_KEY:
         found = brave_api_search(query, max(1, max_results - 2))
-        seen = {r["href"] for r in found}
-        wiki = searxng_search(query, 2, engines="wikipedia fr")
-        return found + [w for w in wiki if w["href"] not in seen]
+        if found:
+            seen = {r["href"] for r in found}
+            wiki = searxng_search(query, 2, engines="wikipedia fr")
+            return found + [w for w in wiki if w["href"] not in seen]
+        # Brave muet (crédit épuisé, limite, panne) : relais par SearxNG — Yep
+        # et Seznam (index propres, ni Google ni Bing) plus Wikipédia
     return searxng_search(query, max_results)
 
 

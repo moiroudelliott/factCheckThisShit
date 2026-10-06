@@ -48,7 +48,9 @@ ERREURS = ("faux", "trompeur")
 
 RAW_LABEL_RE = re.compile(r"^Intervenant ([A-Z]|\d+)$")
 SPEECH_GAP_MAX_S = 5.0   # bande : écart max entre deux relevés « qui parle » compté comme parole continue
-FRISE_MIN_S = 90         # chapitre de la frise plus court : fondu dans le précédent (incise, point isolé)
+THEME_MIN_VERDICTS = 3   # verdicts tranchés d'un débatteur sur un thème pour prétendre à son ★
+CONTEXTE_AVANT_S, CONTEXTE_APRES_S = 90, 60  # propos voisins du même débatteur, donnés avec un moment candidat
+FRISE_MIN_S = 90        # chapitre de la frise plus court : fondu dans le précédent (incise, point isolé)
 MOMENT_ERREURS = 6       # erreurs présélectionnées par débatteur pour les moments forts
 MOMENT_EXACTS = 3        # chiffres exacts présélectionnés par débatteur
 MAX_MOMENTS = {"erreur": 2, "exact": 1}  # retenus par débatteur
@@ -271,9 +273,20 @@ def build_fiche(points: list, verdicts: dict, speech: list, duration: float, tit
             counts = _counts([a for a in mine_all if a["qui"] == name])
             par[name] = {"verdicts": counts, "tranches": sum(counts[v] for v in TRANCHES),
                          "temps_parole": round(theme_talk.get(tid, Counter())[name])}
-        best = sorted(names, key=lambda n: -par[n]["verdicts"]["vrai"])
-        plus = (best[0] if best and par[best[0]]["verdicts"]["vrai"] >= 2
-                and (len(best) == 1 or par[best[0]]["verdicts"]["vrai"] > par[best[1]]["verdicts"]["vrai"]) else None)
+        # ★ du thème : le meilleur indice d'exactitude (même calcul que par
+        # débatteur), entre au moins deux débatteurs qui ont THEME_MIN_VERDICTS
+        # verdicts tranchés ; à égalité, celui qui en a avancé le plus. Compter
+        # les « vrai » seuls donnait l'étoile à 7 vrais sur 9 plutôt qu'à 6
+        # sur 6 (remarque d'un lecteur : n'avoir dit que des choses vraies doit
+        # l'emporter)
+        scored = []
+        for name in names:
+            mean, _marge, n = indice(par[name]["verdicts"])
+            par[name]["exactitude"] = round(mean * 100) if mean is not None else None
+            if n >= THEME_MIN_VERDICTS:
+                scored.append((mean, n, name))
+        scored.sort(reverse=True)
+        plus = scored[0][2] if len(scored) >= 2 and scored[0][:2] != scored[1][:2] else None
         themes.append({"id": tid, "label": label, "duree": round(theme_time[tid]), "points": len(pts),
                        "affirmations": len(mine_all), "par_debatteur": par, "plus_exact": plus})
     themes.sort(key=lambda t: (t["id"] == "autre", -t["duree"], -t["points"]))
@@ -286,7 +299,7 @@ def build_fiche(points: list, verdicts: dict, speech: list, duration: float, tit
         "debatteurs": debatteurs, "comparaisons": comparaisons,
         "non_identifies": sum(1 for a in affs if not a["qui"]),
         "themes": themes, "frise": frise,
-        "sources": [{"nom": k, "n": v} for k, v in src.most_common(8)],
+        "sources": [{"nom": k, "n": v} for k, v in src.most_common()],
         "affirmations": affs, "redaction": None,
     }
     if redaction:
@@ -307,7 +320,7 @@ Débat : {titre}{date}
 Débatteurs : {noms}
 Thèmes, du plus long au plus court : {themes}
 
-MOMENTS CANDIDATS (identifiant, débatteur, verdict, position, propos — explication du verdict) :
+MOMENTS CANDIDATS (identifiant, débatteur, verdict, position, propos — explication du verdict ; puis ses mots exacts et ce qu'il disait juste avant et après) :
 {candidats}
 
 AFFIRMATIONS VÉRIFIÉES :
@@ -320,7 +333,7 @@ Réponds UNIQUEMENT avec un objet JSON, sans markdown :
 {{"resume": "…", "moments": [{{"id": "…", "pourquoi": "…"}}], "chiffres": [{{"id": "…", "annonce": "…", "selon_source": "…"}}], "contradictions": [{{"ids": ["…", "…"], "sujet": "…"}}], "propositions": [{{"id": "…", "intitule": "…"}}]}}
 
 - "resume" : 3 ou 4 phrases neutres : de quoi le débat a parlé, sur quoi les débatteurs se sont opposés, quels faits ont été disputés. Aucun jugement sur les personnes, aucun adjectif de valeur, rien qui ne soit dans les listes.
-- "moments" : choisis UNIQUEMENT parmi les MOMENTS CANDIDATS, pour chaque débatteur au plus 2 erreurs (faux ou trompeur) et 1 chiffre exact (vrai) : ceux qui comptent le plus pour le public — le cœur du débat (budget, bilan, statistique nationale, accusation contre l'adversaire), pas un détail. Le chiffre exact est un chiffre que le débatteur avance à l'appui de SON argument (pas la description du programme adverse). "pourquoi" = une phrase courte (25 mots au plus) : ce que ce moment change pour l'argument du débatteur ou pour le public. L'explication du verdict est affichée juste à côté : n'en répète ni les chiffres ni les faits. Pas de formule toute faite (« fausse le débat », « modifie la perception »).
+- "moments" : choisis UNIQUEMENT parmi les MOMENTS CANDIDATS, pour chaque débatteur au plus 2 erreurs (faux ou trompeur) et 1 chiffre exact (vrai) : ceux qui comptent le plus pour le public — le cœur du débat (budget, bilan, statistique nationale, accusation contre l'adversaire), pas un détail. Le chiffre exact est un chiffre que le débatteur avance à l'appui de SON argument (pas la description du programme adverse). "pourquoi" = une phrase (30 mots au plus) qui situe le moment : à quoi le débatteur se servait de ce chiffre ou de ce fait (l'argument qu'il défendait, d'après ses mots exacts et le contexte), et ce que le verdict y change. Ex : « Bardella s'en sert pour dénoncer la hausse du coût de la vie : la hausse annoncée est bien celle décidée par la CRE. » L'explication du verdict est affichée juste à côté : n'en recopie pas les chiffres. Pas de formule toute faite (« invalide l'argument », « fausse le débat », « modifie la perception »).
 - "chiffres" : affirmations faux, trompeur ou partiellement_vrai dont le chiffre annoncé diffère de celui des sources. "annonce" = le chiffre tel que dit, recopié du propos avec son unité (« +47 % ») ; "selon_source" = le chiffre recopié de l'explication, avec sa source et son année si elles y sont (« +38 % entre 2017 et 2024, selon l'Insee »). Au plus 8, les plus parlants ; pas un simple arrondi (30 pour 30,5).
 - "contradictions" : deux affirmations de débatteurs DIFFÉRENTS sur le même fait, dont l'une affirme ce que l'autre nie (« des postes ont été créés » / « des postes ont été supprimés »), et que les verdicts départagent : l'une jugée vrai ou partiellement_vrai, l'autre faux ou trompeur. Deux erreurs dans le même sens ne sont pas une contradiction. Au plus 4. "sujet" = le fait disputé, en quelques mots.
 - "propositions" : les mesures concrètes qu'un débatteur propose LUI-MÊME de prendre, pour son camp (pas un constat, pas une mesure déjà prise, pas le programme de l'adversaire qu'il décrit ou critique, pas ce que fait quelqu'un d'autre), prises dans les affirmations ou les autres propos, seulement quand le débatteur la présente comme la sienne (« je propose », « nous ferons », « il faut »). "intitule" = la mesure en moins de 12 mots, à l'infinitif (« Baisser la TVA sur l'énergie à 5,5 % »). Au plus 6 par débatteur.
@@ -406,6 +419,22 @@ def _rounding(said: frozenset, found: frozenset) -> bool:
             if max(abs(fx), abs(fy)) > 0:
                 gaps.append(abs(fx - fy) / max(abs(fx), abs(fy)))
     return bool(gaps) and min(gaps) < ARRONDI
+
+
+def _candidate_line(a: dict, points: list) -> str:
+    """Un moment candidat, avec ses mots exacts et les propos voisins du même
+    débatteur : sans eux, le « pourquoi » ne pouvait que paraphraser le
+    verdict (« invalide l'argument sur… »), sans dire à quoi servait le
+    chiffre dans le débat."""
+    line = _line(a)
+    if a.get("citation"):
+        line += f'\n    mots exacts : « {a["citation"]} »'
+    if a["t"] is not None:
+        near = [p["texte"] for p in points if p["qui"] == a["qui"] and p["id"] != a["id"] and p["t"] is not None
+                and p["type"] != "question" and -CONTEXTE_AVANT_S <= p["t"] - a["t"] <= CONTEXTE_APRES_S]
+        if near:
+            line += "\n    contexte : " + " / ".join(f"« {t} »" for t in near[-3:])
+    return line
 
 
 def _line(a: dict, explain: bool = True) -> str:
@@ -513,7 +542,7 @@ def write_redaction(fiche: dict, points: list, call=None, model: str = None) -> 
         titre=fiche.get("titre") or "(sans titre)",
         date=f' — {fiche["date"]}' if fiche.get("date") else "",
         noms=", ".join(names), themes=", ".join(themes) or "(non classés)",
-        candidats="\n".join(_line(a) for a in candidates) or "(aucun)",
+        candidats="\n".join(_candidate_line(a, points) for a in candidates) or "(aucun)",
         affirmations="\n".join(_line(a) for a in affs if a["qui"]),
         autres="\n".join(f'[{p["id"]}] {p["qui"]} · « {p["texte"]} »' for p in others) or "(aucun)",
     )

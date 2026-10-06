@@ -7,7 +7,7 @@
   <meta name="description" content="Fiche de chaque débat analysé par SOURCÉ : ce que chaque débatteur a affirmé, ce qui était exact, les moments forts et les thèmes abordés — sans avoir à regarder la vidéo.">
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
   <link rel="canonical" href="https://source.codeminds.fr/fiche.html">
-  <link rel="stylesheet" href="style.css?v=a2d0481b01">
+  <link rel="stylesheet" href="style.css?v=be5fd12e46">
 </head>
 <body>
   <header class="site-header">
@@ -76,7 +76,7 @@
         <div id="f-axis" class="f-axis" aria-hidden="true"></div>
         <div id="f-legend" class="f-legend"></div>
         <h3>Qui a appuyé quoi</h3>
-        <p class="small muted">Par thème : les verdicts des affirmations de chaque débatteur, et son temps de parole. ★ : le plus d'affirmations vraies sur ce thème.</p>
+        <p class="small muted">Par thème : les verdicts des affirmations de chaque débatteur, et son temps de parole. ★ : le meilleur indice d'exactitude sur ce thème (vrai 1, partiel ½, trompeur et faux 0), parmi les débatteurs qui y ont au moins 3 affirmations tranchées.</p>
         <div class="table-scroll"><table id="f-matrix" class="f-matrix"></table></div>
         <h3>Déroulé</h3>
         <ol id="f-chapters" class="f-chapters"></ol>
@@ -84,8 +84,8 @@
 
       <section id="chiffres" aria-labelledby="h-chiffres" hidden>
         <h2 id="h-chiffres">Les chiffres du débat</h2>
-        <p class="small muted">Chiffres avancés pendant le débat, face à ceux des sources.</p>
-        <div class="table-scroll"><table id="f-chiffres" class="f-chiffres"></table></div>
+        <p class="small muted">Chiffres avancés pendant le débat, face à ceux des sources : le propos, le moment, et ce que dit la source.</p>
+        <div id="f-chiffres" class="f-chiffres"></div>
       </section>
 
       <section id="contradictions" aria-labelledby="h-contradictions" hidden>
@@ -100,6 +100,12 @@
         <div id="f-props" class="f-props-grid"></div>
       </section>
 
+      <section id="sources-utilisees" aria-labelledby="h-sources" hidden>
+        <h2 id="h-sources">Les sources</h2>
+        <p class="small muted">Sources des verdicts tranchés, de la plus citée à la moins citée. Cliquer sur une source pour voir les vérifications qui s'appuient sur elle.</p>
+        <div id="f-sources" class="f-sources"></div>
+      </section>
+
       <section id="affirmations" aria-labelledby="h-affirmations">
         <h2 id="h-affirmations">Toutes les affirmations vérifiées</h2>
         <div class="f-filters">
@@ -111,10 +117,6 @@
         <ol id="f-affs" class="f-affs"></ol>
       </section>
 
-      <section id="sources-utilisees" aria-labelledby="h-sources" hidden>
-        <h2 id="h-sources">Sources les plus citées</h2>
-        <p id="f-sources" class="f-sources"></p>
-      </section>
 
       <p class="note">Verdicts produits automatiquement pendant le débat, qui peuvent se tromper : la <a href="methode.html">méthode</a> en détaille le fonctionnement et les <a href="methode.html#limites">limites</a>. Fiche générée le <span id="f-generated"></span>.</p>
     </article>
@@ -127,6 +129,6 @@
     </div>
   </footer>
 
-  <script src="fiche.js?v=c40a170332"></script>
+  <script src="fiche.js?v=d1e91881b5"></script>
 </body>
 </html>

@@ -275,10 +275,21 @@ td:first-child { white-space: nowrap; }
 .f-ch-theme { display: inline-flex; align-items: center; }
 .f-ch-stats { grid-column: 2 / -1; font-size: 0.8rem; }
 
-.f-chiffres { font-size: 0.95rem; }
-.f-chiffres td:first-child { white-space: normal; font-family: var(--sans); font-size: 0.88rem; }
-.f-chiffres a { text-decoration: none; }
-.f-num { font-family: var(--sans); font-weight: 600; font-size: 0.92rem; }
+.f-chiffres { display: grid; gap: 0.8rem; grid-template-columns: repeat(auto-fit, minmax(22rem, 1fr)); margin: 0.8rem 0 1.6rem; }
+.f-chiffre { border: 1px solid var(--rule); padding: 0.8rem 1rem; }
+.f-chiffre .f-card-head > span { display: inline-flex; flex-wrap: wrap; align-items: baseline; gap: 0.3rem 0.6rem; }
+.f-vs { display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; margin: 0.2rem 0 0.6rem; padding: 0.6rem 0; border-top: 1px solid var(--rule); border-bottom: 1px solid var(--rule); }
+.f-vs-l { display: block; font-family: var(--sans); font-size: 0.72rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+.f-vs-n { display: block; font-family: var(--sans); font-weight: 600; font-size: 0.95rem; line-height: 1.35; }
+.f-source { border-bottom: 1px solid var(--rule); }
+.f-source summary { display: flex; justify-content: space-between; gap: 1rem; padding: 0.55rem 0.2rem; cursor: pointer; }
+.f-source summary::-webkit-details-marker { display: none; }
+.f-source summary::before { content: '▸'; color: var(--muted); margin-right: 0.5rem; }
+.f-source[open] summary::before { content: '▾'; }
+.f-source summary > span:first-child { flex: 1; }
+.f-source ul { list-style: none; padding: 0 0 0.6rem 1.2rem; margin: 0; font-size: 0.88rem; }
+.f-source li { margin: 0.35rem 0; }
+.f-source li a { margin: 0 0.3rem; }
 
 .f-contra { border: 1px solid var(--rule); padding: 0.9rem 1rem; margin: 0 0 0.9rem; }
 .f-contra h3 { margin: 0 0 0.7rem; font-size: 1.05rem; }
@@ -297,9 +308,10 @@ td:first-child { white-space: nowrap; }
 .f-aff-head strong { color: var(--text); font-weight: 600; }
 .f-aff-head span { display: inline-flex; align-items: center; }
 .f-quote { margin: 0 0 0.35rem; font-style: italic; font-size: 1.04rem; line-height: 1.45; }
-.f-sources { font-family: var(--sans); font-size: 0.92rem; }
+.f-sources { font-family: var(--sans); font-size: 0.92rem; margin: 0.6rem 0 1.6rem; border-top: 1px solid var(--rule); }
 
 @media (max-width: 640px) {
+  .f-chiffres { grid-template-columns: 1fr; }
   .f-chapters li { grid-template-columns: 1fr auto; }
   .f-ch-time { grid-column: 1 / -1; }
   .f-ch-stats { grid-column: 1 / -1; }

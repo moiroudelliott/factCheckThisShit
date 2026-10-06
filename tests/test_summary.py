@@ -60,6 +60,19 @@ def test_index_only_above_the_minimum_and_speakers_never_ranked_by_score():
     assert f["comparaisons"] == []                               # rien à comparer à un seul indice
 
 
+def test_theme_star_goes_to_the_best_index_not_the_most_true_claims():
+    """Remarque d'un lecteur : 6 vraies sur 6 perdait l'étoile face à 7 vraies
+    et 2 partielles sur 9."""
+    points = [_pt(i, A, i) for i in range(6)] + [_pt(10 + i, B, 10 + i) for i in range(9)]
+    verdicts = {f"p{i}": {"verdict": "vrai"} for i in range(6)}
+    verdicts.update({f"p{10 + i}": {"verdict": "vrai" if i < 7 else "partiellement_vrai"} for i in range(9)})
+    budget = next(t for t in _fiche(points, verdicts)["themes"] if t["id"] == "budget")
+    assert budget["plus_exact"] == A and budget["par_debatteur"][A]["exactitude"] == 100
+    # moins de 3 verdicts tranchés : pas d'étoile possible
+    verdicts.update({f"p{i}": {"verdict": "non_verifiable"} for i in range(4)})
+    assert next(t for t in _fiche(points, verdicts)["themes"] if t["id"] == "budget")["plus_exact"] is None
+
+
 def test_inaudible_claims_count_nowhere():
     points = [_pt(1, A, 10), _pt(2, A, 20)]
     verdicts = {"p1": {"verdict": "non_verifiable", "explication": "Transcription douteuse : chiffre illisible."},

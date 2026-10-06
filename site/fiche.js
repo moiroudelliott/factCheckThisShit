@@ -139,7 +139,7 @@
   function renderToc() {
     const sections = [['debatteurs', 'Débatteurs'], ['moments', 'Moments forts'], ['themes', 'Thèmes'],
       ['chiffres', 'Chiffres'], ['contradictions', 'Contradictions'], ['propositions', 'Propositions'],
-      ['affirmations', 'Toutes les affirmations']];
+      ['sources-utilisees', 'Sources'], ['affirmations', 'Toutes les affirmations']];
     $('f-toc').innerHTML = sections.filter(([id]) => !$(id).hidden)
       .map(([id, label]) => `<a href="#${id}">${label}</a>`).join('');
   }
@@ -220,8 +220,8 @@
         const v = c.verdicts || {};
         const talk = c.temps_parole >= 60 ? `<span class="f-cell-sub">${fmtDur(c.temps_parole)} de parole</span>` : '';
         if (!c.tranches) return `<td><span class="muted">—</span>${talk}</td>`;
-        const best = t.plus_exact === n ? ' <span class="f-best" title="Le plus d’affirmations vraies sur ce thème">★</span>' : '';
-        return `<td>${bar(v, true)}${Number(v.vrai || 0)} vraie${v.vrai > 1 ? 's' : ''} sur ${Number(c.tranches)}${best}${talk}</td>`;
+        const best = t.plus_exact === n ? ' <span class="f-best" title="Meilleur indice d’exactitude sur ce thème">★</span>' : '';
+        return `<td>${bar(v, true)}${cellCounts(v)} <span class="muted">sur ${Number(c.tranches)}</span>${best}${talk}</td>`;
       }).join('')}</tr>`).join('')}</tbody>`;
 
     // Déroulé : chapitres, avec les verdicts tombés pendant chacun
@@ -239,16 +239,30 @@
     }).join('');
   }
 
+  // « 7 vraies, 2 partielles » : toutes les catégories de la case, pas
+  // seulement les vraies (6 vraies sur 6 semblait perdre face à 7 sur 9)
+  const CELL_WORDS = { vrai: ['vraie', 'vraies'], partiellement_vrai: ['partielle', 'partielles'],
+    trompeur: ['trompeuse', 'trompeuses'], faux: ['fausse', 'fausses'] };
+  function cellCounts(v) {
+    return TRANCHES.filter((k) => v[k]).map((k) => `${Number(v[k])} ${CELL_WORDS[k][v[k] > 1 ? 1 : 0]}`).join(', ');
+  }
+
   function renderChiffres() {
     const rows = fiche.redaction?.chiffres || [];
     if (!rows.length) return;
     $('chiffres').hidden = false;
-    $('f-chiffres').innerHTML = `<thead><tr><th scope="col">Débatteur</th><th scope="col">Annoncé</th><th scope="col">Selon la source</th><th scope="col">Verdict</th></tr></thead>
-      <tbody>${rows.map((c) => {
-        const a = affById.get(c.id) || {};
-        return `<tr><td>${esc(c.qui)}</td><td class="f-num">${esc(c.annonce)}</td><td>${esc(c.selon_source)}</td>
-          <td><a href="#a-${esc(c.id)}">${badge(a.verdict)}</a></td></tr>`;
-      }).join('')}</tbody>`;
+    $('f-chiffres').innerHTML = rows.map((c) => {
+      const a = affById.get(c.id);
+      if (!a) return '';
+      const src = safeUrl(a.url) ? ` <a href="${esc(a.url)}" target="_blank" rel="noopener noreferrer">${esc(a.source || 'source')} ↗</a>` : '';
+      return `<article class="f-chiffre">
+        <p class="f-card-head"><span>${badge(a.verdict)} <strong>${esc(c.qui)}</strong></span>${tsLink(a.t)}</p>
+        <p class="f-quote">« ${esc(a.texte)} »</p>
+        <div class="f-vs"><div><span class="f-vs-l">Annoncé</span><span class="f-vs-n">${esc(c.annonce)}</span></div>
+          <div><span class="f-vs-l">Selon la source</span><span class="f-vs-n">${esc(c.selon_source)}</span></div></div>
+        <p class="f-expl">${esc(a.explication)}${src}</p>
+      </article>`;
+    }).join('');
   }
 
   function renderContradictions() {
@@ -310,10 +324,17 @@
     }).join('') || '<li class="muted">Aucune affirmation pour ces filtres.</li>';
   }
 
+  // Chaque source se déplie sur les vérifications qui la citent, avec le
+  // lien vers l'article ou la donnée
   function renderSources() {
     const src = fiche.sources || [];
     if (!src.length) return;
     $('sources-utilisees').hidden = false;
-    $('f-sources').textContent = src.map((s) => `${s.nom} (${s.n})`).join(' · ');
+    const cited = (name) => (fiche.affirmations || []).filter((a) => (a.source || '').trim() === name && safeUrl(a.url)
+      && TRANCHES.includes(a.verdict));
+    $('f-sources').innerHTML = src.map((s) => `<details class="f-source"><summary><span>${esc(s.nom)}</span>
+      <span class="muted">${plural(s.n, 'vérification')}</span></summary><ul>${cited(s.nom).map((a) => `<li>${badge(a.verdict)}
+      <a href="${esc(a.url)}" target="_blank" rel="noopener noreferrer">« ${esc(a.texte)} » ↗</a>
+      <span class="muted">${esc(a.qui || 'Non attribuée')}</span></li>`).join('')}</ul></details>`).join('');
   }
 })();

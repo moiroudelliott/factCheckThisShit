@@ -49,7 +49,7 @@ et les autres fichiers de [`tests/`](tests/) — voir [ARCHITECTURE.md](ARCHITEC
 | `server/` | Logique du serveur : Whisper, diarisation, Mistral, sources, cache — voir [ARCHITECTURE.md](ARCHITECTURE.md) |
 | `tests/` | Tests unitaires et test de fumée du backend complet (sans GPU ni réseau) |
 | `searxng/` | Instance SearxNG auto-hébergée (recherche web sans dépendance à un moteur tiers) |
-| `site/` | Site statique du projet : accueil, méthode, politique des sources, à propos, fiches des débats analysés (`fiche.html` : ce que chacun a affirmé, ce qui était exact, par thème — sans la vidéo) et démonstration (`relecture.html`) qui rejoue des analyses enregistrées sur des débats YouTube, sans GPU ni backend |
+| `site/` | Site statique du projet : accueil, méthode, politique des sources, à propos, fiches des débats analysés (`fiche.html` : ce que chacun a affirmé, ce qui était exact, par thème — sans la vidéo ; `resume.html` : la même chose en un écran paysage) et démonstration (`relecture.html`) qui rejoue des analyses enregistrées sur des débats YouTube, sans GPU ni backend |
 | `enroll.py`, `harvest_voices.py`, `remove_voice.py` | Outils CLI pour peupler/retirer des voix dans `voices/` (banque d'empreintes vocales) |
 | `vocabulaire.txt` | Mots que Whisper doit s'attendre à entendre (sigles, partis, termes souvent mal transcrits) — modifiable |
 | `generate_session.py` | Génère une session de relecture à partir d'un simple lien YouTube, sans regarder la vidéo : même pipeline que le direct, minutage du direct (`--publish` pour la mettre sur le site) |

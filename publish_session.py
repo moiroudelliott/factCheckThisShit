@@ -60,7 +60,7 @@ SYNCED = [
 # modifiée — sans lui, les visiteurs gardaient l'ancienne en cache (cas vécu :
 # une correction du lecteur invisible après rechargement de la page)
 RELECTURE_HTML = os.path.join(SITE, "relecture.html")
-VERSIONED = ("style.css", "relecture.js", "fiche.js", "overlay/content.js", "overlay/overlay.css")
+VERSIONED = ("style.css", "relecture.js", "fiche.js", "resume.js", "overlay/content.js", "overlay/overlay.css")
 
 
 def site_pages() -> list:

@@ -127,6 +127,7 @@
     $('f-meta').textContent = [fmtDate(fiche.date), fiche.duree ? fmtDur(fiche.duree) : '',
       t.affirmations ? plural(t.affirmations, 'affirmation vérifiée', 'affirmations vérifiées') : ''].filter(Boolean).join(' · ');
     $('f-replay').href = replayUrl(null);
+    $('f-resume-link').href = `resume.html?s=${encodeURIComponent(sid)}`;
     $('f-generated').textContent = fmtDate(fiche.genere) || fiche.genere || '';
     $('f-min').textContent = fiche.min_verdicts || 15;
     const resume = fiche.redaction?.resume;

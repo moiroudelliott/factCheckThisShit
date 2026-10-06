@@ -34,7 +34,7 @@ KEEP_BACKUPS = 5
 def files_to_publish() -> list:
     """Chemins relatifs à site/, dans une liste explicite."""
     out = [f for f in sorted(os.listdir(SITE)) if f.endswith(".html")]
-    out += ["style.css", "relecture.js", "fiche.js", "favicon.svg", "robots.txt",
+    out += ["style.css", "relecture.js", "fiche.js", "resume.js", "favicon.svg", "robots.txt",
             "overlay/content.js", "overlay/overlay.css", "sessions/index.json"]
     out += [f"fonts/{f}" for f in sorted(os.listdir(os.path.join(SITE, "fonts"))) if f.endswith(".woff2")]
     out += [f"fonts/licenses/{f}" for f in sorted(os.listdir(os.path.join(SITE, "fonts", "licenses")))]

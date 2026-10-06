@@ -35,7 +35,7 @@ import time
 from bisect import bisect_right
 from collections import Counter
 
-from server.config import FICHE_MIN_VERDICTS, MISTRAL_FICHE_MODEL, MISTRAL_FICHE_TIMEOUT_S, MISTRAL_MODEL
+from server.config import FICHE_MIN_VERDICTS, MISTRAL_FICHE_MODEL, MISTRAL_FICHE_TIMEOUT_S
 from server.sources import is_inaudible
 from server.text_utils import figures, key_words
 from server.themes import THEMES, normalize_theme, themes_prompt_list
@@ -58,7 +58,7 @@ MAX_CHIFFRES = 8
 ARRONDI = 0.05           # écart relatif sous lequel un chiffre annoncé n'est qu'un arrondi de celui de la source
 MAX_CONTRADICTIONS = 4
 MAX_PROPOSITIONS = 6     # par débatteur
-THEMES_BATCH = 150       # points classés par appel (rattrapage des sessions sans thème)
+THEMES_BATCH = 80        # points classés par appel (rattrapage des sessions sans thème) : tient dans le contexte du modèle local
 
 
 # ── Entrées ─────────────────────────────────────────────────────────────────
@@ -552,15 +552,22 @@ def write_redaction(fiche: dict, points: list, call=None, model: str = None) -> 
     return validate_redaction(data, affs, points, candidates={a["id"] for a in candidates})
 
 
+def _small(prompt: str, **_) -> str:
+    from server.factcheck import call_small_task  # voir _call
+    return call_small_task(prompt)
+
+
 def ensure_themes(points: list, call=None, model: str = None) -> int:
     """Classe dans un thème les points qui n'en ont pas (sessions
-    enregistrées avant le champ « theme »). Renvoie le nombre classé."""
+    enregistrées avant le champ « theme ») — petite tâche : modèle local,
+    sinon petit modèle Mistral (`model` force un modèle de l'API). Renvoie
+    le nombre classé."""
     todo = [p for p in points if not p.get("theme")]
     for i in range(0, len(todo), THEMES_BATCH):
         chunk = todo[i:i + THEMES_BATCH]
         prompt = THEMES_PROMPT.format(themes=themes_prompt_list(),
                                       lignes="\n".join(f'[{p["id"]}] {p["texte"]}' for p in chunk))
-        data = _json((call or _call)(prompt, model=model or MISTRAL_MODEL, timeout=MISTRAL_FICHE_TIMEOUT_S))
+        data = _json((call or (_call if model else _small))(prompt, model=model, timeout=MISTRAL_FICHE_TIMEOUT_S))
         for p in chunk:
             p["theme"] = normalize_theme(data.get(p["id"]))
     return len(todo)

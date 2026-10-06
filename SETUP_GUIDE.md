@@ -85,6 +85,24 @@ en dégradé (verdicts basés sur les connaissances du modèle, sans preuve web)
 
 ---
 
+## Étape 5 bis — Modèle local pour les petites tâches (optionnel)
+
+L'identification des voix, le classement par thème et la détection des
+intervenants d'une vidéo tournent sur un **modèle local** (Ollama), gratuit et
+sans envoi de données ; sans lui, ils passent par `mistral-small` (API).
+
+```bash
+winget install Ollama.Ollama
+ollama pull ministral-3:8b
+```
+
+~1 Go pour Ollama, ~6 Go pour le modèle (Ministral 3 8B, modèle ouvert de
+Mistral) ; il tient sur une carte de 12 Go à côté de Whisper. Ollama se lance
+au démarrage de Windows (`http://127.0.0.1:11434`). Autre modèle :
+`LOCAL_LLM_MODEL` dans `.env` ; vide pour s'en passer.
+
+---
+
 ## Étape 6 — Charger l'extension Chrome
 
 1. `chrome://extensions`

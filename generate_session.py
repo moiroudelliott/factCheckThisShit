@@ -26,6 +26,12 @@ description). --publish range directement la session sur le site
 (publish_session.py). SearxNG doit tourner : sans recherche web, presque
 aucun verdict n'aurait de source (--sans-recherche pour passer outre).
 Le backend peut rester lancé : ce script charge sa propre copie des modèles.
+
+Une seule génération à la fois sur la machine (verrou) : deux en parallèle
+doublaient les appels Mistral et Brave (cas vécu, ~730 appels perdus). Une
+génération coupée (ordinateur éteint, crédit épuisé) se reprend où elle en
+était, depuis sa sauvegarde partielle : --reprendre. Refaire tout le débat
+coûtait ~700 appels Mistral pour 2 h de vidéo.
 """
 
 import eventlet
@@ -37,6 +43,7 @@ import copy  # noqa: E402
 import io  # noqa: E402
 import json  # noqa: E402
 import os  # noqa: E402
+import re  # noqa: E402
 import subprocess  # noqa: E402
 import sys  # noqa: E402
 import tempfile  # noqa: E402
@@ -60,6 +67,9 @@ SEARCH_GAP_API_S = 1.2   # avec l'API Brave (1 requête/s, offre gratuite)
 DONE_TIMEOUT_S = 180     # attente max de la fin des dernières vérifications
 FICHE_TIMEOUT_S = 200    # puis de la fiche de fin de débat rédigée (un appel Mistral, borné à 150 s)
 CHECKPOINT_CHUNKS = 50   # sauvegarde de la bande partielle tous les 50 morceaux (~7 min de vidéo)
+RESUME_MARGIN_S = 60     # reprise : ce qui a été enregistré dans la dernière minute avant la coupure est refait…
+RESUME_AUDIO_S = 30      # … et l'audio repris 30 s plus tôt encore (texte en attente d'analyse au moment de la coupure)
+LOCK_PATH = os.path.join(ROOT, "data", "generate_session.lock")
 
 # Ce que l'extension enregistre (content.js → TAPE_TYPES), sauf les messages
 # de limite de débit : ici ce sont des artefacts du traitement accéléré
@@ -230,6 +240,108 @@ def to_message(event: str, data: dict, origin: float):
     return {"type": event}
 
 
+# ── Une génération à la fois, et reprise d'une génération coupée ───────────────
+
+def acquire_lock(path: str = LOCK_PATH):
+    """Verrou exclusif du système, relâché d'office si le processus meurt
+    (ordinateur éteint, Ctrl+C) : jamais de verrou fantôme. None si une autre
+    génération le tient."""
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    f = open(path, "a+")
+    try:
+        if os.name == "nt":
+            import msvcrt
+            f.seek(0)
+            msvcrt.locking(f.fileno(), msvcrt.LK_NBLCK, 1)
+        else:
+            import fcntl
+            fcntl.flock(f, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError:
+        f.close()
+        return None
+    return f
+
+
+def resume_plan(events: list, margin: float = RESUME_MARGIN_S) -> tuple:
+    """(position de reprise, événements gardés) d'une bande partielle : tout
+    ce qui a été enregistré jusqu'à `margin` secondes avant son dernier
+    événement — ce qui était encore en cours d'analyse à la coupure est
+    refait. La fin de session éventuelle n'est pas gardée."""
+    last = max((e["t"] for e in events), default=0.0)
+    t0 = max(0.0, last - margin)
+    ending = {"finalizing", "session_done", "debate_summary"}
+    kept = [e for e in events if e["t"] <= t0 and e["m"].get("type") not in ending
+            and e["m"].get("action") != "captureEnded"]
+    return t0, kept
+
+
+_RAW_LABEL = re.compile(r"^Intervenant ([A-Z]|\d+)$")
+
+
+def label_index(label: str):
+    m = _RAW_LABEL.match(label or "")
+    if not m:
+        return None
+    g = m.group(1)
+    return ord(g) - 65 if g.isalpha() else int(g) - 1
+
+
+def label_offset(events: list) -> int:
+    """Nombre de labels de locuteur déjà utilisés dans la bande : après une
+    reprise, le backend repart de « Intervenant A » — sans décalage, deux
+    voix différentes porteraient le même label (et le même nom)."""
+    seen = []
+    for e in events:
+        m = e["m"]
+        seen += [m.get("speaker")] + list((m.get("map") or {}).keys()) + list(m.get("labels") or [])
+        for p in m.get("points") or []:
+            seen += [p.get("qui"), p.get("qui_label")]
+    idx = [i for i in (label_index(x) for x in seen if isinstance(x, str)) if i is not None]
+    return max(idx) + 1 if idx else 0
+
+
+def shift_labels(m: dict, offset: int) -> dict:
+    """Message enregistré après une reprise : labels décalés de `offset`."""
+    if not offset:
+        return m
+
+    def shift(label):
+        i = label_index(label)
+        return SpeakerLabels.label_for(i + offset) if i is not None else label
+    if m.get("speaker"):
+        m["speaker"] = shift(m["speaker"])
+    if isinstance(m.get("map"), dict):
+        m["map"] = {shift(k): v for k, v in m["map"].items()}
+    if isinstance(m.get("labels"), list):
+        m["labels"] = [shift(x) for x in m["labels"]]
+    for p in m.get("points") or []:
+        for k in ("qui", "qui_label"):
+            if isinstance(p.get(k), str):
+                p[k] = shift(p[k])
+    return m
+
+
+class SpeakerLabels:
+    """Même nommage que SpeakerTracker.label_for (server/voices.py), sans
+    charger les modèles de voix pour l'importer."""
+
+    @staticmethod
+    def label_for(idx: int) -> str:
+        return f"Intervenant {chr(65 + idx)}" if idx < 26 else f"Intervenant {idx + 1}"
+
+
+def find_partial(out: str, vid: str):
+    """Sauvegarde partielle de cette vidéo : celle de la sortie demandée, à
+    défaut la plus récente pour cette vidéo (une génération coupée la veille
+    porte une autre date dans son nom)."""
+    partial = out.replace(".json", ".partiel.json")
+    if os.path.exists(partial):
+        return partial
+    import glob
+    found = sorted(glob.glob(os.path.join(ROOT, f"source-session_*{vid}*.partiel.json")), key=os.path.getmtime)
+    return found[-1] if found else None
+
+
 # ── Programme ───────────────────────────────────────────────────────────────
 
 def main():
@@ -241,7 +353,18 @@ def main():
     ap.add_argument("--out", default="", help="Fichier de sortie (défaut : source-session_<date>_<id>.json)")
     ap.add_argument("--publish", action="store_true", help="Publier directement sur le site (publish_session.py)")
     ap.add_argument("--sans-recherche", action="store_true", help="Continuer même si SearxNG est éteint")
+    again = ap.add_mutually_exclusive_group()
+    again.add_argument("--reprendre", action="store_true",
+                       help="Reprendre une génération coupée depuis sa sauvegarde partielle")
+    again.add_argument("--recommencer", action="store_true",
+                       help="Ignorer une génération coupée et repartir de zéro")
     args = ap.parse_args()
+
+    lock = acquire_lock()
+    if lock is None:
+        print("✗ Une génération tourne déjà sur cette machine : en lancer une deuxième doublerait les appels "
+              "Mistral et Brave. Attendre qu'elle finisse.")
+        sys.exit(1)
 
     from server import network
     from server.config import FORCE_IPV4
@@ -259,6 +382,24 @@ def main():
     if args.limit:
         duration = min(duration, args.limit)
     print(f"  {title} — {channel} ({int(duration // 60)} min {int(duration % 60)} s analysées)")
+
+    out = args.out or os.path.join(ROOT, f"source-session_{time.strftime('%Y-%m-%d')}_{vid}.json")
+    partial = out.replace(".json", ".partiel.json")
+    # Génération coupée : la reprendre plutôt que tout refaire
+    kept, resume_t = [], 0.0
+    found = None if args.recommencer else find_partial(out, vid)
+    if found:
+        with open(found, encoding="utf-8") as f:
+            old_events = json.load(f).get("events") or []
+        if not args.reprendre:
+            done_t = max((e["t"] for e in old_events), default=0.0)
+            print(f"✗ Génération coupée trouvée ({os.path.basename(found)}, jusqu'à "
+                  f"{int(done_t // 60)}:{int(done_t % 60):02d}).\n"
+                  "  --reprendre pour la continuer là où elle en était, --recommencer pour repartir de zéro.")
+            sys.exit(1)
+        resume_t, kept = resume_plan(old_events)
+        if found != partial:
+            os.replace(found, partial)
 
     print("⚙ Chargement du pipeline (Whisper, voix, sources)…")
     import server.routes as routes
@@ -302,6 +443,7 @@ def main():
     socketio.server.async_handlers = False  # un morceau est traité avant l'envoi du suivant
 
     tape, done, fiche = [], [], {"attendue": False, "finale": False}
+    shift = {"offset": 0}  # reprise : décalage des labels de locuteur (label_offset)
 
     def record(event, data):
         if event not in TAPE_EVENTS:
@@ -312,6 +454,8 @@ def main():
         if event == "debate_summary" and (data or {}).get("final"):
             fiche["finale"] = True
         m = to_message(event, copy.deepcopy(data), clock.origin)
+        if m:
+            m = shift_labels(m, shift["offset"])
         if m:
             tape.append({"t": round(max(0.0, clock.video_now()), 1), "m": m})
 
@@ -347,8 +491,35 @@ def main():
 
     items = schedule(duration)
     total = sum(1 for i in items if i[1] == "audio_chunk")
-    out = args.out or os.path.join(ROOT, f"source-session_{time.strftime('%Y-%m-%d')}_{vid}.json")
-    partial = out.replace(".json", ".partiel.json")
+    resume_from = 0.0
+    if kept:
+        # Reprise : la bande gardée, les labels de la suite décalés, et l'état
+        # du backend reconstitué — points du débat (historique, doublons) et
+        # verdicts rendus (cohérence des suivants)
+        tape[:] = kept
+        shift["offset"] = label_offset(kept)
+        resume_from = max(0.0, resume_t - RESUME_AUDIO_S)
+        sid = next(iter(routes.session_points))  # la seule session de ce processus
+        pts = [dict(p) for e in kept if e["m"].get("type") == "talking_points" for p in e["m"].get("points") or []]
+        index = routes.session_dupe_index.setdefault(sid, {})
+        for i, p in enumerate(pts):
+            routes.dupe_index_add(index, routes.claim_signature(p["texte"]).words, i)
+        routes.session_points[sid] = pts
+        verdicts = {e["m"]["id"]: e["m"] for e in kept if e["m"].get("type") == "fact_check_result"}
+        routes.session_verdicts[sid] = [
+            {"id": p["id"], "claim": p["texte"], "qui": p.get("qui", ""),
+             **{k: v for k, v in verdicts[p["id"]].items() if k not in ("type", "id")}}
+            for p in pts if p["id"] in verdicts]
+        # Verdicts tombés après le point de reprise : redemandés (le plus
+        # souvent servis par le cache, sans appel)
+        clock.at(resume_t)
+        missing = [p for p in pts if p.get("type") == "affirmation" and p["id"] not in verdicts]
+        for p in missing:
+            routes._spawn_tracked(sid, routes.fact_check_affirmation, sid, p["id"], p["texte"], p.get("citation", ""),
+                                  str(p.get("recherche") or ""), p.get("qui", ""), str(p.get("periode") or "")[:40], "")
+        print(f"↻ Reprise à {int(resume_t // 60)}:{int(resume_t % 60):02d} : {len(pts)} points et {len(verdicts)} verdicts "
+              f"gardés, {len(missing)} verdict(s) redemandé(s), audio repris à "
+              f"{int(resume_from // 60)}:{int(resume_from % 60):02d}")
 
     def build_session(events: list) -> dict:
         return {
@@ -359,10 +530,12 @@ def main():
             "events": sorted(events, key=lambda e: e["t"]),
         }
 
-    sent = 0
-    chunk_free = 0.0       # position où le chunk précédent a fini d'être traité
+    sent = sum(1 for i in items if i[1] == "audio_chunk" and i[2] < resume_from)  # déjà faits (reprise)
+    chunk_free = resume_from  # position où le chunk précédent a fini d'être traité
     real_start = time.monotonic()
     for arrival, kind, start, end in items:
+        if start < resume_from:
+            continue
         # Débit Mistral : pas trop d'analyses en vol (une seule session dans ce
         # processus) — l'horloge de la vidéo ne bouge pas pendant cette attente
         while sum(routes.session_pending.values()) > MAX_PENDING:

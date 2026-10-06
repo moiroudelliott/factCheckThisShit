@@ -17,9 +17,10 @@ from server.config import (
     DIARIZATION_THRESHOLD, MIN_NEW_SPEAKER_SEC, MAX_SPEAKERS, PROBE_MATCH_T,
     VOICES_DIR, VOICE_MATCH_THRESHOLD, VOICE_MATCH_MARGIN, VOICE_MATCH_SOLO_BONUS,
     VOICE_ENROLL_MIN_SEGMENTS, VOICE_ENROLL_MIN_VOTES,
+    IDENT_SETTLED_VOTES, IDENT_SETTLED_RATIO, IDENT_GIVE_UP,
 )
 from server import voice_store
-from server.factcheck import call_mistral_api
+from server.factcheck import call_small_task
 from server.names import canonical_name, matches_any
 from server.state import (
     session_speakers, session_contexts, session_speaker_map, session_voice_locked,
@@ -303,6 +304,31 @@ Réponds UNIQUEMENT avec un objet JSON, sans markdown:
 Règles: null au moindre doute — une mauvaise attribution est pire qu'une absence. Ne choisis un nom hors de la liste des intervenants que si une interpellation nominale explicite l'impose."""
 
 
+def identification_pending(sid: str, labels: list) -> list:
+    """Labels qui méritent encore un appel d'identification. Ne le méritent
+    plus : un label reconnu à la voix (banque), un nom stable (au moins
+    IDENT_SETTLED_VOTES votes concordants, IDENT_SETTLED_RATIO fois plus que
+    le suivant), ou un label resté sans nom après IDENT_GIVE_UP appels (le
+    présentateur, une voix de reportage). Cas vécu : 188 appels sur un débat
+    de 2 h, l'identification continuant toutes les 4 analyses alors que les
+    trois débatteurs étaient nommés depuis longtemps."""
+    locked = session_voice_locked.get(sid, set())
+    votes = session_map_votes.get(sid, {})
+    asked = (session_map_state.get(sid) or {}).get("asked", {})
+    pending = []
+    for label in labels:
+        if label in locked:
+            continue
+        ranked = sorted((votes.get(label) or {}).values(), reverse=True)
+        top, second = (ranked + [0, 0])[:2]
+        if top >= IDENT_SETTLED_VOTES and top >= IDENT_SETTLED_RATIO * second:
+            continue
+        if not top and asked.get(label, 0) >= IDENT_GIVE_UP:
+            continue
+        pending.append(label)
+    return pending
+
+
 def identify_speakers(sid: str):
     """Tâche de fond : associe les labels anonymes aux vrais noms par VOTE
     MAJORITAIRE. Chaque appel Mistral = un vote par label ; un nom est confirmé
@@ -329,7 +355,7 @@ def identify_speakers(sid: str):
             guests_line=", ".join(guests) if guests else "(liste non fournie)",
             excerpts="\n---\n".join(excerpts),
         )
-        content = call_mistral_api(prompt, sid=sid)
+        content = call_small_task(prompt, sid=sid)
         print(f"[SpeakerMap] {content[:150]}")
         start = content.find('{')
         if start == -1:
@@ -337,6 +363,14 @@ def identify_speakers(sid: str):
         data, _ = json.JSONDecoder().raw_decode(content, start)
         if not isinstance(data, dict):
             return
+
+        # Labels soumis à cette identification : sert à ne plus redemander
+        # sans fin un label que personne ne sait nommer (le présentateur)
+        if state is not None:
+            asked = state.setdefault("asked", {})
+            for label in labels:
+                if label not in locked:
+                    asked[label] = asked.get(label, 0) + 1
 
         # Enregistrer les votes (les "null" ne votent pas)
         votes = session_map_votes.setdefault(sid, {})

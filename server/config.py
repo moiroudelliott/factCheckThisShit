@@ -19,6 +19,16 @@ MISTRAL_FACTCHECK_TIMEOUT_S = 40  # … d'un verdict : prompt long (preuves), mo
 # plus accusateur des verdicts, et celui qui se trompait le plus souvent
 FACTCHECK_RECHECK_FALSE = os.environ.get("FACTCHECK_RECHECK_FALSE", "1") != "0"
 PASSAGE_MAX_CHARS = 1200  # passage de transcription autour du propos, passé à la vérification (contexte)
+# Petites tâches (identification des voix, thèmes, intervenants d'une vidéo) :
+# un modèle local (Ollama, sur la carte graphique) s'il répond, sinon un petit
+# modèle Mistral. Les verdicts et le repérage des affirmations restent sur
+# MISTRAL_MODEL : ce sont eux qui demandent le plus de finesse.
+LOCAL_LLM_URL = os.environ.get("LOCAL_LLM_URL", "http://127.0.0.1:11434").rstrip("/")
+LOCAL_LLM_MODEL = os.environ.get("LOCAL_LLM_MODEL", "ministral-3:8b")  # LOCAL_LLM_MODEL= (vide) pour s'en passer
+LOCAL_LLM_TIMEOUT_S = 60      # premier appel : chargement du modèle en mémoire graphique (~10 s)
+LOCAL_LLM_CTX = 8192          # contexte demandé à Ollama (son défaut, plus court, tronquerait sans prévenir)
+LOCAL_LLM_RETRY_S = 300       # modèle local injoignable : on repasse par l'API pendant 5 min avant de réessayer
+MISTRAL_SMALL_MODEL = os.environ.get("MISTRAL_SMALL_MODEL", "mistral-small-latest")
 # Fiche de fin de débat (server/summary.py) : un seul appel, une fois le débat
 # fini — la lenteur ne gêne pas, un modèle plus grand peut s'y justifier
 MISTRAL_FICHE_MODEL = os.environ.get("MISTRAL_FICHE_MODEL", MISTRAL_MODEL)
@@ -191,6 +201,11 @@ VOICE_MATCH_MARGIN = 0.08      # écart min avec la 2e meilleure empreinte de TO
 VOICE_MATCH_SOLO_BONUS = 0.10  # une seule voix en banque (pas de 2e pour la marge) : seuil relevé d'autant
 VOICE_ENROLL_MIN_SEGMENTS = 8  # segments min pour auto-enrôler une voix
 VOICE_ENROLL_MIN_VOTES = 3     # votes LLM concordants (et aucun vote contraire) avant d'enrôler : une empreinte en banque est définitive
+# Identification des voix par Mistral : on cesse de demander pour un label
+# dont le nom est stable, ou que personne ne sait nommer (présentateur)
+IDENT_SETTLED_VOTES = 3   # votes concordants pour tenir un nom pour acquis…
+IDENT_SETTLED_RATIO = 3   # … avec au moins 3 fois plus de votes que le nom suivant
+IDENT_GIVE_UP = 6         # appels sans aucun nom proposé : on abandonne ce label
 
 # ── Cache persistant des fact-checks ──────────────────────────────────────
 # Les politiques répètent les mêmes claims pendant des mois : un claim déjà

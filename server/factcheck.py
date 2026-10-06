@@ -16,7 +16,8 @@ from server.articles import fetch_passage
 from server.config import (
     PASSAGE_MAX_CHARS, ARTICLE_FETCH_MAX, BRAVE_API_KEY, BRAVE_API_MIN_GAP_S, FACTCHECK_RECHECK_FALSE, MISTRAL_API_KEY,
     MISTRAL_FACTCHECK_MODEL, MISTRAL_FACTCHECK_TIMEOUT_S, MISTRAL_MODEL, MISTRAL_MAX_RETRIES, MISTRAL_RETRY_BASE_S,
-    MISTRAL_TIMEOUT_S, SEARXNG_URL,
+    MISTRAL_TIMEOUT_S, SEARXNG_URL, LOCAL_LLM_URL, LOCAL_LLM_MODEL, LOCAL_LLM_TIMEOUT_S, LOCAL_LLM_CTX, LOCAL_LLM_RETRY_S,
+    MISTRAL_SMALL_MODEL,
 )
 from server.text_utils import _STOPWORDS
 from server.themes import themes_prompt_list
@@ -234,20 +235,28 @@ def build_context_block(context: dict) -> str:
     return "Contexte de l'émission:\n" + "\n".join(f"- {p}" for p in parts) + "\n\n"
 
 
+HISTORY_RECENT = 15   # derniers points (tous types) rappelés à chaque analyse
+HISTORY_OLDER = 45    # affirmations plus anciennes rappelées
+
+
 def build_history_block(points: list) -> str:
-    """Les 25 derniers points, plus toutes les affirmations plus anciennes du
-    débat : avec les 25 derniers seulement, « une heure de cours sur dix »
-    relevée à 9 min revenait à 32, 33 et 34 min, vérifiée chaque fois."""
+    """Les derniers points, plus les affirmations plus anciennes du débat :
+    avec les derniers seulement, « une heure de cours sur dix » relevée à
+    9 min revenait à 32, 33 et 34 min, vérifiée chaque fois. Bornés : cet
+    historique pesait 40 % du prompt d'extraction, renvoyé ~380 fois par
+    débat de 2 h (25 + 60 points, « secondaires » compris : 7 400 caractères
+    en moyenne ; 15 + 45 affirmations : 5 300). La déduplication du code
+    rattrape les reprises qui passeraient."""
     if not points:
         return ""
     lines = []
-    older = [p for p in points[:-25] if p.get("type") in ("affirmation", "secondaire")][-60:]
+    older = [p for p in points[:-HISTORY_RECENT] if p.get("type") == "affirmation"][-HISTORY_OLDER:]
     if older:
         lines.append("\nAffirmations relevées plus tôt dans le débat — déjà traitées, NE PAS les relever à nouveau, "
                      "même reformulées ou reprises par l'autre débatteur:")
         lines += [f"- {p['texte']}" for p in older]
     lines.append("\nTalking points déjà identifiés — NE PAS RÉPÉTER, même sous une formulation légèrement différente:")
-    for p in points[-25:]:
+    for p in points[-HISTORY_RECENT:]:
         lines.append(f"- [{p['type']}] {p['texte']}")
     return "\n".join(lines)
 
@@ -272,6 +281,8 @@ def call_mistral_api(prompt: str, sid: str = None, model: str = None, timeout: f
     l'extension affiche l'attente au lieu de laisser l'utilisateur sans
     retour pendant le backoff."""
     model = model or MISTRAL_MODEL
+    if model.startswith("local:"):  # « local:ministral-3:8b » : modèle servi par Ollama (essais sans crédit API)
+        return call_local_llm(prompt, model[len("local:"):], timeout, json_mode=False)
     for attempt in range(MISTRAL_MAX_RETRIES + 1):
         started = time.monotonic()
         resp = requests.post(
@@ -295,6 +306,42 @@ def call_mistral_api(prompt: str, sid: str = None, model: str = None, timeout: f
         print(f"[Mistral] {model} : {time.monotonic() - started:.1f} s, "
               f"{usage.get('prompt_tokens', '?')} + {usage.get('completion_tokens', '?')} tokens")
         return body["choices"][0]["message"]["content"]
+
+
+_local_down_until = [0.0]  # modèle local injoignable : API Mistral jusqu'à cette heure (monotonic)
+
+
+def call_local_llm(prompt: str, model: str, timeout: float = None, json_mode: bool = True) -> str:
+    """Modèle local servi par Ollama, par son API native : elle seule permet
+    de fixer la taille du contexte (LOCAL_LLM_CTX) — le défaut d'Ollama
+    tronquerait sans prévenir un lot de 80 propos à classer. Lève une
+    exception s'il ne répond pas : à l'appelant de repasser par l'API."""
+    started = time.monotonic()
+    body = {"model": model, "messages": [{"role": "user", "content": prompt}], "stream": False,
+            "options": {"temperature": 0.1, "num_ctx": LOCAL_LLM_CTX}}
+    if json_mode:
+        body["format"] = "json"  # sortie JSON garantie par Ollama
+    resp = requests.post(f"{LOCAL_LLM_URL}/api/chat", json=body, timeout=timeout or LOCAL_LLM_TIMEOUT_S)
+    resp.raise_for_status()
+    data = resp.json()
+    print(f"[Local] {model} : {time.monotonic() - started:.1f} s, "
+          f"{data.get('prompt_eval_count', '?')} + {data.get('eval_count', '?')} tokens")
+    return data["message"]["content"]
+
+
+def call_small_task(prompt: str, sid: str = None, timeout: float = None) -> str:
+    """Petites tâches (identification des voix, thèmes, intervenants d'une
+    vidéo) : le modèle local s'il répond, sinon MISTRAL_SMALL_MODEL. Une panne
+    du modèle local (Ollama éteint, modèle absent) ne bloque rien : l'API
+    prend le relais pendant LOCAL_LLM_RETRY_S."""
+    if LOCAL_LLM_MODEL and time.monotonic() >= _local_down_until[0]:
+        try:
+            return call_local_llm(prompt, LOCAL_LLM_MODEL, timeout)
+        except Exception as e:
+            _local_down_until[0] = time.monotonic() + LOCAL_LLM_RETRY_S
+            print(f"[Local] {LOCAL_LLM_MODEL} indisponible ({type(e).__name__}) — "
+                  f"{MISTRAL_SMALL_MODEL} pendant {LOCAL_LLM_RETRY_S // 60} min")
+    return call_mistral_api(prompt, sid=sid, model=MISTRAL_SMALL_MODEL, timeout=timeout)
 
 
 def call_mistral(text: str, context: dict = None, recent_points: list = None, sid: str = None) -> list:

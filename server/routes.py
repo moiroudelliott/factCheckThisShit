@@ -23,7 +23,7 @@ from server.config import (
 from server import cache, indicators, known_factchecks, summary, votes
 from server.dedup import dupe_index_add, is_duplicate_indexed, repeats_figures_indexed
 from server.factcheck import (
-    SEARCH_DOWN_MESSAGE, call_mistral, call_mistral_api, fact_check_affirmation, search_available,
+    SEARCH_DOWN_MESSAGE, call_mistral, call_small_task, fact_check_affirmation, search_available,
     VIDEO_ANALYSIS_PROMPT,
 )
 from server.notify import describe_error, warn_client
@@ -40,7 +40,7 @@ from server.text_utils import (
 )
 from server.vocabulary import build_hotwords, is_hotword_echo, learn
 from server.voices import (
-    SpeakerTracker, speaker_label, probe_speaker, apply_speaker_map,
+    SpeakerTracker, speaker_label, probe_speaker, apply_speaker_map, identification_pending,
     match_clusters_to_bank, auto_enroll_voices, identify_speakers, load_voice_bank, _voice_bank,
 )
 
@@ -70,7 +70,7 @@ def analyze_video():
     if not MISTRAL_API_KEY or not (title or description):
         return {"guests": []}
     try:
-        content = call_mistral_api(VIDEO_ANALYSIS_PROMPT.format(
+        content = call_small_task(VIDEO_ANALYSIS_PROMPT.format(
             title=title, channel=channel,
             publish_date=publish_date or "inconnue",
             description=description or "(vide)",
@@ -428,10 +428,11 @@ def flush_to_mistral(sid: str, text: str, ts: float = None, entries: list = ()):
             tracker = session_speakers.get(sid)
             if tracker:
                 mapped = session_speaker_map.get(sid, {})
-                locked = session_voice_locked.get(sid, set())
                 labels = [SpeakerTracker.label_for(i) for i in range(len(tracker.sums))]
-                every = 2 if any(l not in mapped for l in labels) else 4
-                if state["flushes"] % every == 0 and any(l not in locked for l in labels):
+                # Seulement tant qu'un label reste à nommer (identification_pending)
+                pending = identification_pending(sid, labels)
+                every = 2 if any(l not in mapped for l in pending) else 4
+                if pending and state["flushes"] % every == 0:
                     state["inflight"] = True
                     socketio.start_background_task(identify_speakers, sid)
 

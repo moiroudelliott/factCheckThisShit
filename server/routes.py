@@ -23,7 +23,7 @@ from server.config import (
 from server import cache, indicators, known_factchecks, summary, votes
 from server.dedup import dupe_index_add, is_duplicate_indexed, repeats_figures_indexed
 from server.factcheck import (
-    SEARCH_DOWN_MESSAGE, call_mistral, call_small_task, fact_check_affirmation, search_available,
+    SEARCH_DOWN_MESSAGE, call_mistral, call_mistral_api, fact_check_affirmation, search_available,
     VIDEO_ANALYSIS_PROMPT,
 )
 from server.notify import describe_error, warn_client
@@ -70,7 +70,10 @@ def analyze_video():
     if not MISTRAL_API_KEY or not (title or description):
         return {"guests": []}
     try:
-        content = call_small_task(VIDEO_ANALYSIS_PROMPT.format(
+        # Mistral (MISTRAL_MODEL), pas le modèle local : essayé, il inventait des
+        # fonctions (« Manuel Bompard (présentateur) »), qui servent ensuite au
+        # contrôle des verdicts — et ce n'est qu'un appel par débat
+        content = call_mistral_api(VIDEO_ANALYSIS_PROMPT.format(
             title=title, channel=channel,
             publish_date=publish_date or "inconnue",
             description=description or "(vide)",

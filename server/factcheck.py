@@ -330,10 +330,11 @@ def call_local_llm(prompt: str, model: str, timeout: float = None, json_mode: bo
 
 
 def call_small_task(prompt: str, sid: str = None, timeout: float = None) -> str:
-    """Petites tâches (identification des voix, thèmes, intervenants d'une
-    vidéo) : le modèle local s'il répond, sinon MISTRAL_SMALL_MODEL. Une panne
-    du modèle local (Ollama éteint, modèle absent) ne bloque rien : l'API
-    prend le relais pendant LOCAL_LLM_RETRY_S."""
+    """Petites tâches (classement des propos par thème) : le modèle local
+    s'il répond, sinon MISTRAL_SMALL_MODEL. Une panne du modèle local (Ollama
+    éteint, modèle absent) ne bloque rien : l'API prend le relais pendant
+    LOCAL_LLM_RETRY_S. Pas pour l'identification des voix ni les intervenants
+    d'une vidéo : essayé, le modèle local s'y trompait trop (voir config)."""
     if LOCAL_LLM_MODEL and time.monotonic() >= _local_down_until[0]:
         try:
             return call_local_llm(prompt, LOCAL_LLM_MODEL, timeout)

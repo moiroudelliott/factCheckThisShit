@@ -1,6 +1,6 @@
-"""Petites tâches (identification des voix, thèmes, intervenants) : modèle
-local d'abord, API Mistral en relais ; identification arrêtée une fois les
-noms stables — sans modèle, réseau ni serveur.
+"""Petites tâches (classement par thème) : modèle local d'abord, API Mistral
+en relais ; identification des voix arrêtée une fois les noms stables, et
+garde-fou sur ses votes — sans modèle, réseau ni serveur.
 
 Lancer : python tests/test_small_tasks.py   (ou python -m pytest tests)"""
 
@@ -57,6 +57,21 @@ def test_identification_stops_once_names_are_settled():
     assert voices.identification_pending(sid, labels) == ["Intervenant B"]
     # une nouvelle voix relance l'identification
     assert voices.identification_pending(sid, labels + ["Intervenant E"]) == ["Intervenant B", "Intervenant E"]
+
+
+def test_whoever_pronounces_a_name_is_not_that_person():
+    """Erreur classique (modèle local, 6 cas sur 15) : « Olivier Faure, votre
+    programme… » attribué à l'intervieweur. Le vote est écarté, sauf si
+    l'on se présente soi-même."""
+    excerpts = ["Intervenant A: Olivier Faure, le programme du Nouveau Front populaire prévoit un SMIC à 1 600 euros.\n"
+                "Intervenant B: Oui, et nous l'assumons.",
+                "Intervenant C: Bonsoir, je suis Marion Maréchal, et je veux parler d'immigration."]
+    said = voices.said_by_label(excerpts)
+    assert said["Intervenant A"].startswith("Olivier Faure, le programme")
+    assert voices.speaker_named_in_citation("Olivier Faure", said["Intervenant A"])     # vote écarté
+    assert not voices.speaker_named_in_citation("Olivier Faure", said["Intervenant B"])
+    assert voices.introduces_self("Marion Maréchal", said["Intervenant C"])               # vote gardé
+    assert not voices.introduces_self("Olivier Faure", said["Intervenant A"])
 
 
 if __name__ == "__main__":

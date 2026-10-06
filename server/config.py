@@ -19,16 +19,21 @@ MISTRAL_FACTCHECK_TIMEOUT_S = 40  # … d'un verdict : prompt long (preuves), mo
 # plus accusateur des verdicts, et celui qui se trompait le plus souvent
 FACTCHECK_RECHECK_FALSE = os.environ.get("FACTCHECK_RECHECK_FALSE", "1") != "0"
 PASSAGE_MAX_CHARS = 1200  # passage de transcription autour du propos, passé à la vérification (contexte)
-# Petites tâches (identification des voix, thèmes, intervenants d'une vidéo) :
-# un modèle local (Ollama, sur la carte graphique) s'il répond, sinon un petit
-# modèle Mistral. Les verdicts et le repérage des affirmations restent sur
-# MISTRAL_MODEL : ce sont eux qui demandent le plus de finesse.
+# Petites tâches (classement des propos par thème) : un modèle local (Ollama,
+# sur la carte graphique) s'il répond, sinon un petit modèle Mistral. Essai
+# d'octobre 2026 avec ministral-3:8b : thèmes d'accord avec medium sur 80 % des
+# affirmations — mais 9 voix sur 15 seulement (le nom attribué à celui qui le
+# prononce, des invités absents) et des fonctions inventées pour les
+# intervenants d'une vidéo : ces deux tâches restent sur Mistral.
 LOCAL_LLM_URL = os.environ.get("LOCAL_LLM_URL", "http://127.0.0.1:11434").rstrip("/")
 LOCAL_LLM_MODEL = os.environ.get("LOCAL_LLM_MODEL", "ministral-3:8b")  # LOCAL_LLM_MODEL= (vide) pour s'en passer
 LOCAL_LLM_TIMEOUT_S = 60      # premier appel : chargement du modèle en mémoire graphique (~10 s)
 LOCAL_LLM_CTX = 8192          # contexte demandé à Ollama (son défaut, plus court, tronquerait sans prévenir)
 LOCAL_LLM_RETRY_S = 300       # modèle local injoignable : on repasse par l'API pendant 5 min avant de réessayer
 MISTRAL_SMALL_MODEL = os.environ.get("MISTRAL_SMALL_MODEL", "mistral-small-latest")
+# Identification des voix : MISTRAL_MODEL par défaut ; « local:ministral-3:8b »
+# ou « mistral-small-latest » pour l'essayer sur un autre modèle
+MISTRAL_IDENT_MODEL = os.environ.get("MISTRAL_IDENT_MODEL", MISTRAL_MODEL)
 # Fiche de fin de débat (server/summary.py) : un seul appel, une fois le débat
 # fini — la lenteur ne gêne pas, un modèle plus grand peut s'y justifier
 MISTRAL_FICHE_MODEL = os.environ.get("MISTRAL_FICHE_MODEL", MISTRAL_MODEL)

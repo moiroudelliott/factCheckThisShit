@@ -19,7 +19,7 @@ from faster_whisper.utils import download_model
 from server import network
 from server.config import (
     SEARXNG_URL, MISTRAL_API_KEY, BACKEND_TOKEN, WHISPER_MODEL, DIARIZATION_DEVICE, ALLOWED_ORIGINS, FORCE_IPV4,
-    BRAVE_API_KEY,
+    BRAVE_API_KEY, LOCAL_LLM_URL, LOCAL_LLM_MODEL, MISTRAL_SMALL_MODEL,
 )
 
 # Origines autorisées : l'extension Chrome (popup + document offscreen,
@@ -98,6 +98,19 @@ else:
 
 if not MISTRAL_API_KEY:
     print("⚠️  MISTRAL_API_KEY non définie — les talking points seront désactivés.")
+
+# Petites tâches (classement par thème) : modèle local ?
+if LOCAL_LLM_MODEL:
+    try:
+        _local = [m.get("name") for m in requests.get(f"{LOCAL_LLM_URL}/api/tags", timeout=2).json().get("models", [])]
+        if LOCAL_LLM_MODEL in _local:
+            print(f"Classement par thème : modèle local {LOCAL_LLM_MODEL} (Ollama).")
+        else:
+            print(f"ℹ️  Ollama répond mais sans {LOCAL_LLM_MODEL} (`ollama pull {LOCAL_LLM_MODEL}`) — "
+                  f"classement par thème par {MISTRAL_SMALL_MODEL}.")
+    except Exception:
+        print(f"ℹ️  Ollama injoignable sur {LOCAL_LLM_URL} — classement par thème par {MISTRAL_SMALL_MODEL} "
+              "(voir SETUP_GUIDE.md, étape 5 bis).")
 
 if not BACKEND_TOKEN:
     print("⚠️  BACKEND_TOKEN non défini — le backend accepte toute connexion locale sans "

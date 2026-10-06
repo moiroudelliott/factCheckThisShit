@@ -87,9 +87,10 @@ en dégradé (verdicts basés sur les connaissances du modèle, sans preuve web)
 
 ## Étape 5 bis — Modèle local pour les petites tâches (optionnel)
 
-L'identification des voix, le classement par thème et la détection des
-intervenants d'une vidéo tournent sur un **modèle local** (Ollama), gratuit et
-sans envoi de données ; sans lui, ils passent par `mistral-small` (API).
+Le classement des propos par thème (fiche de fin de débat) tourne sur un
+**modèle local** (Ollama), gratuit et sans envoi de données ; sans lui, il passe
+par `mistral-small` (API). L'identification des voix et la détection des
+intervenants restent sur Mistral : essayé, le modèle local s'y trompait trop.
 
 ```bash
 winget install Ollama.Ollama

@@ -9,6 +9,7 @@ identifié de façon fiable."""
 
 import json
 import os
+import re
 
 import numpy as np
 
@@ -17,11 +18,12 @@ from server.config import (
     DIARIZATION_THRESHOLD, MIN_NEW_SPEAKER_SEC, MAX_SPEAKERS, PROBE_MATCH_T,
     VOICES_DIR, VOICE_MATCH_THRESHOLD, VOICE_MATCH_MARGIN, VOICE_MATCH_SOLO_BONUS,
     VOICE_ENROLL_MIN_SEGMENTS, VOICE_ENROLL_MIN_VOTES,
-    IDENT_SETTLED_VOTES, IDENT_SETTLED_RATIO, IDENT_GIVE_UP,
+    IDENT_SETTLED_VOTES, IDENT_SETTLED_RATIO, IDENT_GIVE_UP, MISTRAL_IDENT_MODEL,
 )
 from server import voice_store
-from server.factcheck import call_small_task
-from server.names import canonical_name, matches_any
+from server.factcheck import call_mistral_api
+from server.names import canonical_name, matches_any, norm_name
+from server.points import speaker_named_in_citation
 from server.state import (
     session_speakers, session_contexts, session_speaker_map, session_voice_locked,
     session_bank_miss, session_excerpts, session_map_votes, session_map_state,
@@ -301,7 +303,32 @@ Associe chaque label à un nom réel UNIQUEMENT si les preuves sont décisives:
 Réponds UNIQUEMENT avec un objet JSON, sans markdown:
 {{"Intervenant A": "Prénom Nom ou null", "Intervenant B": "Prénom Nom ou null"}}
 
-Règles: null au moindre doute — une mauvaise attribution est pire qu'une absence. Ne choisis un nom hors de la liste des intervenants que si une interpellation nominale explicite l'impose."""
+Règles: null au moindre doute — une mauvaise attribution est pire qu'une absence. Ne choisis un nom hors de la liste des intervenants que si une interpellation nominale explicite l'impose.
+PIÈGE : celui qui PRONONCE un nom (« Olivier Faure, votre programme… ») s'adresse à cette personne ou parle d'elle — ce n'est JAMAIS lui. Le nom revient à celui qui prend la parole JUSTE APRÈS."""
+
+
+_EXCERPT_LINE_RE = re.compile(r"^(Intervenant (?:[A-Z]|\d+)|Intervenant \?)\s*:\s*(.*)$")
+
+
+def said_by_label(excerpts: list) -> dict:
+    """{label: tout ce qu'il dit} dans les extraits annotés (« Intervenant A: … »,
+    voir text_utils.build_transcript)."""
+    said = {}
+    for excerpt in excerpts:
+        for line in str(excerpt).splitlines():
+            m = _EXCERPT_LINE_RE.match(line.strip())
+            if m:
+                said[m.group(1)] = f"{said.get(m.group(1), '')} {m.group(2)}".strip()
+    return said
+
+
+def introduces_self(name: str, text: str) -> bool:
+    """« Bonsoir, je suis Marion Maréchal » : le seul cas où l'on prononce
+    son propre nom."""
+    parts = norm_name(name).split()
+    surnames = [w for w in parts[1:] if len(w) >= 4] or parts
+    said = norm_name(text)
+    return any(re.search(rf"\b(?:je suis|je m appelle|moi)(?: \w+){{0,2}} {re.escape(w)}\b", said) for w in surnames)
 
 
 def identification_pending(sid: str, labels: list) -> list:
@@ -355,7 +382,7 @@ def identify_speakers(sid: str):
             guests_line=", ".join(guests) if guests else "(liste non fournie)",
             excerpts="\n---\n".join(excerpts),
         )
-        content = call_small_task(prompt, sid=sid)
+        content = call_mistral_api(prompt, sid=sid, model=MISTRAL_IDENT_MODEL)
         print(f"[SpeakerMap] {content[:150]}")
         start = content.find('{')
         if start == -1:
@@ -374,10 +401,18 @@ def identify_speakers(sid: str):
 
         # Enregistrer les votes (les "null" ne votent pas)
         votes = session_map_votes.setdefault(sid, {})
+        said = said_by_label(excerpts)
         for label, name in data.items():
             if (label in labels and isinstance(name, str) and name.strip()
                     and name.strip().lower() not in ("null", "none", "?")):
                 n = canonical_name(name.strip()[:48], guests, _voice_bank)
+                # Garde-fou : un label qui prononce lui-même ce nom s'adresse
+                # à cette personne (« Olivier Faure, votre programme… ») — erreur
+                # classique des petits modèles, qui attribuaient le nom à
+                # l'intervieweur
+                if speaker_named_in_citation(n, said.get(label, "")) and not introduces_self(n, said.get(label, "")):
+                    print(f"[SpeakerMap] vote écarté : {label} prononce lui-même « {n} »")
+                    continue
                 votes.setdefault(label, {})
                 votes[label][n] = votes[label].get(n, 0) + 1
 

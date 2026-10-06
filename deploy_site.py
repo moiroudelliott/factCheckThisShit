@@ -34,12 +34,15 @@ KEEP_BACKUPS = 5
 def files_to_publish() -> list:
     """Chemins relatifs à site/, dans une liste explicite."""
     out = [f for f in sorted(os.listdir(SITE)) if f.endswith(".html")]
-    out += ["style.css", "relecture.js", "favicon.svg", "robots.txt",
+    out += ["style.css", "relecture.js", "fiche.js", "favicon.svg", "robots.txt",
             "overlay/content.js", "overlay/overlay.css", "sessions/index.json"]
     out += [f"fonts/{f}" for f in sorted(os.listdir(os.path.join(SITE, "fonts"))) if f.endswith(".woff2")]
     out += [f"fonts/licenses/{f}" for f in sorted(os.listdir(os.path.join(SITE, "fonts", "licenses")))]
     with open(os.path.join(SITE, "sessions", "index.json"), encoding="utf-8") as f:
-        out += [f"sessions/{s['id']}.json" for s in json.load(f).get("sessions", [])]
+        sessions = json.load(f).get("sessions", [])
+    out += [f"sessions/{s['id']}.json" for s in sessions]
+    # Fiche du débat (fiche.html), pour les sessions qui en ont une
+    out += [f"sessions/{s['id']}.fiche.json" for s in sessions if s.get("fiche")]
     missing = [p for p in out if not os.path.isfile(os.path.join(SITE, p))]
     if missing:
         raise SystemExit(f"✗ fichiers manquants : {', '.join(missing)}")

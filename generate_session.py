@@ -353,6 +353,8 @@ def main():
     ap.add_argument("--out", default="", help="Fichier de sortie (défaut : source-session_<date>_<id>.json)")
     ap.add_argument("--publish", action="store_true", help="Publier directement sur le site (publish_session.py)")
     ap.add_argument("--sans-recherche", action="store_true", help="Continuer même si SearxNG est éteint")
+    ap.add_argument("--sans-cache", action="store_true",
+                    help="Ni réutiliser ni enregistrer de verdicts en cache : pour comparer des réglages sur un même débat")
     again = ap.add_mutually_exclusive_group()
     again.add_argument("--reprendre", action="store_true",
                        help="Reprendre une génération coupée depuis sa sauvegarde partielle")
@@ -406,6 +408,14 @@ def main():
     from server import factcheck
     from server.app import socketio, app
     from server.config import BACKEND_TOKEN, BRAVE_API_KEY
+
+    if args.sans_cache:
+        # Chaque affirmation est vraiment revérifiée, et l'essai ne touche pas
+        # au cache des vrais débats
+        from server import cache
+        cache.lookup = lambda *a, **k: None
+        cache.store = lambda *a, **k: None
+        print("⚠ Sans cache : chaque verdict est recalculé, rien n'est enregistré")
 
     if not args.sans_recherche:
         if not factcheck.search_available():

@@ -81,9 +81,10 @@ def collect(args):
 
 
 def score(rows: list) -> dict:
-    s = {"total": len(rows), "ok": 0, "faux_a_tort": 0, "parole_validee": 0, "derobade": 0}
+    s = {"total": len(rows), "ok": 0, "faux_a_tort": 0, "parole_validee": 0, "derobade": 0, "erreurs": 0}
     for r in rows:
         v, accept = r["verdict"], r["accept"]
+        s["erreurs"] += v == "erreur"
         s["ok"] += v in accept
         s["faux_a_tort"] += v == "faux" and "faux" not in accept
         s["parole_validee"] += v in ("vrai", "partiellement_vrai") and accept == ["non_recoupe"]
@@ -107,8 +108,14 @@ def run(args):
                 for r in ev["results"]:
                     r.pop("extrait", None)
             started = time.monotonic()
-            res = fc.judge(c["texte"], ev, ctx, citation=c["citation"], qui=c["qui"], periode=c["periode"],
-                           previous=related_verdicts(c["texte"], done, qui=c["qui"]))
+            try:
+                res = fc.judge(c["texte"], ev, ctx, citation=c["citation"], qui=c["qui"], periode=c["periode"],
+                               previous=related_verdicts(c["texte"], done, qui=c["qui"]))
+            except Exception as e:
+                # Délai dépassé, réseau… : compté comme erreur technique, sans
+                # arrêter l'essai (cas vécu : un seul verdict de plus de 40 s
+                # interrompait tout le banc)
+                res = {"verdict": "erreur", "explication": f"{type(e).__name__}: {str(e)[:120]}", "source": ""}
             done.append({"claim": c["texte"], "qui": c["qui"], **res})
             rows.append({"id": c["id"], "texte": c["texte"], "verdict": res["verdict"], "accept": c["accept"],
                          "explication": res.get("explication", ""), "source": res.get("source", ""),
@@ -125,7 +132,7 @@ def run(args):
               open(path, "w", encoding="utf-8"), ensure_ascii=False, indent=1)
     print(f"\n══ {label} ══ {time.monotonic() - started:.0f} s, {sum(r['s'] for r in rows) / len(rows):.1f} s par verdict")
     print(f"acceptables : {s['ok']}/{s['total']} · faux à tort : {s['faux_a_tort']} · parole validée : "
-          f"{s['parole_validee']} · dérobades : {s['derobade']}")
+          f"{s['parole_validee']} · dérobades : {s['derobade']} · erreurs techniques : {s['erreurs']}")
     for r in rows:
         if r["verdict"] not in r["accept"]:
             print(f"  ✗ {r['verdict']:<18} (attendu {'/'.join(r['accept'])}) « {r['texte'][:80]} »")

@@ -17,7 +17,7 @@ from server.config import (
     PASSAGE_MAX_CHARS, ARTICLE_FETCH_MAX, BRAVE_API_KEY, BRAVE_API_MIN_GAP_S, FACTCHECK_RECHECK_FALSE, MISTRAL_API_KEY,
     MISTRAL_FACTCHECK_MODEL, MISTRAL_FACTCHECK_TIMEOUT_S, MISTRAL_MODEL, MISTRAL_MAX_RETRIES, MISTRAL_RETRY_BASE_S,
     MISTRAL_TIMEOUT_S, SEARXNG_URL, LOCAL_LLM_URL, LOCAL_LLM_MODEL, LOCAL_LLM_TIMEOUT_S, LOCAL_LLM_CTX, LOCAL_LLM_RETRY_S,
-    MISTRAL_SMALL_MODEL, LLM_API_URL,
+    MISTRAL_SMALL_MODEL, LLM_API_URL, MISTRAL_REASONING_EFFORT,
 )
 from server.text_utils import _STOPWORDS
 from server.themes import themes_prompt_list
@@ -288,7 +288,8 @@ def call_mistral_api(prompt: str, sid: str = None, model: str = None, timeout: f
         resp = requests.post(
             f"{LLM_API_URL}/chat/completions",  # l'API de Mistral, ou un hébergeur au même format (config)
             headers={"Authorization": f"Bearer {MISTRAL_API_KEY}", "Content-Type": "application/json"},
-            json={"model": model, "messages": [{"role": "user", "content": prompt}], "temperature": 0.1},
+            json={"model": model, "messages": [{"role": "user", "content": prompt}], "temperature": 0.1,
+                  **({"reasoning_effort": MISTRAL_REASONING_EFFORT} if MISTRAL_REASONING_EFFORT else {})},
             timeout=timeout or MISTRAL_TIMEOUT_S,
         )
         if resp.status_code == 429 and attempt < MISTRAL_MAX_RETRIES:
@@ -305,7 +306,12 @@ def call_mistral_api(prompt: str, sid: str = None, model: str = None, timeout: f
         usage = body.get("usage") or {}
         print(f"[Mistral] {model} : {time.monotonic() - started:.1f} s, "
               f"{usage.get('prompt_tokens', '?')} + {usage.get('completion_tokens', '?')} tokens")
-        return body["choices"][0]["message"]["content"]
+        content = body["choices"][0]["message"]["content"]
+        if isinstance(content, list):
+            # Modèle qui raisonne (Large 4) : blocs « thinking » puis « text » —
+            # seul le texte est la réponse
+            content = "".join(b.get("text", "") for b in content if isinstance(b, dict) and b.get("type") == "text")
+        return content
 
 
 _local_down_until = [0.0]  # modèle local injoignable : API Mistral jusqu'à cette heure (monotonic)

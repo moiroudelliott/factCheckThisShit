@@ -19,7 +19,9 @@ MISTRAL_MODEL = os.environ.get("MISTRAL_MODEL", "mistral-medium-latest")  # medi
 # qui raisonne sur les sources (période, périmètre, cumul / annuel)
 MISTRAL_FACTCHECK_MODEL = os.environ.get("MISTRAL_FACTCHECK_MODEL", MISTRAL_MODEL)
 MISTRAL_TIMEOUT_S = 20            # délai d'une réponse (extraction, identification des voix)
-MISTRAL_FACTCHECK_TIMEOUT_S = 40  # … d'un verdict : prompt long (preuves), modèle parfois plus lent
+# … d'un verdict : prompt long (preuves), modèle parfois plus lent ; réglable
+# pour un modèle plus lent (Large 4 dépassait 40 s sur certains verdicts)
+MISTRAL_FACTCHECK_TIMEOUT_S = float(os.environ.get("MISTRAL_FACTCHECK_TIMEOUT_S", "40"))
 # Contre-vérification d'un « faux » (second appel, sur ce seul verdict) : le
 # plus accusateur des verdicts, et celui qui se trompait le plus souvent
 FACTCHECK_RECHECK_FALSE = os.environ.get("FACTCHECK_RECHECK_FALSE", "1") != "0"
@@ -36,6 +38,10 @@ LOCAL_LLM_TIMEOUT_S = 60      # premier appel : chargement du modèle en mémoir
 LOCAL_LLM_CTX = 8192          # contexte demandé à Ollama (son défaut, plus court, tronquerait sans prévenir)
 LOCAL_LLM_RETRY_S = 300       # modèle local injoignable : on repasse par l'API pendant 5 min avant de réessayer
 MISTRAL_SMALL_MODEL = os.environ.get("MISTRAL_SMALL_MODEL", "mistral-small-latest")
+# Modèles qui raisonnent avant de répondre (Large 4) : « none » coupe ce
+# raisonnement — sinon 1 500 à 2 700 tokens de réflexion et 20 à 90 s par
+# verdict. Vide : réglage par défaut du modèle (Medium 3.5 répond directement)
+MISTRAL_REASONING_EFFORT = os.environ.get("MISTRAL_REASONING_EFFORT", "")
 # Identification des voix : MISTRAL_MODEL par défaut ; « local:ministral-3:8b »
 # ou « mistral-small-latest » pour l'essayer sur un autre modèle
 MISTRAL_IDENT_MODEL = os.environ.get("MISTRAL_IDENT_MODEL", MISTRAL_MODEL)

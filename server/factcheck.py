@@ -17,7 +17,7 @@ from server.config import (
     PASSAGE_MAX_CHARS, ARTICLE_FETCH_MAX, BRAVE_API_KEY, BRAVE_API_MIN_GAP_S, FACTCHECK_RECHECK_FALSE, MISTRAL_API_KEY,
     MISTRAL_FACTCHECK_MODEL, MISTRAL_FACTCHECK_TIMEOUT_S, MISTRAL_MODEL, MISTRAL_MAX_RETRIES, MISTRAL_RETRY_BASE_S,
     MISTRAL_TIMEOUT_S, SEARXNG_URL, LOCAL_LLM_URL, LOCAL_LLM_MODEL, LOCAL_LLM_TIMEOUT_S, LOCAL_LLM_CTX, LOCAL_LLM_RETRY_S,
-    MISTRAL_SMALL_MODEL,
+    MISTRAL_SMALL_MODEL, LLM_API_URL,
 )
 from server.text_utils import _STOPWORDS
 from server.themes import themes_prompt_list
@@ -286,7 +286,7 @@ def call_mistral_api(prompt: str, sid: str = None, model: str = None, timeout: f
     for attempt in range(MISTRAL_MAX_RETRIES + 1):
         started = time.monotonic()
         resp = requests.post(
-            "https://api.mistral.ai/v1/chat/completions",
+            f"{LLM_API_URL}/chat/completions",  # l'API de Mistral, ou un hébergeur au même format (config)
             headers={"Authorization": f"Bearer {MISTRAL_API_KEY}", "Content-Type": "application/json"},
             json={"model": model, "messages": [{"role": "user", "content": prompt}], "temperature": 0.1},
             timeout=timeout or MISTRAL_TIMEOUT_S,

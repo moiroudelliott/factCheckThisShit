@@ -8,7 +8,12 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # ── Mistral ────────────────────────────────────────────────────────────────
-MISTRAL_API_KEY = os.environ.get("MISTRAL_API_KEY", "")
+# Fournisseur des modèles Mistral : l'API de Mistral par défaut, ou un hébergeur
+# qui reprend son format « chat/completions » (Scaleway, OVHcloud) —
+# LLM_API_URL=https://api.scaleway.ai/v1 et LLM_API_KEY=<clé secrète>, avec les
+# noms de modèles de cet hébergeur dans MISTRAL_MODEL et MISTRAL_SMALL_MODEL
+LLM_API_URL = os.environ.get("LLM_API_URL", "https://api.mistral.ai/v1").rstrip("/")
+MISTRAL_API_KEY = os.environ.get("LLM_API_KEY") or os.environ.get("MISTRAL_API_KEY", "")
 MISTRAL_MODEL = os.environ.get("MISTRAL_MODEL", "mistral-medium-latest")  # medium: suit bien le prompt d'extraction; small le sur-applique
 # Modèle de l'étape de vérification (verdict), réglable à part : c'est elle
 # qui raisonne sur les sources (période, périmètre, cumul / annuel)

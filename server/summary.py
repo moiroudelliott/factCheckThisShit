@@ -25,7 +25,12 @@ Entrées communes au direct (inputs_from_live) et aux sessions enregistrées
             début de l'analyse en direct) ;
   verdicts  {id: {verdict, confiance, explication, source, url, inaudible}} ;
   speech    [(début, durée, nom)] — temps de parole, nom "" si inconnu ;
-  duration  secondes analysées.
+  duration  secondes analysées ;
+  animateurs  invités déclarés comme présentateur, animateur ou journaliste
+            (points.hosts) : leurs propos restent dans la relecture, sous
+            leur nom, mais pas dans la fiche — ils mènent le débat, ils n'y
+            défendent pas de position. Une bande ne garde pas les fonctions
+            des invités : la liste voyage dans la fiche enregistrée.
 """
 
 import json
@@ -36,6 +41,7 @@ from bisect import bisect_right
 from collections import Counter
 
 from server.config import FICHE_MIN_VERDICTS, MISTRAL_FICHE_MODEL, MISTRAL_FICHE_TIMEOUT_S
+from server.names import matches_any
 from server.sources import is_inaudible
 from server.text_utils import figures, key_words
 from server.themes import THEMES, normalize_theme, themes_prompt_list
@@ -84,7 +90,8 @@ def _verdict(m: dict) -> dict:
 
 def inputs_from_tape(session: dict) -> dict:
     """Session enregistrée (format source-session) → entrées de la fiche,
-    plus la rédaction, le titre et la date d'une fiche déjà enregistrée."""
+    plus la rédaction, le titre, la date et les animateurs d'une fiche déjà
+    enregistrée."""
     events = [e for e in session.get("events") or [] if isinstance(e, dict) and isinstance(e.get("m"), dict)]
     smap, points, seen, verdicts, ticks, segs = {}, [], set(), {}, [], []
     duration, previous = 0.0, None
@@ -113,7 +120,7 @@ def inputs_from_tape(session: dict) -> dict:
     previous = previous or {}
     return {"points": points, "verdicts": verdicts, "speech": speech, "duration": duration,
             "redaction": previous.get("redaction"), "titre": previous.get("titre") or "",
-            "date": previous.get("date") or ""}
+            "date": previous.get("date") or "", "animateurs": list(previous.get("animateurs") or [])}
 
 
 def inputs_from_live(points: list, verdicts: list, speech: list, smap: dict, started_at: float,
@@ -206,16 +213,20 @@ def build_frise(points: list, duration: float) -> list:
 
 
 def build_fiche(points: list, verdicts: dict, speech: list, duration: float, titre: str = "", date: str = "",
-                redaction: dict = None, **_) -> dict:
+                redaction: dict = None, animateurs=(), **_) -> dict:
     """Fiche complète. La rédaction éventuelle (déjà écrite) est revérifiée
     contre les verdicts actuels — une session revérifiée depuis ne garde
-    pas un « moment fort » devenu vrai."""
+    pas un « moment fort » devenu vrai. Les affirmations des animateurs
+    n'y figurent pas : ni débatteur, ni indice, ni thème, ni rédaction."""
+    animateurs = [str(a) for a in animateurs or () if a]
     times = [p["t"] for p in points if p["t"] is not None]
     duration = max([duration or 0.0] + times)
     affs = []
     for p in sorted(points, key=lambda p: (p["t"] is None, p["t"] or 0.0)):
         v = verdicts.get(p["id"])
         if p["type"] != "affirmation" or not v or v.get("verdict") not in VERDICTS:
+            continue
+        if p["qui"] and matches_any(p["qui"], animateurs):
             continue
         if v["verdict"] == "non_verifiable" and (v.get("inaudible") is True or is_inaudible(v.get("explication") or "")):
             continue  # propos mal transcrit : l'overlay retire sa carte, il ne compte nulle part
@@ -296,7 +307,7 @@ def build_fiche(points: list, verdicts: dict, speech: list, duration: float, tit
         "version": 1, "titre": titre, "date": date, "duree": round(duration), "genere": time.strftime("%Y-%m-%d"),
         "min_verdicts": FICHE_MIN_VERDICTS,
         "totaux": {"points": len(points), "affirmations": len(affs), "verdicts": _counts(affs)},
-        "debatteurs": debatteurs, "comparaisons": comparaisons,
+        "debatteurs": debatteurs, "comparaisons": comparaisons, "animateurs": animateurs,
         "non_identifies": sum(1 for a in affs if not a["qui"]),
         "themes": themes, "frise": frise,
         "sources": [{"nom": k, "n": v} for k, v in src.most_common()],
@@ -502,10 +513,11 @@ def validate_redaction(data: dict, affs: list, points: list, candidates: set = N
         out["contradictions"].append({"ids": [a["id"], b["id"]], "sujet": _clean(c.get("sujet"), 120)})
 
     per = Counter()
+    debaters = {a["qui"] for a in affs if a["qui"]}  # ni animateur, ni locuteur sans affirmation vérifiée
     for c in _items(data.get("propositions")):
         p = pts.get(str(c.get("id")))
         intitule = _clean(c.get("intitule"), 120)
-        if not p or not p["qui"] or not intitule or per[p["qui"]] >= MAX_PROPOSITIONS \
+        if not p or p["qui"] not in debaters or not intitule or per[p["qui"]] >= MAX_PROPOSITIONS \
                 or any(x["id"] == p["id"] for x in out["propositions"]):
             continue
         # Une affirmation jugée fausse n'est pas une proposition de son auteur :
@@ -535,7 +547,7 @@ def write_redaction(fiche: dict, points: list, call=None, model: str = None) -> 
     model = model or MISTRAL_FICHE_MODEL
     candidates = moment_candidates(affs, points, names)
     aff_ids = {a["id"] for a in affs}
-    others = [p for p in points if p["qui"] and p["id"] not in aff_ids
+    others = [p for p in points if p["qui"] in names and p["id"] not in aff_ids
               and p["type"] in ("argument", "subjectif", "secondaire", "affirmation")][:250]
     themes = [f'{t["label"]} ({t["duree"] // 60} min)' for t in fiche["themes"] if t["duree"] >= 60]
     prompt = FICHE_PROMPT.format(

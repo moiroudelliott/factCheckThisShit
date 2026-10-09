@@ -483,7 +483,9 @@ def main():
     routes.emit = handler_emit
 
     # Intervenants : comme la popup (Mistral lit le titre et la description)
-    guests = [g.strip() for g in args.guests.split(",") if g.strip()]
+    # Virgules hors parenthèses : « Darius Rochebin (journaliste, LCI) » reste un
+    # seul intervenant, avec sa fonction (présentateur → hors de la fiche)
+    guests = [g.strip() for g in re.split(r",(?![^()]*\))", args.guests) if g.strip()]
     if not guests:
         r = app.test_client().post("/analyze_video", headers={"X-Backend-Token": BACKEND_TOKEN or ""},
                                    json={"title": title, "channel": channel,

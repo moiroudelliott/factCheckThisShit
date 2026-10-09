@@ -179,7 +179,7 @@ def _wait_for(client, event, timeout=15):
 def test_full_session():
     client = socketio.test_client(app)
     assert client.is_connected()
-    client.emit("set_context", {"emission": "Débat", "guests": "Jordan Bardella\nGabriel Attal",
+    client.emit("set_context", {"emission": "Débat", "guests": "Jordan Bardella\nGabriel Attal\nLéa Salamé (présentatrice)",
                                 "date": "2024-06-27", "description": ""})
     client.emit("start_transcription")
     for _ in range(len(SCRIPT)):
@@ -245,6 +245,8 @@ def test_full_session():
     # et sans débatteur, rien à rédiger (aucun appel à Mistral pour la fiche)
     assert final["fiche"]["debatteurs"] == [] and final["fiche"]["non_identifies"] == 2
     assert final["fiche"]["redaction"] is None
+    # présentatrice déclarée : hors de la fiche (points.hosts → summary.build_fiche)
+    assert final["fiche"]["animateurs"] == ["Léa Salamé"]
     assert not any("fiche de synthèse" in p for p in PROMPTS)
     client.disconnect()
 

@@ -27,7 +27,9 @@ from server.factcheck import (
     VIDEO_ANALYSIS_PROMPT,
 )
 from server.notify import describe_error, warn_client
-from server.points import apply_checkworthiness, parse_guests, citation_time, speaker_named_in_citation, validate_citation
+from server.points import (
+    apply_checkworthiness, parse_guests, citation_time, hosts, speaker_named_in_citation, validate_citation,
+)
 from server.state import (
     session_history, session_starts, session_buffers, session_contexts, session_points, session_verdicts,
     session_dupe_index, session_flush_locks, session_chunk_locks, session_speakers,
@@ -41,7 +43,8 @@ from server.text_utils import (
 from server.vocabulary import build_hotwords, is_hotword_echo, learn
 from server.voices import (
     SpeakerTracker, speaker_label, probe_speaker, apply_speaker_map, identification_pending,
-    match_clusters_to_bank, auto_enroll_voices, identify_speakers, load_voice_bank, _voice_bank,
+    match_clusters_to_bank, auto_enroll_voices, identify_speakers, load_voice_bank, settle_by_elimination,
+    _voice_bank,
 )
 
 cache.load()
@@ -255,6 +258,12 @@ def _finish_session(sid: str):
     # que le client reste connecté jusque-là
     fiche, inputs = None, None
     try:
+        # Un label resté à un seul vote, sans concurrent, reçoit son nom avant
+        # la fiche (voices.names_by_elimination)
+        settle_by_elimination(sid)
+    except Exception as e:
+        print(f"[SpeakerMap error] élimination : {type(e).__name__}: {e}")
+    try:
         inputs = _fiche_inputs(sid)
         if inputs["points"]:
             fiche = summary.build_fiche(**inputs)
@@ -283,7 +292,9 @@ def _fiche_inputs(sid: str) -> dict:
     missing = sum(1 for p in inputs["points"] if not p["theme"])
     if MISTRAL_API_KEY and missing > 0.2 * max(1, len(inputs["points"])):
         summary.ensure_themes(inputs["points"])
-    inputs.update(titre=ctx.get("emission", ""), date=ctx.get("date", ""))
+    # Présentateur ou journaliste déclaré parmi les intervenants : identifié
+    # comme les autres (la relecture garde son nom), mais hors de la fiche
+    inputs.update(titre=ctx.get("emission", ""), date=ctx.get("date", ""), animateurs=hosts(ctx.get("roles")))
     return inputs
 
 

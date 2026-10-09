@@ -7,6 +7,7 @@ Usage:
     python fiche_session.py source-session_X.json --date 2024-06-27
     python fiche_session.py source-session_X.json --modele mistral-large-latest --out essai.json
     python fiche_session.py source-session_X.json --sans-redaction     # chiffres seuls, sans Mistral
+    python fiche_session.py source-session_X.json --animateurs "Darius Rochebin"   # hors de la fiche
 
 Points sans thème (sessions antérieures au champ « theme ») : classés
 d'abord, en un ou deux appels, et le thème est inscrit dans la bande. La
@@ -40,6 +41,9 @@ def main():
     ap.add_argument("--modele", default="", help="Modèle Mistral de la rédaction (défaut : MISTRAL_FICHE_MODEL)")
     ap.add_argument("--out", default="", help="Fichier de sortie (défaut : la session elle-même)")
     ap.add_argument("--sans-redaction", action="store_true", help="Chiffres seuls, sans appel à Mistral pour la rédaction")
+    ap.add_argument("--animateurs", default=None,
+                    help="Présentateurs ou journalistes à laisser hors de la fiche, séparés par des virgules "
+                         "(défaut : ceux de la fiche enregistrée ; \"\" pour aucun)")
     args = ap.parse_args()
 
     summary = _load_server()
@@ -60,6 +64,8 @@ def main():
         print(f"🏷 {tagged} point(s) classés par thème")
 
     title = args.titre or inputs["titre"] or (session.get("video") or {}).get("title", "")
+    if args.animateurs is not None:
+        inputs["animateurs"] = [n.strip() for n in args.animateurs.split(",") if n.strip()]
     fiche = summary.build_fiche(**{**inputs, "titre": title, "date": args.date or inputs["date"], "redaction": None})
     if not args.sans_redaction:
         fiche["redaction"] = summary.write_redaction(fiche, inputs["points"], model=args.modele or None)
@@ -73,6 +79,8 @@ def main():
         json.dump(session, f, ensure_ascii=False)
 
     print(f"✓ {out}")
+    if fiche["animateurs"]:
+        print(f'  hors fiche (animateurs) : {", ".join(fiche["animateurs"])}')
     for d in fiche["debatteurs"]:
         idx = f'{d["exactitude"]} % ± {d["marge"]}' if d["suffisant"] else "trop peu de verdicts"
         print(f'  {d["nom"]:<22} {d["tranches"]:>3} tranchés · {idx} · {d["temps_parole"] // 60} min de parole')

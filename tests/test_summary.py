@@ -174,6 +174,61 @@ def test_a_programme_description_is_not_a_striking_figure():
     assert [m["id"] for m in _fiche(points, verdicts, redaction=stored)["redaction"]["moments"]] == ["p2"]
 
 
+def test_hosts_are_left_out_of_the_fiche():
+    """Cas vécu (débat LCI) : le présentateur, déclaré parmi les intervenants,
+    était identifié et noté comme un débatteur. Ses affirmations ne comptent
+    plus nulle part dans la fiche (débatteurs, thèmes, rédaction) ; elles ne
+    deviennent pas pour autant « non attribuées »."""
+    host = "Darius Rochebin"
+    points = [_pt(1, A, 10, texte="Le déficit est de 5,5 %"), _pt(2, host, 20, texte="Plus de 2 000 interpellations"),
+              _pt(3, B, 30, texte="Les éoliennes durent 10 ans"),
+              _pt(4, host, 40, type_="argument", texte="Il faut écouter les lycéens")]
+    points[3]["citation"] = "il faut écouter les lycéens"
+    verdicts = {"p1": {"verdict": "vrai"}, "p2": {"verdict": "faux", "explication": "1 747 selon le ministère."},
+                "p3": {"verdict": "faux"}}
+    f = summary.build_fiche(points, verdicts, [(0, 100, host), (100, 50, A), (150, 50, B)], 600.0,
+                            animateurs=["Darius Rochebin"])
+    assert [d["nom"] for d in f["debatteurs"]] == [A, B] and f["animateurs"] == [host]
+    assert [a["id"] for a in f["affirmations"]] == ["p1", "p3"] and f["non_identifies"] == 0
+    assert all(host not in t["par_debatteur"] for t in f["themes"])
+    assert f["totaux"]["points"] == 4                      # la frise et les thèmes suivent tout le débat
+
+    prompts = []
+
+    def fake(prompt, **k):
+        prompts.append(prompt)
+        return json.dumps({"resume": "r", "chiffres": [{"id": "p2", "annonce": "2 000", "selon_source": "1 747"}],
+                           "propositions": [{"id": "p4", "intitule": "Écouter les lycéens"}]})
+    red = summary.write_redaction(f, points, call=fake)
+    assert host not in prompts[0]                           # ni affirmation, ni autre propos de l'animateur
+    assert red["chiffres"] == [] and red["propositions"] == []
+    # sans fonction déclarée, il reste un débatteur
+    assert host in [d["nom"] for d in summary.build_fiche(points, verdicts, [], 600.0)["debatteurs"]]
+
+
+def test_hosts_travel_with_the_recorded_fiche():
+    """Une bande ne garde pas la fonction des invités : la liste des
+    animateurs voyage dans la fiche enregistrée, et la publication
+    (inputs_from_tape) l'applique encore. Le point garde le nom de
+    l'animateur — la relecture l'affiche."""
+    tape = {"events": [
+        {"t": 31.0, "m": {"type": "talking_points", "points": [
+            {"id": "a1", "type": "affirmation", "texte": "x", "qui": "Intervenant A", "qui_label": "Intervenant A",
+             "vt": 20.0, "theme": "securite"},
+            {"id": "a2", "type": "affirmation", "texte": "y", "qui": "Intervenant B", "qui_label": "Intervenant B",
+             "vt": 25.0, "theme": "securite"}]}},
+        {"t": 40.0, "m": {"type": "fact_check_result", "id": "a1", "verdict": "vrai"}},
+        {"t": 41.0, "m": {"type": "fact_check_result", "id": "a2", "verdict": "vrai"}},
+        {"t": 50.0, "m": {"type": "speaker_map", "map": {"Intervenant A": "Darius Rochebin", "Intervenant B": A}}},
+        {"t": 60.0, "m": {"type": "debate_summary", "fiche": {"titre": "Débat", "animateurs": ["Darius Rochebin"]}}},
+    ]}
+    inp = summary.inputs_from_tape(tape)
+    assert inp["animateurs"] == ["Darius Rochebin"] and inp["points"][0]["qui"] == "Darius Rochebin"
+    f = summary.build_fiche(**inp)
+    assert [d["nom"] for d in f["debatteurs"]] == [A] and f["animateurs"] == ["Darius Rochebin"]
+    assert summary.inputs_from_tape({"events": []})["animateurs"] == []
+
+
 def test_inputs_from_tape():
     tape = {"events": [
         {"t": 5.0, "m": {"type": "speaker_live", "speaker": "Intervenant C"}},

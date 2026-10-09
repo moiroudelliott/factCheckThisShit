@@ -106,7 +106,8 @@ def parse_guests(raw) -> tuple:
     """Intervenants saisis dans la popup, un par ligne (ou séparés par des
     virgules hors parenthèses) : « Prénom Nom » ou « Prénom Nom (fonction) ».
     Renvoie (noms, {nom: fonction}) — les noms seuls servent partout ailleurs
-    (Whisper, identification des voix), la fonction à la vérification."""
+    (Whisper, banque de voix), la fonction à la vérification, à
+    l'identification des voix et à la fiche (hosts)."""
     if isinstance(raw, list):
         raw = "\n".join(str(g) for g in raw)
     lines = []
@@ -122,3 +123,19 @@ def parse_guests(raw) -> tuple:
         if m.group(2) and m.group(2).strip():
             roles[name] = m.group(2).strip()[:80]
     return names, roles
+
+
+# Fonction d'un invité qui mène le débat sans y défendre de position : ce
+# n'est pas un débatteur de la fiche (cas vécu : le présentateur de LCI,
+# déclaré parmi les intervenants, noté comme un débatteur). « Ancienne
+# journaliste, députée LFI » reste une débattrice.
+_HOST_ROLE_RE = re.compile(r"\b(?:pr[ée]sentat(?:eur|rice)|animat(?:eur|rice)|journaliste|mod[ée]rat(?:eur|rice))\b",
+                           re.IGNORECASE)
+_FORMER_RE = re.compile(r"\b(?:ancien(?:ne)?|ex)[\s-]+$", re.IGNORECASE)
+
+
+def hosts(roles: dict) -> list:
+    """Invités déclarés comme présentateur, animateur, journaliste ou
+    modérateur ({nom: fonction} de parse_guests)."""
+    return [name for name, role in (roles or {}).items()
+            if any(not _FORMER_RE.search(role[:m.start()]) for m in _HOST_ROLE_RE.finditer(role))]

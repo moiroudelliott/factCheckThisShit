@@ -22,7 +22,7 @@ from server.config import (
 )
 from server import voice_store
 from server.factcheck import call_mistral_api
-from server.names import canonical_name, matches_any, norm_name
+from server.names import canonical_name, matches_any, name_matches, norm_name
 from server.points import speaker_named_in_citation
 from server.state import (
     session_speakers, session_contexts, session_speaker_map, session_voice_locked,
@@ -295,16 +295,25 @@ Extraits transcrits (les labels sont stables sur toute la session):
 
 {excerpts}
 
-Associe chaque label à un nom réel UNIQUEMENT si les preuves sont décisives:
-- le locuteur est interpellé par son nom juste avant de prendre la parole, ou on s'adresse à lui nommément ("vous, monsieur X…"),
-- il se présente lui-même,
-- ses propos correspondent sans aucune ambiguïté aux positions publiques d'un intervenant de la liste.
+Associe chaque label à un nom réel quand l'un de ces indices le désigne:
+- on lui répond en le nommant, juste après qu'il a parlé (« votre prise de parole, M. X… », « monsieur X, vous dites… »), ou on l'interpelle par son nom et il répond juste après,
+- il se présente lui-même (« je suis X »),
+- il parle de son propre camp à la première personne (« nous, les insoumis », « notre groupe ») et un seul intervenant de la liste en est, ou ses propos correspondent sans ambiguïté aux positions publiques d'un seul intervenant de la liste.
 
 Réponds UNIQUEMENT avec un objet JSON, sans markdown:
 {{"Intervenant A": "Prénom Nom ou null", "Intervenant B": "Prénom Nom ou null"}}
 
-Règles: null au moindre doute — une mauvaise attribution est pire qu'une absence. Ne choisis un nom hors de la liste des intervenants que si une interpellation nominale explicite l'impose.
-PIÈGE : celui qui PRONONCE un nom (« Olivier Faure, votre programme… ») s'adresse à cette personne ou parle d'elle — ce n'est JAMAIS lui. Le nom revient à celui qui prend la parole JUSTE APRÈS."""
+Règles: null quand aucun indice ne désigne une seule personne — une mauvaise attribution est pire qu'une absence. Ne choisis un nom hors de la liste des intervenants que si une interpellation nominale explicite l'impose.
+PIÈGE : celui qui PRONONCE un nom (« Madame X, vous… », « Olivier Faure, votre programme… ») s'adresse à cette personne ou parle d'elle — ce n'est JAMAIS lui, sauf s'il se désigne lui-même (« je suis X », « moi, X »). Le nom revient à un autre : celui à qui il répond, ou celui qui lui répond juste après."""
+
+
+def guests_line(guests: list, roles: dict) -> str:
+    """Invités déclarés avec leur fonction (« Manuel Bompard (député LFI) »,
+    « Darius Rochebin (présentateur) ») : le camp d'un débatteur et le rôle
+    du présentateur sont des indices pour l'identification."""
+    if not guests:
+        return "(liste non fournie)"
+    return ", ".join(f"{g} ({roles[g]})" if roles.get(g) else g for g in guests)
 
 
 _EXCERPT_LINE_RE = re.compile(r"^(Intervenant (?:[A-Z]|\d+)|Intervenant \?)\s*:\s*(.*)$")
@@ -379,7 +388,7 @@ def identify_speakers(sid: str):
         guests = ctx.get("guests") or []
         prompt = SPEAKER_MAP_PROMPT_TEMPLATE.format(
             emission_line=f"Émission: {ctx['emission']}\n" if ctx.get("emission") else "",
-            guests_line=", ".join(guests) if guests else "(liste non fournie)",
+            guests_line=guests_line(guests, ctx.get("roles") or {}),
             excerpts="\n---\n".join(excerpts),
         )
         content = call_mistral_api(prompt, sid=sid, model=MISTRAL_IDENT_MODEL)
@@ -443,3 +452,44 @@ def identify_speakers(sid: str):
     finally:
         if state is not None:
             state["inflight"] = False
+
+
+def names_by_elimination(votes: dict, confirmed: dict, locked: set, guests: list) -> dict:
+    """{label: nom} retenus faute de concurrent, en fin de session : un label
+    sans nom confirmé dont tous les votes vont au même invité déclaré, que
+    nul autre label ne porte (nom confirmé) ni ne dispute (vote d'un label
+    encore anonyme). Cas vécu : Manuel Bompard, 12 min de parole sur un débat
+    LCI, jamais confirmé faute d'un second vote — Mistral répondait null
+    presque à chaque appel. Chaque vote compté a passé le garde-fou
+    speaker_named_in_citation / introduces_self ; ces noms ne sont jamais
+    enrôlés en banque (auto_enroll_voices exige VOICE_ENROLL_MIN_VOTES)."""
+    out = {}
+    for label, cand in votes.items():
+        if label in locked or confirmed.get(label) or len(cand) != 1:
+            continue
+        name = next(iter(cand))
+        if not matches_any(name, guests):
+            continue
+        taken = any(other != label and name_matches(name, n) for other, n in confirmed.items())
+        disputed = any(other != label and not confirmed.get(other) and matches_any(name, c)
+                       for other, c in votes.items())
+        if not taken and not disputed:
+            out[label] = name
+    return out
+
+
+def settle_by_elimination(sid: str) -> dict:
+    """Fin de session (_finish_session, avant la fiche) : applique
+    names_by_elimination et renomme les points comme toute confirmation —
+    aucun appel Mistral."""
+    if not DIARIZATION:
+        return {}
+    confirmed = session_speaker_map.setdefault(sid, {})
+    added = names_by_elimination(session_map_votes.get(sid, {}), confirmed,
+                                 session_voice_locked.get(sid, set()),
+                                 session_contexts.get(sid, {}).get("guests") or [])
+    if added:
+        confirmed.update(added)
+        print(f"[SpeakerMap] retenu sans concurrent : {added}")
+        _emit_speaker_map(sid, confirmed)
+    return added

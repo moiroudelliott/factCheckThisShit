@@ -173,8 +173,17 @@
     });
     $('f-comps').innerHTML = (fiche.comparaisons || []).map((c) => `<li><strong>${esc(c.a)}</strong> et <strong>${esc(c.b)}</strong> :
       écart de ${plural(c.ecart, 'point')} — ${c.significatif ? "au-delà de la marge d'erreur" : "dans la marge d'erreur : pas de différence établie"}.</li>`).join('');
+    const notes = [];
     if (fiche.non_identifies) {
-      $('f-unknown').textContent = `${plural(fiche.non_identifies, 'affirmation n’a pas pu être attribuée', 'affirmations n’ont pas pu être attribuées')} à un débatteur (voix non reconnue) : elles ne comptent pour personne.`;
+      notes.push(`${plural(fiche.non_identifies, 'affirmation n’a pas pu être attribuée', 'affirmations n’ont pas pu être attribuées')} à un débatteur (voix non reconnue) : elles ne comptent pour personne.`);
+    }
+    const hosts = fiche.animateurs || [];
+    if (hosts.length) {
+      const many = hosts.length > 1;
+      notes.push(`${hosts.join(' et ')} ${many ? 'mènent' : 'mène'} le débat : ${many ? 'leurs' : 'ses'} propos ne comptent pas dans la fiche.`);
+    }
+    if (notes.length) {
+      $('f-unknown').textContent = notes.join(' ');
       $('f-unknown').hidden = false;
     }
   }

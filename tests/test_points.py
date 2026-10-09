@@ -8,7 +8,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from server.points import (  # noqa: E402
-    apply_checkworthiness, citation_time, parse_guests, speaker_named_in_citation, validate_citation,
+    apply_checkworthiness, citation_time, hosts, parse_guests, speaker_named_in_citation, validate_citation,
     verifiable_score,
 )
 
@@ -43,6 +43,17 @@ def test_guests_with_their_role():
     assert names == ["Gabriel Attal", "Marion Maréchal"] and roles["Marion Maréchal"] == "eurodéputée, Identité-Libertés"
     assert parse_guests(["Jordan Bardella"]) == (["Jordan Bardella"], {})
     assert parse_guests("") == ([], {})
+
+
+def test_hosts_are_recognised_by_their_role():
+    """Présentateur, animateur ou journaliste déclaré parmi les intervenants :
+    hors de la fiche (cas vécu : le présentateur de LCI noté comme un
+    débatteur). Une ancienne journaliste devenue députée reste une débattrice."""
+    _names, roles = parse_guests("Darius Rochebin (journaliste, LCI), Manuel Bompard (député LFI)\n"
+                                 "Léa Salamé (présentatrice)\nSophia Chikirou (ancienne journaliste, députée LFI)\n"
+                                 "Jean Dupont (ex-animateur, maire)\nAnne Martin (modératrice)\nPrisca Thévenot")
+    assert hosts(roles) == ["Darius Rochebin", "Léa Salamé", "Anne Martin"]
+    assert hosts({}) == [] and hosts(None) == []
 
 
 def test_missing_or_bad_score_never_blocks_a_check():

@@ -453,10 +453,10 @@ total = t
 # sur l'ouverture du premier extrait. Morceau B : reprise 8 mesures plus tôt
 # (32 temps = 10,918 s), sous la parole de Faure, pour que la vraie fin du
 # morceau accompagne l'écran final.
-MUSIC_SRC = "assets/music/jungle-waves.mp3"
+MUSIC_SRC = "assets/music/jungle-waves-norm.mp3"
 SPLICE = 22.283                      # temps vidéo du raccord
 PIECES = [(0.0, 3.092, SPLICE), (SPLICE, 14.457, total)]   # (début vidéo, début morceau, fin vidéo)
-HIGH, READ, LOW = 0.42, 0.2, 0.07    # ouverture/fiche ; lecture des cartes ; sous la parole
+HIGH, READ, LOW = 1.0, 0.53, 0.19    # ouverture/fiche ; lecture des cartes ; sous la parole
 
 starts = {}
 acc = 0.0

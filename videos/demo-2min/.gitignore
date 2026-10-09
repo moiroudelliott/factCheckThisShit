@@ -8,3 +8,6 @@ node_modules/
 .thumbnails/
 assets/stills/
 storyboard-v*.png
+# Musique Pixabay : licence sans redistribution du fichier seul
+assets/music/
+beats/

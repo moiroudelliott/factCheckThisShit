@@ -30,57 +30,68 @@ FONTS = """
 SCENES = [
     ("s01-volume", 5.0),
     ("s02-promesse", 5.0),
-    ("m03-faure", 22.0),
-    ("m04-bardella", 12.4),
-    ("m05-attal", 23.5),
-    ("m06-bompard", 20.8),
+    ("m03-faure", None),
+    ("m04-bardella", None),
+    ("m05-attal", None),
+    ("m06-bompard", None),
     ("s07-fiche", 16.0),
     ("s08-fin", 8.0),
 ]
 
 MOMENTS = {
     "m03-faure": dict(
-        src="leg-faure-meloni-3608.mp4", media_start=9.6, card_in=15.2, index=0, verdict="faux", tag="FAUX",
+        src="leg-faure-meloni-3608.mp4", media_start=10.85, card_in=13.9, hold=12.0, index=0, verdict="faux", tag="FAUX",
         who="Olivier Faure", ts="1:00:29",
         claim="Giorgia Meloni a régularisé 450 000 sans-papiers en Italie",
         body="Les 452 000 sont des entrées de travailleurs recrutés à l'étranger, autorisées par le décret « flussi » de 2023 pour 2023-2025 : pas une régularisation de sans-papiers. Une partie a servi de régularisation de fait, au moins 150 000 personnes selon le quotidien Avvenire.",
         source="Il Fatto Quotidiano", foot="✗ démenti · 85%", wipe_in=True,
-        speakers=[(0, "Olivier Faure"), (17.7, "Jordan Bardella")],
-        volume=[(0, 0), (0.5, 1), (15.8, 1), (16.3, 0.32), (21.4, 0.32), (22.0, 0)],
+        speakers=[(0, "Olivier Faure"), (16.4, "Jordan Bardella")],
     ),
     "m04-bardella": dict(
-        src="leg-bardella-essence-1346.mp4", media_start=14.1, card_in=5.7, index=1, verdict="partiel", tag="PARTIEL",
+        src="leg-bardella-essence-1346.mp4", media_start=14.1, card_in=5.7, hold=11.0, index=1, verdict="partiel", tag="PARTIEL",
         who="Jordan Bardella", ts="22:40",
         claim="Les taxes représentent 60 à 70 % du prix du carburant à la pompe",
         body="En 2024, l'accise et la TVA ont représenté en moyenne 54 % du prix du gazole et du SP95-E10, selon le ministère chargé de l'énergie : plus de la moitié du prix, mais moins que les 60 à 70 % annoncés.",
         source="Assemblée nationale", foot="≈ nuancé · 85%",
         speakers=[(0, "Jordan Bardella")], scrim="linear-gradient(90deg, rgba(0,0,0,0) 38%, rgba(0,0,0,0.62) 100%)",
-        # fondu avant « un tiers de taxes sur les factures d'énergie » (non montré)
-        volume=[(0, 0), (0.12, 1), (6.3, 1), (6.8, 0.32), (8.6, 0.32), (9.7, 0), (12.4, 0)],
     ),
     "m05-attal": dict(
-        src="leg-attal-binationaux-160.mp4", media_start=7.5, card_in=16.6, index=2, verdict="trompeur", tag="TROMPEUR",
+        src="leg-attal-binationaux-160.mp4", media_start=7.5, card_in=16.6, hold=14.0, duck_at=19.9, index=2, verdict="trompeur", tag="TROMPEUR",
         who="Gabriel Attal", ts="2:48",
         claim="Jordan Bardella présente les binationaux comme plus corruptibles et moins dignes de confiance pour occuper des postes à responsabilité",
         body="Le RN voulait réserver quelques dizaines d'emplois très sensibles (défense, nucléaire, renseignement) aux Français sans autre nationalité, au nom du risque d'ingérence étrangère. Jordan Bardella n'a pas dit que les binationaux étaient « plus corruptibles », et la mesure ne visait pas les postes à responsabilité en général.",
         source="Public Sénat", foot="⚠ trompeur · 80%",
         speakers=[(0, "Gabriel Attal"), (16.7, "Jordan Bardella"), (19.9, "Gabriel Attal")],
-        # la protestation de Bardella reste audible, puis le son baisse
-        volume=[(0, 0), (0.12, 1), (19.9, 1), (20.4, 0.32), (22.9, 0.32), (23.5, 0)],
     ),
     "m06-bompard": dict(
-        src="lci-bompard-decret-1890.mp4", media_start=14.4, card_in=14.1, index=3, verdict="vrai", tag="VRAI",
+        src="lci-bompard-decret-1890.mp4", media_start=14.4, card_in=14.1, hold=11.0, index=3, verdict="vrai", tag="VRAI",
         who="Manuel Bompard", ts="31:44",
         claim="Un décret du 22 février 2024 signé par Gabriel Attal a prévu 700 millions d'euros de coupes budgétaires dans l'enseignement scolaire",
         body="Le décret du 21 février 2024, publié le 22 et signé par Gabriel Attal, a annulé 10 milliards d'euros de crédits, dont 692 millions pour l'enseignement scolaire.",
         source="Légifrance", foot="✓ confirmé · 95%",
-        speakers=[(0, "Manuel Bompard"), (16.1, "Prisca Thévenot")],
+        speakers=[(0, "Manuel Bompard"), (16.1, "Prisca Thévenot"), (19.7, "Manuel Bompard")],
         # recadrage : le bandeau défilant de LCI (sans rapport) sort du cadre
         crop="transform: scale(1.17); transform-origin: 20% 0;",
-        volume=[(0, 0), (0.12, 1), (14.7, 1), (15.2, 0.32), (19.6, 0.32), (20.8, 0)],
         outro_to_fiche=True,
     ),
 }
+
+
+def moment_dur(m):
+    """Fin de lecture de la carte + sortie (et, pour le dernier moment, le passage vers la fiche)."""
+    end = m["card_in"] + 0.9 + m["hold"]
+    return round(end + (1.9 if m.get("outro_to_fiche") else 0.55), 2)
+
+
+def volume_points(m, dur):
+    """Son du débat : plein pendant la phrase, puis baissé sous la carte jusqu'à un murmure
+    (la suite du débat n'est pas vérifiée dans la vidéo)."""
+    fade_in = 0.5 if m.get("wipe_in") else 0.12
+    duck = m.get("duck_at", m["card_in"] + 0.6)
+    return [(0, 0), (fade_in, 1), (duck, 1), (round(duck + 0.5, 2), 0.25), (round(duck + 3.5, 2), 0.08), (round(dur - 0.5, 2), 0.08), (dur, 0)]
+
+
+SCENES = [(sid, dur if dur is not None else moment_dur(MOMENTS[sid])) for sid, dur in SCENES]
 
 
 def esc(s):
@@ -98,14 +109,14 @@ def dots_html(sid, index):
 
 def moment_html(sid, dur, m):
     v = m["verdict"]
-    automation = json.dumps({"version": 1, "lanes": [{"target": "volume", "points": [{"t": t, "v": val} for t, val in m["volume"]]}]})
+    automation = json.dumps({"version": 1, "lanes": [{"target": "volume", "points": [{"t": t, "v": val} for t, val in volume_points(m, dur)]}]})
     p = f'[data-composition-id="{sid}"]'
     crop = m.get("crop", "")
     wipe = f'<div class="wipe" id="{sid}-wipe" data-layout-allow-overflow></div>' if m.get("wipe_in") else ""
     outro = f'<div class="wipe-out" id="{sid}-wipeout" data-layout-allow-overflow></div>' if m.get("outro_to_fiche") else ""
     ci = m["card_in"]
     resolve = ci + 0.9
-    card_out = dur - 0.55 if not m.get("outro_to_fiche") else dur - 1.9
+    card_out = round(resolve + m["hold"], 2)
     reps = lambda cycle: max(0, int(dur // cycle) - 1)
     js_outro = ""
     if m.get("outro_to_fiche"):
@@ -433,9 +444,61 @@ t = 0.0
 slots = []
 for sid, dur in SCENES:
     slots.append(f"""      <div id="el-{sid}" data-composition-id="{sid}" data-composition-src="compositions/{sid}.html"
-        data-start="{t:.1f}" data-duration="{dur}" data-track-index="1" data-width="1920" data-height="1080"></div>""")
+        data-start="{t:.2f}" data-duration="{dur}" data-track-index="1" data-width="1920" data-height="1080"></div>""")
     t = round(t + dur, 2)
 total = t
+
+# ── Musique : « Jungle Waves » (dimmysad, Pixabay, licence Pixabay) ─────────
+# 176 BPM, drop à 13,092 s dans le morceau. Morceau A : le drop tombe à 10 s,
+# sur l'ouverture du premier extrait. Morceau B : reprise 8 mesures plus tôt
+# (32 temps = 10,918 s), sous la parole de Faure, pour que la vraie fin du
+# morceau accompagne l'écran final.
+MUSIC_SRC = "assets/music/jungle-waves.mp3"
+SPLICE = 22.283                      # temps vidéo du raccord
+PIECES = [(0.0, 3.092, SPLICE), (SPLICE, 14.457, total)]   # (début vidéo, début morceau, fin vidéo)
+HIGH, READ, LOW = 0.42, 0.2, 0.07    # ouverture/fiche ; lecture des cartes ; sous la parole
+
+starts = {}
+acc = 0.0
+for sid, dur in SCENES:
+    starts[sid] = acc
+    acc = round(acc + dur, 2)
+env = [(0.0, 0.0), (0.8, HIGH), (10.0, HIGH), (10.5, LOW)]
+moment_ids = [sid for sid, _ in SCENES if sid in MOMENTS]
+for i, sid in enumerate(moment_ids):
+    m, t0 = MOMENTS[sid], starts[sid]
+    duck = t0 + m.get("duck_at", m["card_in"] + 0.6)
+    env += [(round(duck, 2), LOW), (round(duck + 1.0, 2), READ)]
+    if i + 1 < len(moment_ids):
+        nxt = starts[moment_ids[i + 1]]
+        env += [(round(nxt - 0.25, 2), READ), (round(nxt, 2), LOW)]
+    else:
+        card_out = t0 + m["card_in"] + 0.9 + m["hold"]
+        env += [(round(card_out, 2), READ), (round(starts["s07-fiche"], 2), HIGH)]
+env += [(round(total - 3.4, 2), HIGH), (total, 0.0)]
+
+
+def env_at(t):
+    for (a, va), (b, vb) in zip(env, env[1:]):
+        if a <= t <= b:
+            return va if b == a else va + (vb - va) * (t - a) / (b - a)
+    return env[-1][1]
+
+
+audio_tags = []
+for n, (v0, m0, v1) in enumerate(PIECES):
+    pts = [(0.0, round(env_at(v0), 3))] + [(round(t - v0, 3), v) for t, v in env if v0 < t < v1] + [(round(v1 - v0, 3), round(env_at(v1), 3))]
+    # raccord sans clic : 40 ms de fondu de part et d'autre
+    if n > 0:
+        pts[0] = (0.0, 0.0)
+        pts.insert(1, (0.04, round(env_at(v0 + 0.04), 3)))
+    if n < len(PIECES) - 1:
+        pts[-1] = (round(v1 - v0, 3), 0.0)
+        pts.insert(-1, (round(v1 - v0 - 0.04, 3), round(env_at(v1 - 0.04), 3)))
+    lane = json.dumps({"version": 1, "lanes": [{"target": "volume", "points": [{"t": t, "v": v} for t, v in pts]}]})
+    audio_tags.append(f"""      <audio id="bgm-{n}" src="{MUSIC_SRC}" data-start="{v0:.3f}" data-duration="{v1 - v0:.3f}" data-media-start="{m0}"
+        data-track-index="{10 + n}" data-automation='{lane}'></audio>""")
+
 index = f"""<!doctype html>
 <html lang="fr">
   <head>
@@ -453,6 +516,7 @@ index = f"""<!doctype html>
   <body>
     <div id="root" data-composition-id="main" data-start="0" data-duration="{total}" data-width="1920" data-height="1080">
 {chr(10).join(slots)}
+{chr(10).join(audio_tags)}
     </div>
     <script>
       window.__timelines["main"] = gsap.timeline({{ paused: true }});

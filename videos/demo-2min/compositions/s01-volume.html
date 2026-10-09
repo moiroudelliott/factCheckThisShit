@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head><meta charset="UTF-8"></head>
+<body>
+<template id="s01-volume-template">
+<div data-hf-id="hf-a0st" data-composition-id="s01-volume" data-width="1920" data-height="1080" data-duration="5.0">
+<style>
+
+@font-face { font-family: 'SRC Archivo'; font-style: normal; font-weight: 100 900; src: url('assets/fonts/archivo-latin.woff2') format('woff2'); }
+@font-face { font-family: 'SRC Newsreader'; font-style: normal; font-weight: 200 800; src: url('assets/fonts/newsreader-latin.woff2') format('woff2'); }
+@font-face { font-family: 'SRC Newsreader'; font-style: italic; font-weight: 200 800; src: url('assets/fonts/newsreader-italic-latin.woff2') format('woff2'); }
+@font-face { font-family: 'SRC Plex Mono'; font-style: normal; font-weight: 400; src: url('assets/fonts/ibm-plex-mono-400-latin.woff2') format('woff2'); }
+@font-face { font-family: 'SRC Plex Mono'; font-style: normal; font-weight: 500; src: url('assets/fonts/ibm-plex-mono-500-latin.woff2') format('woff2'); }
+
+[data-composition-id="s01-volume"] { position: absolute; inset: 0; overflow: hidden; background: #ffffff; color: #1c1c1c; font-family: 'SRC Archivo', sans-serif; }
+[data-composition-id="s01-volume"] .abs { position: absolute; }
+[data-composition-id="s01-volume"] .mono { font-family: 'SRC Plex Mono', monospace; font-size: 22px; letter-spacing: 0.12em; text-transform: uppercase; color: #5e5e5e; }
+[data-composition-id="s01-volume"] .wordmark { font-family: 'SRC Newsreader', serif; font-style: italic; font-weight: 500; color: #1c1c1c; line-height: 1; }
+[data-composition-id="s01-volume"] .wordmark b { font-weight: 500; color: #a3172c; }
+[data-composition-id="s01-volume"] .rule { display: block; background: #a3172c; transform-origin: 0 50%; }
+[data-composition-id="s01-volume"] .big { left: 128px; top: 210px; font-weight: 800; font-size: 430px; line-height: 0.9; letter-spacing: -0.04em; font-variant-numeric: tabular-nums; }
+[data-composition-id="s01-volume"] .line { left: 140px; top: 680px; font-size: 46px; }
+[data-composition-id="s01-volume"] .q { left: 140px; top: 770px; font-family: 'SRC Newsreader', serif; font-style: italic; font-size: 72px; color: #a3172c; }
+</style>
+<div data-hf-id="hf-pnyj" class="abs mono" id="s01-label" style="left:140px; top:150px;">Débat des législatives · France 2 · 27 juin 2024</div>
+<div data-hf-id="hf-82zi" class="abs big" id="s01-num">195</div>
+<span data-hf-id="hf-noro" class="abs rule" id="s01-rule" style="left:140px; top:640px; width:220px; height:4px;"></span>
+<div data-hf-id="hf-rb8u" class="abs line" id="s01-line">affirmations vérifiées en un seul débat de 1 h 58.</div>
+<div data-hf-id="hf-vwjh" class="abs q" id="s01-q">Qui a le temps de tout vérifier ?</div>
+<script>
+(function () {
+  const tl = gsap.timeline({ paused: true });
+  const num = document.getElementById('s01-num');
+  const counter = { v: 0 };
+  tl.fromTo('#s01-label', { opacity: 0, y: 10 }, { opacity: 1, y: 0, duration: 0.45, ease: 'power2.out' }, 0.15);
+  tl.fromTo('#s01-num', { opacity: 0 }, { opacity: 1, duration: 0.3 }, 0.3);
+  tl.fromTo(counter, { v: 0 }, { v: 195, duration: 1.2, ease: 'power2.out', onUpdate: () => { num.textContent = String(Math.round(counter.v)); } }, 0.3);
+  tl.fromTo('#s01-rule', { scaleX: 0 }, { scaleX: 1, duration: 0.5, ease: 'power3.out' }, 1.45);
+  tl.fromTo('#s01-line', { opacity: 0, x: -16 }, { opacity: 1, x: 0, duration: 0.5, ease: 'power3.out' }, 1.6);
+  tl.fromTo('#s01-q', { opacity: 0, y: 18 }, { opacity: 1, y: 0, duration: 0.6, ease: 'power3.out' }, 2.4);
+  window.__timelines['s01-volume'] = tl;
+})();
+</script>
+</div>
+</template>
+</body>
+</html>

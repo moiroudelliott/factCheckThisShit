@@ -1,0 +1,10 @@
+# Extraits de France 2 et LCI : ne pas publier les images des chaînes
+assets/clips/
+snapshots/
+renders/
+.hyperframes/
+node_modules/
+*.mp4
+.thumbnails/
+assets/stills/
+storyboard-v*.png

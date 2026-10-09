@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head><meta charset="UTF-8"></head>
+<body>
+<template id="s02-promesse-template">
+<div data-hf-id="hf-uu3y" data-composition-id="s02-promesse" data-width="1920" data-height="1080" data-duration="5.0">
+<style>
+
+@font-face { font-family: 'SRC Archivo'; font-style: normal; font-weight: 100 900; src: url('assets/fonts/archivo-latin.woff2') format('woff2'); }
+@font-face { font-family: 'SRC Newsreader'; font-style: normal; font-weight: 200 800; src: url('assets/fonts/newsreader-latin.woff2') format('woff2'); }
+@font-face { font-family: 'SRC Newsreader'; font-style: italic; font-weight: 200 800; src: url('assets/fonts/newsreader-italic-latin.woff2') format('woff2'); }
+@font-face { font-family: 'SRC Plex Mono'; font-style: normal; font-weight: 400; src: url('assets/fonts/ibm-plex-mono-400-latin.woff2') format('woff2'); }
+@font-face { font-family: 'SRC Plex Mono'; font-style: normal; font-weight: 500; src: url('assets/fonts/ibm-plex-mono-500-latin.woff2') format('woff2'); }
+
+[data-composition-id="s02-promesse"] { position: absolute; inset: 0; overflow: hidden; background: #ffffff; color: #1c1c1c; font-family: 'SRC Archivo', sans-serif; }
+[data-composition-id="s02-promesse"] .abs { position: absolute; }
+[data-composition-id="s02-promesse"] .mono { font-family: 'SRC Plex Mono', monospace; font-size: 22px; letter-spacing: 0.12em; text-transform: uppercase; color: #5e5e5e; }
+[data-composition-id="s02-promesse"] .wordmark { font-family: 'SRC Newsreader', serif; font-style: italic; font-weight: 500; color: #1c1c1c; line-height: 1; }
+[data-composition-id="s02-promesse"] .wordmark b { font-weight: 500; color: #a3172c; }
+[data-composition-id="s02-promesse"] .rule { display: block; background: #a3172c; transform-origin: 0 50%; }
+[data-composition-id="s02-promesse"] .wm { left: 140px; top: 190px; font-size: 190px; }
+[data-composition-id="s02-promesse"] .phrase { left: 146px; top: 470px; width: 1300px; font-family: 'SRC Newsreader', serif; font-size: 64px; line-height: 1.2; }
+[data-composition-id="s02-promesse"] .steps { left: 146px; top: 760px; display: flex; gap: 28px; align-items: center; }
+[data-composition-id="s02-promesse"] .steps .st { color: #1c1c1c; }
+[data-composition-id="s02-promesse"] .steps .ar { color: #a3172c; }
+[data-composition-id="s02-promesse"] .content { position: absolute; inset: 0; }
+</style>
+<div data-hf-id="hf-v2a2" class="content" id="s02-content">
+<div data-hf-id="hf-1xtp" class="abs wordmark wm" id="s02-wm">SOURC<b data-hf-id="hf-ry2s">É</b></div>
+<div data-hf-id="hf-lide" class="abs phrase" id="s02-phrase">Chaque affirmation vérifiée en direct, sources à l'appui, sur la vidéo.</div>
+<div data-hf-id="hf-wsuc" class="abs mono steps"><span data-hf-id="hf-xsvg" class="st" id="s02-st0">01 Transcription</span><span data-hf-id="hf-tbbb" class="ar" id="s02-ar0">→</span><span data-hf-id="hf-bekb" class="st" id="s02-st1">02 Recherche des sources</span><span data-hf-id="hf-7yo4" class="ar" id="s02-ar1">→</span><span data-hf-id="hf-ju7l" class="st" id="s02-st2">03 Verdict</span></div>
+<span data-hf-id="hf-vwga" class="abs rule" id="s02-rule" style="left:146px; top:820px; width:1100px; height:2px; background:#e2e0da;"></span>
+</div>
+<script>
+(function () {
+  const tl = gsap.timeline({ paused: true });
+  tl.fromTo('#s02-wm', { clipPath: 'inset(-40% 100% -40% -5%)' }, { clipPath: 'inset(-40% -10% -40% -5%)', duration: 0.7, ease: 'power3.inOut' }, 0.15);
+  tl.fromTo('#s02-phrase', { opacity: 0, y: 14 }, { opacity: 1, y: 0, duration: 0.6, ease: 'power3.out' }, 0.9);
+  tl.fromTo('#s02-rule', { scaleX: 0 }, { scaleX: 1, duration: 0.8, ease: 'power2.out' }, 1.6);
+  ['#s02-st0', '#s02-ar0', '#s02-st1', '#s02-ar1', '#s02-st2'].forEach((sel, i) => {
+    tl.fromTo(sel, { opacity: 0, x: 12 }, { opacity: 1, x: 0, duration: 0.35, ease: 'power2.out' }, 1.75 + i * 0.12);
+  });
+  tl.to('#s02-content', { opacity: 0, duration: 0.4, ease: 'power1.in' }, 4.55);
+  window.__timelines['s02-promesse'] = tl;
+})();
+</script>
+</div>
+</template>
+</body>
+</html>

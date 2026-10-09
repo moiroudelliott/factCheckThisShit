@@ -1,0 +1,284 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Démo SOURCÉ — storyboard v3</title>
+<style>
+  @font-face { font-family: 'Newsreader'; font-style: normal; font-weight: 400 600; src: url('assets/fonts/newsreader-latin.woff2') format('woff2'); }
+  @font-face { font-family: 'Newsreader'; font-style: italic; font-weight: 400 500; src: url('assets/fonts/newsreader-italic-latin.woff2') format('woff2'); }
+  @font-face { font-family: 'Archivo'; font-style: normal; font-weight: 400 900; src: url('assets/fonts/archivo-latin.woff2') format('woff2'); }
+  @font-face { font-family: 'Plex Mono'; font-style: normal; font-weight: 400; src: url('assets/fonts/ibm-plex-mono-400-latin.woff2') format('woff2'); }
+  @font-face { font-family: 'Plex Mono'; font-style: normal; font-weight: 500; src: url('assets/fonts/ibm-plex-mono-500-latin.woff2') format('woff2'); }
+
+  :root {
+    --paper: #ffffff; --surface: #f6f5f1; --ink: #1c1c1c; --muted: #5e5e5e; --rule: #e2e0da; --red: #a3172c;
+    --v-vrai: oklch(0.74 0.13 145); --v-partiel: oklch(0.76 0.14 90); --v-trompeur: oklch(0.78 0.14 75); --v-faux: oklch(0.62 0.20 25);
+    --serif: 'Newsreader', Georgia, serif; --sans: 'Archivo', system-ui, sans-serif; --mono: 'Plex Mono', ui-monospace, monospace;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #ecebe6; color: var(--ink); font-family: var(--sans); }
+  header.sheet { max-width: 1680px; margin: 0 auto; padding: 40px 32px 8px; display: flex; align-items: baseline; gap: 24px; flex-wrap: wrap; }
+  header.sheet h1 { font-family: var(--serif); font-weight: 500; font-size: 34px; margin: 0; }
+  header.sheet h1 i { color: var(--red); font-style: italic; }
+  header.sheet .dek { color: var(--muted); font-size: 16px; }
+  header.sheet .tag { font-family: var(--mono); font-size: 13px; background: var(--ink); color: #fff; padding: 4px 10px; border-radius: 4px; }
+  .act { max-width: 1680px; margin: 24px auto 0; padding: 0 32px; font-family: var(--mono); font-size: 13px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); border-bottom: 1px solid #cfccc4; padding-bottom: 6px; }
+  main { max-width: 1680px; margin: 0 auto; padding: 16px 32px 60px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 28px 24px; }
+  figure { margin: 0; }
+  .frame { position: relative; aspect-ratio: 16 / 9; container-type: inline-size; overflow: hidden; background: var(--paper); border-radius: 6px; box-shadow: 0 1px 0 rgba(0,0,0,.08), 0 8px 24px rgba(0,0,0,.08); --px: calc(100cqw / 1920); }
+  .label { display: flex; justify-content: space-between; font-family: var(--mono); font-size: 12px; margin-top: 10px; color: var(--ink); }
+  .label span:last-child { color: var(--muted); }
+  .note { font-size: 13.5px; line-height: 1.5; color: #3a3a3a; margin: 6px 0 0; }
+  .seam { display: inline-block; margin-top: 8px; font-family: var(--mono); font-size: 11px; padding: 2px 8px; border-radius: 999px; border: 1px solid #b9b5ab; color: var(--muted); }
+
+  /* ── Registre « site » ── */
+  .paper { position: absolute; inset: 0; background: var(--paper); }
+  .mono-label { font-family: var(--mono); font-size: calc(var(--px) * 22); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+  .wordmark { font-family: var(--serif); font-style: italic; font-weight: 500; color: var(--ink); }
+  .wordmark b { font-weight: 500; color: var(--red); }
+  .rule { position: absolute; height: calc(var(--px) * 4); background: var(--red); }
+
+  /* ── Registre « extension » (repris de extension/overlay.css, ×1,7) ── */
+  .still { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+  .scrim { position: absolute; inset: 0; background: linear-gradient(90deg, rgba(0,0,0,0) 55%, rgba(0,0,0,.28) 100%); }
+  .chip { position: absolute; top: calc(var(--px) * 24); right: calc(var(--px) * 24); height: calc(var(--px) * 64); display: flex; align-items: center; gap: calc(var(--px) * 15); padding: 0 calc(var(--px) * 22); border-radius: 999px; background: rgba(16,18,22,.65); border: calc(var(--px) * 2) solid rgba(255,255,255,.12); color: #fff; }
+  .chip .ping { width: calc(var(--px) * 14); height: calc(var(--px) * 14); border-radius: 50%; background: oklch(0.74 0.13 145); box-shadow: 0 0 0 calc(var(--px) * 6) oklch(0.74 0.13 145 / .25); }
+  .chip .brand { font-family: var(--serif); font-style: italic; font-weight: 500; font-size: calc(var(--px) * 25); }
+  .chip .brand b { font-weight: 500; color: #e0324f; }
+  .chip .sub { font-size: calc(var(--px) * 19); color: rgba(255,255,255,.7); }
+  .badge { position: absolute; top: calc(var(--px) * 24); left: calc(var(--px) * 24); display: flex; align-items: flex-end; gap: calc(var(--px) * 15); padding: calc(var(--px) * 17) calc(var(--px) * 24) calc(var(--px) * 17) calc(var(--px) * 20); border-radius: 999px; background: rgba(16,18,22,.65); border: calc(var(--px) * 2) solid rgba(255,255,255,.12); color: rgba(255,255,255,.94); font-weight: 600; font-size: calc(var(--px) * 22); }
+  .eq { display: flex; align-items: flex-end; gap: calc(var(--px) * 4); height: calc(var(--px) * 20); }
+  .eq i { width: calc(var(--px) * 5); border-radius: 2px; background: #e0324f; }
+  .eq i:nth-child(1) { height: 45%; } .eq i:nth-child(2) { height: 100%; } .eq i:nth-child(3) { height: 65%; }
+  .dots { position: absolute; top: calc(var(--px) * 112); left: calc(var(--px) * 24); display: flex; align-items: center; gap: calc(var(--px) * 10); padding: calc(var(--px) * 11) calc(var(--px) * 18); border-radius: 999px; background: rgba(16,18,22,.65); border: calc(var(--px) * 2) solid rgba(255,255,255,.12); font-family: var(--mono); font-size: calc(var(--px) * 17); color: rgba(255,255,255,.7); }
+  .dots i { width: calc(var(--px) * 16); height: calc(var(--px) * 16); border-radius: 50%; border: calc(var(--px) * 2) solid rgba(255,255,255,.35); }
+  .dots i.on { border: none; }
+  .ctx { position: absolute; left: calc(var(--px) * 24); bottom: calc(var(--px) * 24); font-family: var(--mono); font-size: calc(var(--px) * 18); color: rgba(255,255,255,.85); background: rgba(16,18,22,.6); padding: calc(var(--px) * 6) calc(var(--px) * 12); border-radius: calc(var(--px) * 6); }
+
+  .card { position: absolute; top: calc(var(--px) * 104); right: calc(var(--px) * 24); width: calc(var(--px) * 640); border-radius: calc(var(--px) * 27); overflow: hidden; background: linear-gradient(180deg, rgba(22,24,29,.88), rgba(15,16,20,.86)); border: calc(var(--px) * 2) solid rgba(255,255,255,.1); box-shadow: 0 calc(var(--px) * 40) calc(var(--px) * 110) rgba(0,0,0,.55), 0 calc(var(--px) * 12) calc(var(--px) * 60) color-mix(in oklch, var(--accent) 16%, transparent); color: rgba(255,255,255,.95); }
+  .card.left { right: auto; left: calc(var(--px) * 24); top: calc(var(--px) * 180); }
+  .card .bar { height: calc(var(--px) * 5); background: var(--accent); }
+  .card .inner { padding: calc(var(--px) * 26) calc(var(--px) * 32) calc(var(--px) * 28); }
+  .card .head { display: flex; justify-content: space-between; align-items: center; margin-bottom: calc(var(--px) * 20); }
+  .card .cbrand { font-family: var(--serif); font-style: italic; font-weight: 500; font-size: calc(var(--px) * 23); color: rgba(255,255,255,.8); }
+  .card .cbrand .d { color: var(--accent); font-size: calc(var(--px) * 15); margin-right: calc(var(--px) * 8); font-style: normal; }
+  .card .cbrand b { font-weight: 500; color: var(--accent); }
+  .card .tag { display: inline-flex; align-items: center; gap: calc(var(--px) * 11); padding: calc(var(--px) * 7) calc(var(--px) * 17) calc(var(--px) * 7) calc(var(--px) * 15); border-radius: 999px; background: color-mix(in oklch, var(--accent) 15%, transparent); border: calc(var(--px) * 2) solid color-mix(in oklch, var(--accent) 42%, transparent); color: var(--accent); font-weight: 700; font-size: calc(var(--px) * 18); letter-spacing: .08em; }
+  .card .tag i { width: calc(var(--px) * 10); height: calc(var(--px) * 10); border-radius: 50%; background: var(--accent); }
+  .card .meta { display: flex; justify-content: space-between; align-items: center; margin-bottom: calc(var(--px) * 9); }
+  .card .who { font-size: calc(var(--px) * 18); font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); }
+  .card .ts { font-family: var(--mono); font-size: calc(var(--px) * 17); color: rgba(255,255,255,.7); border: calc(var(--px) * 2) solid rgba(255,255,255,.12); background: rgba(255,255,255,.07); border-radius: calc(var(--px) * 8); padding: calc(var(--px) * 2) calc(var(--px) * 10); }
+  .card .claim { font-family: var(--serif); font-style: italic; font-size: calc(var(--px) * 32); line-height: 1.32; margin: 0 0 calc(var(--px) * 20); }
+  .card .body { font-size: calc(var(--px) * 22); line-height: 1.5; color: rgba(255,255,255,.78); margin: 0; }
+  .card .foot { display: flex; justify-content: space-between; gap: calc(var(--px) * 16); margin-top: calc(var(--px) * 20); padding-top: calc(var(--px) * 20); border-top: calc(var(--px) * 2) solid rgba(255,255,255,.09); font-size: calc(var(--px) * 18); }
+  .card .src { font-family: var(--mono); color: rgba(255,255,255,.65); border-bottom: 1px dotted rgba(255,255,255,.35); white-space: nowrap; }
+  .card .verdict { color: var(--accent); font-weight: 500; white-space: nowrap; }
+  .vrai { --accent: var(--v-vrai); } .partiel { --accent: var(--v-partiel); } .trompeur { --accent: var(--v-trompeur); } .faux { --accent: var(--v-faux); }
+
+  /* Fiche */
+  .shot { position: absolute; border-radius: calc(var(--px) * 14); box-shadow: 0 calc(var(--px) * 30) calc(var(--px) * 80) rgba(28,28,28,.18), 0 0 0 calc(var(--px) * 2) var(--rule); overflow: hidden; }
+  .shot img { display: block; width: 100%; }
+  .callout { position: absolute; display: flex; align-items: center; gap: calc(var(--px) * 12); font-family: var(--mono); font-size: calc(var(--px) * 20); color: #fff; background: var(--red); padding: calc(var(--px) * 8) calc(var(--px) * 16); border-radius: calc(var(--px) * 6); letter-spacing: .04em; }
+
+  /* Cellules de fin */
+  .seams { display: flex; flex-direction: column; justify-content: center; gap: 10px; padding: 18px 22px; background: var(--surface); }
+  .seams .row { display: grid; grid-template-columns: 54px 1fr; align-items: center; font-family: var(--mono); font-size: 12px; }
+  .seams .row b { font-weight: 500; color: var(--red); }
+  .tokens { padding: 18px 22px; background: var(--surface); font-size: 12.5px; line-height: 1.5; }
+  .sw { display: inline-flex; align-items: center; gap: 6px; margin: 0 10px 6px 0; font-family: var(--mono); font-size: 11px; }
+  .sw i { width: 16px; height: 16px; border-radius: 3px; border: 1px solid rgba(0,0,0,.1); }
+  @media (max-width: 1100px) { main { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+
+<header class="sheet">
+  <h1>Démo <i>SOURCÉ</i> — storyboard v3</h1>
+  <span class="dek">Quatre moments, quatre politiques, quatre verdicts : faux, partiellement vrai, trompeur, vrai.</span>
+  <span class="tag">1920×1080 · 113 s · 8 plans</span>
+</header>
+
+<div class="act">Ouverture — le problème, la promesse</div>
+<main>
+
+  <!-- 01 -->
+  <figure>
+    <div class="frame" id="frame-01">
+      <div class="paper"></div>
+      <div class="mono-label" style="position:absolute; left:calc(var(--px)*140); top:calc(var(--px)*150)">Débat des législatives · France 2 · 27 juin 2024</div>
+      <div style="position:absolute; left:calc(var(--px)*128); top:calc(var(--px)*220); font-family:var(--sans); font-weight:800; font-size:calc(var(--px)*430); line-height:.9; letter-spacing:-.04em; color:var(--ink)">195</div>
+      <div class="rule" style="left:calc(var(--px)*140); top:calc(var(--px)*640); width:calc(var(--px)*220)"></div>
+      <div style="position:absolute; left:calc(var(--px)*140); top:calc(var(--px)*680); font-family:var(--sans); font-size:calc(var(--px)*46); color:var(--ink)">affirmations vérifiées en un seul débat de 1 h 58.</div>
+      <div style="position:absolute; left:calc(var(--px)*140); top:calc(var(--px)*770); font-family:var(--serif); font-style:italic; font-size:calc(var(--px)*70); color:var(--red)">Qui a le temps de tout vérifier ?</div>
+    </div>
+    <div class="label"><span>01 · LE VOLUME</span><span>frame-01 · 0:00–0:05</span></div>
+    <p class="note"><b>Le « 195 » compte de 0 à 195</b> en 1,2 s puis se fige ; la ligne rouge se trace, la question arrive en dernier. Rien d'autre ne bouge.</p>
+    <span class="seam">entrée : coupe</span>
+  </figure>
+
+  <!-- 02 -->
+  <figure>
+    <div class="frame" id="frame-02">
+      <div class="paper"></div>
+      <div class="wordmark" style="position:absolute; left:calc(var(--px)*140); top:calc(var(--px)*190); font-size:calc(var(--px)*190)">SOURC<b>É</b></div>
+      <div style="position:absolute; left:calc(var(--px)*146); top:calc(var(--px)*470); width:calc(var(--px)*1300); font-family:var(--serif); font-size:calc(var(--px)*64); line-height:1.2; color:var(--ink)">Chaque affirmation vérifiée en direct, sources à l'appui, sur la vidéo.</div>
+      <div style="position:absolute; left:calc(var(--px)*146); top:calc(var(--px)*760); display:flex; gap:calc(var(--px)*28); align-items:center" class="mono-label">
+        <span style="color:var(--ink)">01 Transcription</span><span style="color:var(--red)">→</span>
+        <span style="color:var(--ink)">02 Recherche des sources</span><span style="color:var(--red)">→</span>
+        <span style="color:var(--ink)">03 Verdict</span>
+      </div>
+      <div class="rule" style="left:calc(var(--px)*146); top:calc(var(--px)*820); width:calc(var(--px)*1100); height:calc(var(--px)*2); background:var(--rule)"></div>
+    </div>
+    <div class="label"><span>02 · LA PROMESSE</span><span>frame-02 · 0:05–0:10</span></div>
+    <p class="note"><b>La marque entre en premier</b>, la phrase suit, puis les trois étapes s'allument de gauche à droite. <b>Sortie</b> : le blanc se retire vers la gauche et découvre le premier débat.</p>
+    <span class="seam">entrée : volet ←</span>
+  </figure>
+
+  <figure>
+    <div class="frame" id="frame-03">
+      <img class="still" src="assets/stills/03-faure-meloni.jpg" alt="">
+      <div class="scrim"></div>
+      <div class="badge"><span class="eq"><i></i><i></i><i></i></span>Olivier Faure</div>
+      <div class="dots"><i class="on" style="background:var(--v-faux)"></i><i></i><i></i><i></i></div>
+      <div class="chip"><span class="ping"></span><span class="brand">SOURC<b>É</b></span><span class="sub">analyse en direct</span></div>
+      <div class="card faux">
+        <div class="bar"></div>
+        <div class="inner">
+          <div class="head"><span class="cbrand"><span class="d">◆</span>SOURC<b>É</b></span><span class="tag"><i></i>FAUX</span></div>
+          <div class="meta"><span class="who">Olivier Faure</span><span class="ts">▶ 1:00:29</span></div>
+          <p class="claim">« Giorgia Meloni a régularisé 450 000 sans-papiers en Italie »</p>
+          <p class="body">Les 452 000 sont des entrées de travailleurs recrutés à l'étranger, autorisées par le décret « flussi » de 2023 pour 2023-2025 : pas une régularisation de sans-papiers. Une partie a servi de régularisation de fait, au moins 150 000 personnes selon le quotidien Avvenire.</p>
+          <div class="foot"><span class="src">Il Fatto Quotidiano ↗</span><span class="verdict" style="color:oklch(0.72 0.16 28)">✗ démenti · 85%</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="label"><span>03 · FAURE, MELONI</span><span>frame-03 · 0:10–0:32</span></div>
+    <p class="note"><b>« Mme Meloni, qui est votre amie en Italie, qu'est-ce qu'elle a fait ? […] Elle a régularisé 450 000 sans-papiers. »</b> La carte entre au mot « sans-papiers », tourne 0,9 s (« Recoupement des sources… ») puis vire au rouge ; première pastille. Le son baisse sous la carte.</p>
+    <span class="seam">entrée : volet ← (le blanc découvre l'image)</span>
+  </figure>
+  <figure>
+    <div class="frame" id="frame-04">
+      <img class="still" src="assets/stills/04-bardella-essence.jpg" alt="">
+      <div class="scrim"></div>
+      <div class="badge"><span class="eq"><i></i><i></i><i></i></span>Jordan Bardella</div>
+      <div class="dots"><i class="on" style="background:var(--v-faux)"></i><i class="on" style="background:var(--v-partiel)"></i><i></i><i></i></div>
+      <div class="chip"><span class="ping"></span><span class="brand">SOURC<b>É</b></span><span class="sub">analyse en direct</span></div>
+      <div class="card partiel">
+        <div class="bar"></div>
+        <div class="inner">
+          <div class="head"><span class="cbrand"><span class="d">◆</span>SOURC<b>É</b></span><span class="tag"><i></i>PARTIEL</span></div>
+          <div class="meta"><span class="who">Jordan Bardella</span><span class="ts">▶ 22:40</span></div>
+          <p class="claim">« Les taxes représentent 60 à 70 % du prix du carburant à la pompe »</p>
+          <p class="body">En 2024, l'accise et la TVA ont représenté en moyenne 54 % du prix du gazole et du SP95-E10, selon le ministère chargé de l'énergie : plus de la moitié du prix, mais moins que les 60 à 70 % annoncés.</p>
+          <div class="foot"><span class="src">Assemblée nationale (réponse du ministère) ↗</span><span class="verdict">≈ nuancé · 85%</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="label"><span>04 · BARDELLA, L'ESSENCE</span><span>frame-04 · 0:32–0:44</span></div>
+    <p class="note"><b>« Quand on a par exemple 60 à 70 % de taxes sur le carburant lorsqu'on va mettre de l'essence dans sa voiture… »</b> Carte au mot « voiture », jaune. Le son se coupe en fondu avant la phrase suivante.</p>
+    <span class="seam">entrée : coupe</span>
+  </figure>
+  <figure>
+    <div class="frame" id="frame-05">
+      <img class="still" src="assets/stills/05-attal-binationaux.jpg" alt="">
+      <div class="scrim"></div>
+      <div class="badge"><span class="eq"><i></i><i></i><i></i></span>Gabriel Attal</div>
+      <div class="dots"><i class="on" style="background:var(--v-faux)"></i><i class="on" style="background:var(--v-partiel)"></i><i class="on" style="background:var(--v-trompeur)"></i><i></i></div>
+      <div class="chip"><span class="ping"></span><span class="brand">SOURC<b>É</b></span><span class="sub">analyse en direct</span></div>
+      <div class="card trompeur">
+        <div class="bar"></div>
+        <div class="inner">
+          <div class="head"><span class="cbrand"><span class="d">◆</span>SOURC<b>É</b></span><span class="tag"><i></i>TROMPEUR</span></div>
+          <div class="meta"><span class="who">Gabriel Attal</span><span class="ts">▶ 2:48</span></div>
+          <p class="claim">« Jordan Bardella présente les binationaux comme plus corruptibles et moins dignes de confiance pour occuper des postes à responsabilité »</p>
+          <p class="body">Le RN voulait réserver quelques dizaines d'emplois très sensibles (défense, nucléaire, renseignement) aux Français sans autre nationalité, au nom du risque d'ingérence étrangère. Jordan Bardella n'a pas dit que les binationaux étaient « plus corruptibles », et la mesure ne visait pas les postes à responsabilité en général.</p>
+          <div class="foot"><span class="src">Public Sénat ↗</span><span class="verdict">⚠ trompeur · 80%</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="label"><span>05 · ATTAL, LES BINATIONAUX</span><span>frame-05 · 0:44–1:08</span></div>
+    <p class="note"><b>Phrase entière</b> : « …quand on propose dans son programme de stigmatiser 3,5 millions de Français binationaux […] vous indiquez en réalité qu'ils sont plus corruptibles que d'autres… ». La carte arrive pendant que <b>Bardella proteste en direct</b> (« Je n'ai jamais dit ça, vous mentez »).</p>
+    <span class="seam">entrée : coupe</span>
+  </figure>
+  <figure>
+    <div class="frame" id="frame-06">
+      <img class="still" src="assets/stills/06-bompard-decret.jpg" alt="" style="transform:scale(1.17); transform-origin:20% 0">
+      <div class="scrim"></div>
+      <div class="badge"><span class="eq"><i></i><i></i><i></i></span>Manuel Bompard</div>
+      <div class="dots"><i class="on" style="background:var(--v-faux)"></i><i class="on" style="background:var(--v-partiel)"></i><i class="on" style="background:var(--v-trompeur)"></i><i class="on" style="background:var(--v-vrai)"></i></div>
+      <div class="chip"><span class="ping"></span><span class="brand">SOURC<b>É</b></span><span class="sub">analyse en direct</span></div>
+      <div class="card vrai">
+        <div class="bar"></div>
+        <div class="inner">
+          <div class="head"><span class="cbrand"><span class="d">◆</span>SOURC<b>É</b></span><span class="tag"><i></i>VRAI</span></div>
+          <div class="meta"><span class="who">Manuel Bompard</span><span class="ts">▶ 31:44</span></div>
+          <p class="claim">« Un décret du 22 février 2024 signé par Gabriel Attal a prévu 700 millions d'euros de coupes budgétaires dans l'enseignement scolaire »</p>
+          <p class="body">Le décret du 21 février 2024, publié le 22 et signé par Gabriel Attal, a annulé 10 milliards d'euros de crédits, dont 692 millions pour l'enseignement scolaire.</p>
+          <div class="foot"><span class="src">Légifrance ↗</span><span class="verdict">✓ confirmé · 95%</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="label"><span>06 · BOMPARD, LE DÉCRET</span><span>frame-06 · 1:08–1:29</span></div>
+    <p class="note"><b>Il brandit le décret</b> : « Regardez, ça, c'est un décret, 22 février 2024, signé par Gabriel Attal lui-même […] 700 millions de coupes dans le budget de l'éducation nationale. » Carte verte au mot « nationale » ; Thévenot répond dessous. <b>Image recadrée par le haut</b> (×1,17) : le bandeau défilant de LCI, sans rapport, sort du cadre. <b>Sortie</b> : les 4 pastilles glissent au centre et deviennent la barre de la fiche.</p>
+    <span class="seam">sortie : pastilles → fiche</span>
+  </figure>
+
+</main>
+
+<div class="act">Fermeture — la fiche, l'adresse</div>
+<main>
+
+  <!-- 08 -->
+  <figure>
+    <div class="frame" id="frame-07">
+      <div class="paper" style="background:var(--surface)"></div>
+      <div class="mono-label" style="position:absolute; left:calc(var(--px)*120); top:calc(var(--px)*70)">Après le débat</div>
+      <div style="position:absolute; left:calc(var(--px)*120); top:calc(var(--px)*110); font-family:var(--serif); font-size:calc(var(--px)*76); color:var(--ink)">À la fin du débat, <i style="color:var(--red)">la fiche.</i></div>
+      <div class="shot" style="left:calc(var(--px)*120); top:calc(var(--px)*250); width:calc(var(--px)*1500)"><img src="assets/captures/resume-2V70R8-Om7c.png" alt=""></div>
+      <div class="callout" style="left:calc(var(--px)*1490); top:calc(var(--px)*420)">qui a été le plus exact</div>
+      <div class="callout" style="left:calc(var(--px)*1490); top:calc(var(--px)*700)">sur quels thèmes</div>
+      <div class="callout" style="left:calc(var(--px)*1490); top:calc(var(--px)*860)">les chiffres contestés</div>
+    </div>
+    <div class="label"><span>07 · LA FICHE</span><span>frame-07 · 1:29–1:45</span></div>
+    <p class="note"><b>Capture réelle</b> du résumé du débat des législatives, tel que publié (Attal 82 %, Bardella 66 %, Faure 83 %). Lent zoom ; les trois repères rouges s'allument tour à tour ; <b>plan tenu 3 s</b> sur les indices. Le « 195 » de l'ouverture réapparaît en haut à droite de la fiche.</p>
+    <span class="seam">entrée : pastilles → fiche</span>
+  </figure>
+
+  <!-- 09 -->
+  <figure>
+    <div class="frame" id="frame-08">
+      <div class="paper"></div>
+      <div class="wordmark" style="position:absolute; left:calc(var(--px)*140); top:calc(var(--px)*230); font-size:calc(var(--px)*150)">SOURC<b>É</b></div>
+      <div style="position:absolute; left:calc(var(--px)*146); top:calc(var(--px)*470); font-family:var(--mono); font-size:calc(var(--px)*64); color:var(--red); border-bottom:calc(var(--px)*4) solid var(--red); padding-bottom:calc(var(--px)*6)">source.codeminds.fr</div>
+      <div style="position:absolute; left:calc(var(--px)*146); top:calc(var(--px)*610); font-family:var(--sans); font-size:calc(var(--px)*40); color:var(--ink)">Débats en relecture · fiches · méthode</div>
+      <div style="position:absolute; left:calc(var(--px)*146); bottom:calc(var(--px)*80); font-family:var(--sans); font-size:calc(var(--px)*24); color:var(--muted)">Montage : délai de vérification raccourci. Verdicts tels que publiés sur le site. Extraits : France 2, LCI.</div>
+    </div>
+    <div class="label"><span>08 · OÙ LA TROUVER</span><span>frame-08 · 1:45–1:53</span></div>
+    <p class="note"><b>L'adresse s'écrit lettre à lettre</b>, la ligne rouge se trace dessous ; la mention de montage reste lisible 4 s. Fondu au blanc.</p>
+    <span class="seam">entrée : fondu enchaîné</span>
+  </figure>
+
+  <!-- Coutures + tokens -->
+  <figure>
+    <div class="frame seams">
+      <div class="row"><b>01→02</b><span>volet vers la gauche, blanc sur blanc</span></div>
+      <div class="row"><b>02→03</b><span>le blanc se retire à gauche, l'image du débat apparaît</span></div>
+      <div class="row"><b>03→06</b><span>coupes franches ; la carte sort à droite (flou + glissement) juste avant chaque coupe</span></div>
+      <div class="row"><b>06→07</b><span>les 4 pastilles glissent au centre et deviennent la barre de la fiche</span></div>
+      <div class="row"><b>07→08</b><span>fondu enchaîné sur fond blanc</span></div>
+      <div class="row"><b>sens</b><span>tout ce qui entre arrive de la droite, tout ce qui sort part à gauche</span></div>
+    </div>
+    <div class="label"><span>COUTURES</span><span>une seule règle de sens</span></div>
+    <div class="frame tokens" style="margin-top:14px">
+      <div><span class="sw"><i style="background:#ffffff"></i>papier #fff</span><span class="sw"><i style="background:#f6f5f1"></i>surface</span><span class="sw"><i style="background:#1c1c1c"></i>encre</span><span class="sw"><i style="background:#a3172c"></i>rouge</span></div>
+      <div><span class="sw"><i style="background:oklch(0.74 0.13 145)"></i>vrai</span><span class="sw"><i style="background:oklch(0.76 0.14 90)"></i>partiel</span><span class="sw"><i style="background:oklch(0.78 0.14 75)"></i>trompeur</span><span class="sw"><i style="background:oklch(0.62 0.20 25)"></i>faux</span><span class="sw"><i style="background:rgba(22,24,29,.88)"></i>carte</span></div>
+      <p style="margin:6px 0 0"><b style="font-family:var(--serif); font-style:italic; font-weight:500">Newsreader</b> marque, titres, citations · <b>Archivo</b> texte et chiffres · <span style="font-family:var(--mono)">Plex Mono</span> étiquettes.</p>
+      <p style="margin:6px 0 0; color:var(--muted)">Interdits : fausse interface, coupe dans une citation, néon, diaporama, écran de fin figé, visage du locuteur masqué par une carte.</p>
+    </div>
+    <div class="label"><span>TOKENS</span><span>site/style.css · extension/overlay.css</span></div>
+  </figure>
+
+</main>
+</body>
+</html>

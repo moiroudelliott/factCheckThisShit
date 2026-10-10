@@ -60,7 +60,9 @@ SYNCED = [
 # modifiée — sans lui, les visiteurs gardaient l'ancienne en cache (cas vécu :
 # une correction du lecteur invisible après rechargement de la page)
 RELECTURE_HTML = os.path.join(SITE, "relecture.html")
-VERSIONED = ("style.css", "relecture.js", "fiche.js", "resume.js", "overlay/content.js", "overlay/overlay.css")
+VERSIONED = ("style.css", "relecture.js", "fiche.js", "resume.js", "overlay/content.js", "overlay/overlay.css",
+             # Vidéo de l'accueil : le CDN de l'hébergeur garde l'ancienne en cache sans version
+             "media/demo-source.mp4", "media/demo-source.jpg")
 
 
 def site_pages() -> list:
@@ -196,7 +198,7 @@ def asset_version(rel: str) -> str:
 
 def stamp_versions() -> list:
     """Inscrit dans chaque page du site la version des fichiers qu'elle
-    charge (feuille de style, scripts) ; renvoie les pages modifiées."""
+    charge (feuille de style, scripts, vidéo) ; renvoie les pages modifiées."""
     changed = []
     for page in site_pages():
         with open(page, encoding="utf-8") as f:

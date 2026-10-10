@@ -30,48 +30,49 @@ FONTS = """
 SCENES = [
     ("s01-volume", 5.0),
     ("s02-promesse", 5.0),
-    ("m03-faure", None),
-    ("m04-bardella", None),
-    ("m05-attal", None),
-    ("m06-bompard", None),
+    ("m03-bompard", None),
+    ("m04-attal", None),
+    ("m05-bardella", None),
+    ("m06-geffray", None),
     ("s07-fiche", 16.0),
     ("s08-fin", 8.0),
 ]
 
+# Quatre débats, quatre politiques, quatre verdicts. Citations retranscrites au
+# mot près sur chaque extrait, verdicts contrôlés sur la source (voir STORYBOARD.md).
+LCI_CROP = "transform: scale(1.17); transform-origin: 20% 0;"   # sort le bandeau défilant de LCI, sans rapport
 MOMENTS = {
-    "m03-faure": dict(
-        src="leg-faure-meloni-3608.mp4", media_start=10.85, card_in=13.9, hold=12.0, index=0, verdict="faux", tag="FAUX",
-        who="Olivier Faure", ts="1:00:29",
-        claim="Giorgia Meloni a régularisé 450 000 sans-papiers en Italie",
-        body="Les 452 000 sont des entrées de travailleurs recrutés à l'étranger, autorisées par le décret « flussi » de 2023 pour 2023-2025 : pas une régularisation de sans-papiers. Une partie a servi de régularisation de fait, au moins 150 000 personnes selon le quotidien Avvenire.",
-        source="Il Fatto Quotidiano", foot="✗ démenti · 85%", wipe_in=True,
-        speakers=[(0, "Olivier Faure"), (16.4, "Jordan Bardella")],
+    "m03-bompard": dict(
+        src="lci-bompard-salaire-1878.mp4", media_start=4.15, card_in=13.75, hold=11.0, index=0, verdict="faux", tag="FAUX",
+        who="Manuel Bompard", ts="31:34", side="left", crop=LCI_CROP, wipe_in=True,
+        claim="Le salaire des enseignants n'a pas été augmenté",
+        body="Selon le ministère de l'Éducation nationale (DEPP), le salaire net moyen des enseignants fonctionnaires a augmenté de 6,4 % entre 2023 et 2024, soit +4,3 % une fois l'inflation déduite.",
+        source="Éducation nationale (DEPP)", foot="✗ démenti · 90%",
+        speakers=[(0, "Manuel Bompard")],
     ),
-    "m04-bardella": dict(
-        src="leg-bardella-essence-1346.mp4", media_start=14.1, card_in=5.7, hold=11.0, index=1, verdict="partiel", tag="PARTIEL",
-        who="Jordan Bardella", ts="22:40",
-        claim="Les taxes représentent 60 à 70 % du prix du carburant à la pompe",
-        body="En 2024, l'accise et la TVA ont représenté en moyenne 54 % du prix du gazole et du SP95-E10, selon le ministère chargé de l'énergie : plus de la moitié du prix, mais moins que les 60 à 70 % annoncés.",
-        source="Assemblée nationale", foot="≈ nuancé · 85%",
-        speakers=[(0, "Jordan Bardella")], scrim="linear-gradient(90deg, rgba(0,0,0,0) 38%, rgba(0,0,0,0.62) 100%)",
+    "m04-attal": dict(
+        src="fj-attal-farage-171.mp4", media_start=8.6, card_in=17.6, hold=13.0, index=1, verdict="partiel", tag="PARTIEL",
+        who="Gabriel Attal", ts="3:11", side="left",
+        claim="Jordan Bardella a accepté, dans un accord avec Nigel Farage, que la France reçoive l'intégralité des personnes migrantes au Royaume-Uni",
+        body="Le protocole signé avec Nigel Farage le 4 septembre 2026 prévoit bien que la France reprenne les personnes interceptées dans les eaux britanniques après être parties de ses côtes, mais pas l'ensemble des migrants présents au Royaume-Uni ; il ne s'appliquerait qu'en cas d'arrivée au pouvoir des deux partis.",
+        source="Sud Ouest", foot="≈ nuancé · 85%",
+        speakers=[(0, "Gabriel Attal")],
     ),
-    "m05-attal": dict(
-        src="leg-attal-binationaux-160.mp4", media_start=7.5, card_in=16.6, hold=14.0, duck_at=19.9, index=2, verdict="trompeur", tag="TROMPEUR",
-        who="Gabriel Attal", ts="2:48",
-        claim="Jordan Bardella présente les binationaux comme plus corruptibles et moins dignes de confiance pour occuper des postes à responsabilité",
-        body="Le RN voulait réserver quelques dizaines d'emplois très sensibles (défense, nucléaire, renseignement) aux Français sans autre nationalité, au nom du risque d'ingérence étrangère. Jordan Bardella n'a pas dit que les binationaux étaient « plus corruptibles », et la mesure ne visait pas les postes à responsabilité en général.",
-        source="Public Sénat", foot="⚠ trompeur · 80%",
-        speakers=[(0, "Gabriel Attal"), (16.7, "Jordan Bardella"), (19.9, "Gabriel Attal")],
+    "m05-bardella": dict(
+        src="leg-bardella-tva-1380.mp4", media_start=3.5, card_in=8.2, hold=11.0, index=2, verdict="trompeur", tag="TROMPEUR",
+        who="Jordan Bardella", ts="23:04",
+        claim="Dès l'été, baisser la TVA de 20 % à 5,5 % sur l'électricité, le gaz, le fioul et le carburant",
+        body="La directive européenne sur la TVA autorise un taux réduit sur l'électricité et le gaz, mais pas sur le fioul ni les carburants : pour eux, une TVA à 5,5 % contreviendrait au droit européen.",
+        source="Les Surligneurs", foot="⚠ trompeur · 90%",
+        speakers=[(0, "Jordan Bardella")],
     ),
-    "m06-bompard": dict(
-        src="lci-bompard-decret-1890.mp4", media_start=14.4, card_in=14.1, hold=11.0, index=3, verdict="vrai", tag="VRAI",
-        who="Manuel Bompard", ts="31:44",
-        claim="Un décret du 22 février 2024 signé par Gabriel Attal a prévu 700 millions d'euros de coupes budgétaires dans l'enseignement scolaire",
-        body="Le décret du 21 février 2024, publié le 22 et signé par Gabriel Attal, a annulé 10 milliards d'euros de crédits, dont 692 millions pour l'enseignement scolaire.",
-        source="Légifrance", foot="✓ confirmé · 95%",
-        speakers=[(0, "Manuel Bompard"), (16.1, "Prisca Thévenot"), (19.7, "Manuel Bompard")],
-        # recadrage : le bandeau défilant de LCI (sans rapport) sort du cadre
-        crop="transform: scale(1.17); transform-origin: 20% 0;",
+    "m06-geffray": dict(
+        src="fj-geffray-mandela-1435.mp4", media_start=33.05, card_in=5.05, hold=9.0, index=3, verdict="vrai", tag="VRAI",
+        who="Édouard Geffray", ts="24:30",
+        claim="Les dégâts au lycée Mandela de Nantes s'élèvent à 2 millions d'euros",
+        body="La Région Pays de la Loire estime le coût des travaux de remise en état du lycée Nelson-Mandela, incendié le 1er octobre, à au moins 2 millions d'euros.",
+        source="France 3 Régions", foot="✓ confirmé · 95%",
+        speakers=[(0, "Édouard Geffray")],
         outro_to_fiche=True,
     ),
 }
@@ -129,6 +130,10 @@ def moment_html(sid, dur, m):
         js_outro = ""
     wipe_js = f"tl.fromTo('#{sid}-wipe', {{ xPercent: 0 }}, {{ xPercent: -100, duration: 0.7, ease: 'power3.inOut' }}, 0);" if m.get("wipe_in") else ""
     over_in = 0.55 if m.get("wipe_in") else 0.0
+    left = m.get("side") == "left"
+    x_in = -58 if left else 58
+    side_css = (f"{p} .card {{ right: auto; left: 24px; top: 190px; }}\n"
+                f"{p} .scrim {{ background: linear-gradient(270deg, rgba(0,0,0,0) 52%, rgba(0,0,0,0.30) 100%); }}") if left else ""
     speakers = m["speakers"]
     uniq = []
     for _, n in speakers:
@@ -203,6 +208,7 @@ def moment_html(sid, dur, m):
 {p} .foot {{ display: flex; justify-content: space-between; gap: 16px; margin-top: 20px; padding-top: 20px; border-top: 2px solid rgba(255,255,255,0.09); font-size: 18px; }}
 {p} .src {{ font-family: 'SRC Plex Mono', monospace; color: rgba(255,255,255,0.68); border-bottom: 1px dotted rgba(255,255,255,0.35); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }}
 {p} .verdict {{ font-weight: 500; white-space: nowrap; color: {FOOT_COLOR[v]}; }}
+{side_css}
 </style>
 
 <div class="vwrap" data-layout-allow-overflow>
@@ -251,7 +257,7 @@ def moment_html(sid, dur, m):
   tl.fromTo('#{sid}-dot{m['index']}', {{ scale: 0, opacity: 0 }}, {{ scale: 1, opacity: 1, duration: 0.45, ease: 'back.out(2.2)' }}, {resolve + 0.05:.2f});
 
   // La carte entre (overlay.css : translateX(34px) scale(.97) blur(7px), ×1,7)
-  tl.fromTo('#{sid}-card', {{ opacity: 0, x: 58, scale: 0.97, filter: 'blur(7px)' }},
+  tl.fromTo('#{sid}-card', {{ opacity: 0, x: {x_in}, scale: 0.97, filter: 'blur(7px)' }},
     {{ opacity: 1, x: 0, scale: 1, filter: 'blur(0px)', duration: 0.62, ease: 'expo.out' }}, {ci});
   tl.fromTo(['#{sid}-spin1', '#{sid}-spin2'], {{ rotation: 0 }}, {{ rotation: 720, duration: 1.4, ease: 'none' }}, {ci - 0.1:.2f});
   tl.fromTo('#{sid}-shimmer', {{ xPercent: -120 }}, {{ xPercent: 420, duration: 2.04, ease: 'sine.inOut', repeat: 2, repeatDelay: 1.36 }}, {ci + 0.3:.2f});
@@ -263,7 +269,7 @@ def moment_html(sid, dur, m):
   tl.fromTo('#{sid}-card', {{ '--accent': '{ACCENT['pending']}' }}, {{ '--accent': '{ACCENT[v]}', duration: 0.55, ease: 'power1.inOut', immediateRender: false }}, {resolve:.2f});
 
   // Sortie de la carte avant la coupe
-  tl.to('#{sid}-card', {{ opacity: 0, x: 58, scale: 0.97, filter: 'blur(7px)', duration: 0.45, ease: 'power2.in' }}, {card_out:.2f});{js_outro}
+  tl.to('#{sid}-card', {{ opacity: 0, x: {x_in}, scale: 0.97, filter: 'blur(7px)', duration: 0.45, ease: 'power2.in' }}, {card_out:.2f});{js_outro}
 
   // Qui parle
   {switch_js}
@@ -449,13 +455,12 @@ for sid, dur in SCENES:
 total = t
 
 # ── Musique : « Jungle Waves » (dimmysad, Pixabay, licence Pixabay) ─────────
-# 176 BPM, drop à 13,092 s dans le morceau. Morceau A : le drop tombe à 10 s,
-# sur l'ouverture du premier extrait. Morceau B : reprise 8 mesures plus tôt
-# (32 temps = 10,918 s), sous la parole de Faure, pour que la vraie fin du
-# morceau accompagne l'écran final.
+# 176 BPM, drop à 13,092 s dans le morceau : il tombe à 10,1 s, au début du
+# volet qui découvre le premier extrait ; la fin du morceau accompagne l'écran final.
 MUSIC_SRC = "assets/music/jungle-waves-norm.mp3"
-SPLICE = 22.283                      # temps vidéo du raccord
-PIECES = [(0.0, 3.092, SPLICE), (SPLICE, 14.457, total)]   # (début vidéo, début morceau, fin vidéo)
+MUSIC_LEN = 131.683
+MUSIC_IN = round(13.092 - 10.1, 3)
+PIECES = [(0.0, MUSIC_IN, round(min(total, MUSIC_LEN - MUSIC_IN), 3))]
 HIGH, READ, LOW = 1.0, 0.53, 0.19    # ouverture/fiche ; lecture des cartes ; sous la parole
 
 starts = {}
@@ -463,7 +468,7 @@ acc = 0.0
 for sid, dur in SCENES:
     starts[sid] = acc
     acc = round(acc + dur, 2)
-env = [(0.0, 0.0), (0.8, HIGH), (10.0, HIGH), (10.5, LOW)]
+env = [(0.0, 0.0), (0.8, HIGH), (10.4, HIGH), (10.65, LOW)]
 moment_ids = [sid for sid, _ in SCENES if sid in MOMENTS]
 for i, sid in enumerate(moment_ids):
     m, t0 = MOMENTS[sid], starts[sid]

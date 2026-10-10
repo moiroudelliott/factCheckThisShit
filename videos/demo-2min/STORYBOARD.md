@@ -1,13 +1,13 @@
 ---
 format: 1920x1080
-duration: 113s
+duration: 130s
 message: "Pendant un débat politique, SOURCÉ vérifie les chiffres en quelques secondes, sources à l'appui, sans prendre parti"
 arc: Le volume (195 affirmations) → la promesse → 4 moments vérifiés → la fiche → où la trouver
 audience: grand public curieux de politique, journalistes, personnes qui découvrent SOURCÉ
 mode: collaborative
 ---
 
-# Démo SOURCÉ — 2 minutes · v3
+# Démo SOURCÉ — 2 minutes · v4
 
 ## Décisions
 
@@ -45,14 +45,25 @@ Remarques de l'utilisateur, mot pour mot : « le faux est sévère 54% c'est pas
 
 Planche v3 validée par l'utilisateur (« parfait alors go ») : 8 plans, 4 moments (faux, partiellement vrai, trompeur, vrai ; Faure, Bardella, Attal, Bompard), mises en page, textes des cartes, placements, recadrage du plan 06, fiche et fin.
 
+## Changes from v3
+
+Remarques de l'utilisateur, mot pour mot : « la vidéo est super mais je ne suis toujours pas fan des extraits choisis en général surtout que ça reste beaucoup sur un seul débat lorsqu'on en a 4, 2 sont complètement absents », avec ses choix : faux = Bompard, salaire des enseignants ; trompeur = Bardella, TVA à 5,5 % ; partiellement vrai = Attal, protocole Bardella-Farage (ou les entrées d'immigrés) ; vrai = Geffray, lycée Mandela à 2 millions d'euros. Puis : « laisse les verdicts plus longtemps » et « ajoute une musique ».
+
+- Quatre débats, quatre politiques, quatre verdicts.
+- Attal : la phrase de la carte du site était celle du journaliste ; la carte vérifie désormais la phrase d'Attal (« l'intégralité des personnes migrantes au Royaume-Uni »). Les entrées d'immigrés (autre option) écartées : explication contradictoire avec une autre carte.
+- Cartes 11 à 14 s après le verdict ; son du débat normalisé à -16 LUFS, murmure sous la lecture.
+- Musique « Jungle Waves » (dimmysad, Pixabay) : drop au début du volet (10,1 s), très basse sous la parole, remontée sous les cartes, pleine sur la fiche. Fichier hors du dépôt (licence).
+
 ## Moments retenus (vérifiés)
 
 | # | Qui | Citation exacte (extrait) | Verdict | Contrôle |
 |---|---|---|---|---|
-| 1 | Olivier Faure (PS) | « Mme Meloni, qui est votre amie en Italie, qu'est-ce qu'elle a fait ? […] Elle a régularisé 450 000 sans-papiers. » France 2 1:00:18–1:00:33 | FAUX | Décret « flussi » 2023 : 452 000 entrées de travailleurs pour 2023-2025, recrutés à l'étranger ; régularisations de fait estimées à au moins 150 000 (Avvenire) — Il Fatto Quotidiano |
-| 2 | Jordan Bardella (RN) | « Quand on a par exemple 60 à 70 % de taxes sur le carburant lorsqu'on va mettre de l'essence dans sa voiture » France 2 22:40–22:46 | PARTIELLEMENT VRAI | Accise + TVA = 54 % du prix TTC du gazole et du SP95-E10 en 2024 — réponse ministérielle, JO AN 20/05/2025 (QE n° 5303) |
-| 3 | Gabriel Attal (Renaissance) | « …vous indiquez en réalité qu'ils sont plus corruptibles que d'autres et qu'ils sont moins dignes de confiance que d'autres pour occuper des postes à responsabilité » France 2 2:48–3:04 | TROMPEUR | RN : « quelques dizaines d'emplois très sensibles », justifiés par le risque d'ingérence ; aucun propos « plus corruptibles » — Public Sénat, Acteurs publics |
-| 4 | Manuel Bompard (LFI) | « Regardez, ça, c'est un décret, 22 février 2024, décret signé par Gabriel Attal lui-même […] 700 millions de coupes dans le budget de l'éducation nationale. » LCI 31:44–31:58 | VRAI | Décret n° 2024-124 du 21/02/2024 (JO du 22), signé G. Attal : 691 624 689 € annulés sur la mission « Enseignement scolaire » — Légifrance |
+| 1 | Manuel Bompard (LFI) — LCI, 2 oct. 2026 | « Vous me dites que vous avez augmenté les professeurs. […] Vous n'avez pas augmenté le salaire des enseignants. » 31:22–31:36 | FAUX | DEPP, note n° 26-36 : salaire net moyen +6,4 % en 2024 (+4,3 % en euros constants) |
+| 2 | Gabriel Attal (Renaissance) — Franc-jeu | « …qui allait au Royaume-Uni signer un accord […] que la France soit le réceptacle, reçoive l'intégralité des personnes migrantes au Royaume-Uni. » 2:59–3:17 | PARTIELLEMENT VRAI | Protocole Farage-Bardella du 4/09/2026, art. 5 : personnes interceptées dans les eaux britanniques après un départ de France ; conditionné à l'arrivée au pouvoir des deux partis |
+| 3 | Jordan Bardella (RN) — France 2, 27 juin 2024 | « Dès l'été, j'entends baisser la TVA de 20 % à 5,5 % sur évidemment l'électricité, le gaz, le fioul, l'énergie et le carburant » 23:03–23:11 | TROMPEUR | Les Surligneurs (12/06/2024) : taux réduit permis pour l'électricité et le gaz, contraire à la directive TVA pour le fioul et les carburants |
+| 4 | Édouard Geffray (gouvernement) — Franc-jeu | « Mais ce n'est pas encore évalué parce qu'il y a des dommages énormes. Vous voyez, par exemple, le lycée Mandela, c'est 2 millions d'euros. » 24:28–24:33 | VRAI | France 3 Régions (2/10/2026) : Région Pays de la Loire, au moins 2 millions d'euros |
+
+Durées : 01 5 s · 02 5 s · 03 Bompard 26,2 s · 04 Attal 32,05 s · 05 Bardella 20,65 s · 06 Geffray 16,85 s · 07 fiche 16 s · 08 fin 8 s = 129,75 s. Les compositions (compositions/*.html) font foi ; le détail est dans scripts/build_scenes.py.
 
 ## Frame 01 — Le volume
 

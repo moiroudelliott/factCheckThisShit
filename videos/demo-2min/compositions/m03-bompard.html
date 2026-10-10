@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="fr">
+<head><meta charset="UTF-8" /></head>
+<body>
+<template id="m03-bompard-template">
+<div data-composition-id="m03-bompard" data-width="1920" data-height="1080" data-duration="26.2">
+<style>
+
+@font-face { font-family: 'SRC Archivo'; font-style: normal; font-weight: 100 900; src: url('assets/fonts/archivo-latin.woff2') format('woff2'); }
+@font-face { font-family: 'SRC Newsreader'; font-style: normal; font-weight: 200 800; src: url('assets/fonts/newsreader-latin.woff2') format('woff2'); }
+@font-face { font-family: 'SRC Newsreader'; font-style: italic; font-weight: 200 800; src: url('assets/fonts/newsreader-italic-latin.woff2') format('woff2'); }
+@font-face { font-family: 'SRC Plex Mono'; font-style: normal; font-weight: 400; src: url('assets/fonts/ibm-plex-mono-400-latin.woff2') format('woff2'); }
+@font-face { font-family: 'SRC Plex Mono'; font-style: normal; font-weight: 500; src: url('assets/fonts/ibm-plex-mono-500-latin.woff2') format('woff2'); }
+
+[data-composition-id="m03-bompard"] { position: absolute; inset: 0; overflow: hidden; background: #0b0c0f; font-family: 'SRC Archivo', sans-serif; color: #fff; }
+[data-composition-id="m03-bompard"] .vwrap { position: absolute; inset: 0; overflow: hidden; transform: scale(1.17); transform-origin: 20% 0; }
+[data-composition-id="m03-bompard"] video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+[data-composition-id="m03-bompard"] .scrim { position: absolute; inset: 0; background: linear-gradient(90deg, rgba(0,0,0,0) 52%, rgba(0,0,0,0.30) 100%); }
+[data-composition-id="m03-bompard"] .names { display: grid; }
+[data-composition-id="m03-bompard"] .names > span { grid-area: 1 / 1; white-space: nowrap; }
+[data-composition-id="m03-bompard"] .wipe, [data-composition-id="m03-bompard"] .wipe-out { position: absolute; inset: 0; background: #ffffff; z-index: 5; }
+[data-composition-id="m03-bompard"] .wipe-out { z-index: 3; }
+[data-composition-id="m03-bompard"] .pill { position: absolute; background: rgba(16,18,22,0.72); border: 2px solid rgba(255,255,255,0.12); box-shadow: 0 6px 22px rgba(0,0,0,0.4); border-radius: 999px; z-index: 4; }
+[data-composition-id="m03-bompard"] .badge { top: 24px; left: 24px; display: flex; align-items: flex-end; gap: 15px; padding: 17px 26px 17px 22px; font-weight: 600; font-size: 24px; line-height: 1; color: rgba(255,255,255,0.94); }
+[data-composition-id="m03-bompard"] .eq { display: flex; align-items: flex-end; gap: 4px; height: 22px; }
+[data-composition-id="m03-bompard"] .eq i { display: block; width: 5px; height: 22px; border-radius: 2px; background: #e0324f; transform-origin: 50% 100%; }
+[data-composition-id="m03-bompard"] .chip { top: 24px; right: 24px; height: 64px; display: flex; align-items: center; gap: 15px; padding: 0 24px 0 22px; }
+[data-composition-id="m03-bompard"] .ping { position: relative; width: 14px; height: 14px; }
+[data-composition-id="m03-bompard"] .ping i { position: absolute; inset: 0; border-radius: 50%; background: #73c076; display: block; }
+[data-composition-id="m03-bompard"] .brand { font-family: 'SRC Newsreader', serif; font-style: italic; font-weight: 500; font-size: 26px; }
+[data-composition-id="m03-bompard"] .brand b, [data-composition-id="m03-bompard"] .cbrand b { font-weight: 500; }
+[data-composition-id="m03-bompard"] .brand b { color: #e0324f; }
+[data-composition-id="m03-bompard"] .chip .sub { font-size: 19px; color: rgba(255,255,255,0.7); }
+[data-composition-id="m03-bompard"] .dots { top: 112px; left: 24px; width: 134px; height: 42px; display: flex; align-items: center; gap: 10px; padding: 0 18px; transform-origin: 50% 50%; }
+[data-composition-id="m03-bompard"] .dot { position: relative; display: block; width: 16px; height: 16px; border-radius: 50%; border: 2px solid rgba(255,255,255,0.35); box-sizing: border-box; }
+[data-composition-id="m03-bompard"] .dot-fill { position: absolute; inset: -2px; border-radius: 50%; display: block; }
+[data-composition-id="m03-bompard"] .card { position: absolute; top: 104px; right: 24px; width: 650px; border-radius: 27px; overflow: hidden; z-index: 4;
+  background: linear-gradient(180deg, rgba(22,24,29,0.93), rgba(15,16,20,0.92)); border: 2px solid rgba(255,255,255,0.1);
+  box-shadow: 0 40px 110px rgba(0,0,0,0.55), 0 12px 60px color-mix(in srgb, var(--accent) 14%, transparent); color: rgba(255,255,255,0.95); }
+[data-composition-id="m03-bompard"] .bar { position: relative; height: 5px; overflow: hidden; }
+[data-composition-id="m03-bompard"] .bar .fill { position: absolute; inset: 0; background: var(--accent); }
+[data-composition-id="m03-bompard"] .bar .shimmer { position: absolute; top: 0; left: 0; width: 30%; height: 100%; background: linear-gradient(90deg, transparent, rgba(255,255,255,0.6), transparent); }
+[data-composition-id="m03-bompard"] .inner { padding: 26px 32px 28px; }
+[data-composition-id="m03-bompard"] .head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+[data-composition-id="m03-bompard"] .cbrand { font-family: 'SRC Newsreader', serif; font-style: italic; font-weight: 500; font-size: 23px; color: rgba(255,255,255,0.8); }
+[data-composition-id="m03-bompard"] .cbrand .d { font-style: normal; font-size: 15px; margin-right: 8px; color: var(--accent); }
+[data-composition-id="m03-bompard"] .cbrand b { color: var(--accent); }
+[data-composition-id="m03-bompard"] .tag { display: grid; justify-items: end; }
+[data-composition-id="m03-bompard"] .tag > span { grid-area: 1 / 1; display: inline-flex; align-items: center; gap: 11px; padding: 7px 17px 7px 15px; border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 15%, transparent); border: 2px solid color-mix(in srgb, var(--accent) 42%, transparent);
+  color: var(--accent); font-weight: 700; font-size: 18px; letter-spacing: 0.08em; white-space: nowrap; }
+[data-composition-id="m03-bompard"] .spin { display: block; width: 15px; height: 15px; border-radius: 50%; border: 2.5px solid rgba(255,255,255,0.25); border-top-color: rgba(255,255,255,0.85); box-sizing: border-box; }
+[data-composition-id="m03-bompard"] .tdot { display: block; width: 10px; height: 10px; border-radius: 50%; background: var(--accent); }
+[data-composition-id="m03-bompard"] .meta { display: flex; justify-content: space-between; align-items: center; margin-bottom: 9px; }
+[data-composition-id="m03-bompard"] .who { font-size: 18px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); }
+[data-composition-id="m03-bompard"] .ts { font-family: 'SRC Plex Mono', monospace; font-size: 17px; color: rgba(255,255,255,0.72); border: 2px solid rgba(255,255,255,0.12); background: rgba(255,255,255,0.07); border-radius: 8px; padding: 2px 10px; }
+[data-composition-id="m03-bompard"] .claim { margin: 0 0 20px; font-family: 'SRC Newsreader', serif; font-style: italic; font-size: 32px; line-height: 1.32; color: rgba(255,255,255,0.97); }
+[data-composition-id="m03-bompard"] .stack { display: grid; }
+[data-composition-id="m03-bompard"] .stack > * { grid-area: 1 / 1; }
+[data-composition-id="m03-bompard"] .checking { display: flex; align-items: flex-start; gap: 14px; font-size: 21px; color: rgba(255,255,255,0.62); padding-top: 4px; }
+[data-composition-id="m03-bompard"] .checking .spin { width: 22px; height: 22px; border-width: 3px; }
+[data-composition-id="m03-bompard"] .body { margin: 0; font-size: 22px; line-height: 1.5; color: rgba(255,255,255,0.8); }
+[data-composition-id="m03-bompard"] .foot { display: flex; justify-content: space-between; gap: 16px; margin-top: 20px; padding-top: 20px; border-top: 2px solid rgba(255,255,255,0.09); font-size: 18px; }
+[data-composition-id="m03-bompard"] .src { font-family: 'SRC Plex Mono', monospace; color: rgba(255,255,255,0.68); border-bottom: 1px dotted rgba(255,255,255,0.35); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+[data-composition-id="m03-bompard"] .verdict { font-weight: 500; white-space: nowrap; color: #f9786a; }
+[data-composition-id="m03-bompard"] .card { right: auto; left: 24px; top: 190px; }
+[data-composition-id="m03-bompard"] .scrim { background: linear-gradient(270deg, rgba(0,0,0,0) 52%, rgba(0,0,0,0.30) 100%); }
+</style>
+
+<div class="vwrap" data-layout-allow-overflow>
+  <video id="m03-bompard-video" class="clip" src="assets/clips/lci-bompard-salaire-1878.mp4" data-start="0" data-duration="26.2" data-media-start="4.15"
+    data-track-index="2" playsinline data-has-audio="true" data-automation='{"version": 1, "lanes": [{"target": "volume", "points": [{"t": 0, "v": 0}, {"t": 0.5, "v": 1}, {"t": 14.35, "v": 1}, {"t": 14.85, "v": 0.25}, {"t": 17.85, "v": 0.08}, {"t": 25.7, "v": 0.08}, {"t": 26.2, "v": 0}]}]}'></video>
+</div>
+<div class="scrim"></div>
+
+<div class="pill badge" id="m03-bompard-badge"><span class="eq"><i id="m03-bompard-eq0"></i><i id="m03-bompard-eq1"></i><i id="m03-bompard-eq2"></i></span><span class="names"><span id="m03-bompard-name0">Manuel Bompard</span></span></div>
+<div class="pill dots" id="m03-bompard-dots"><i class="dot"><span class="dot-fill" id="m03-bompard-dot0" style="background:#ee6060;"></span></i><i class="dot"></i><i class="dot"></i><i class="dot"></i></div>
+<div class="pill chip" id="m03-bompard-chip"><span class="ping"><i id="m03-bompard-ring"></i><i></i></span><span class="brand">SOURC<b>É</b></span><span class="sub">analyse en direct</span></div>
+
+<div class="card" id="m03-bompard-card" style="--accent: #9aa6b4;">
+  <div class="bar"><div class="fill"></div><div class="shimmer" id="m03-bompard-shimmer" data-layout-allow-overflow></div></div>
+  <div class="inner">
+    <div class="head">
+      <span class="cbrand"><span class="d">◆</span>SOURC<b>É</b></span>
+      <span class="tag">
+        <span id="m03-bompard-tagp"><span class="spin" id="m03-bompard-spin1"></span>VÉRIFICATION</span>
+        <span id="m03-bompard-tagv"><span class="tdot"></span>FAUX</span>
+      </span>
+    </div>
+    <div class="meta"><span class="who">Manuel Bompard</span><span class="ts">▶ 31:34</span></div>
+    <p class="claim">« Le salaire des enseignants n'a pas été augmenté »</p>
+    <div class="stack">
+      <div class="checking" id="m03-bompard-checking"><span class="spin" id="m03-bompard-spin2"></span><span>Recoupement des sources…</span></div>
+      <p class="body" id="m03-bompard-body">Selon le ministère de l'Éducation nationale (DEPP), le salaire net moyen des enseignants fonctionnaires a augmenté de 6,4 % entre 2023 et 2024, soit +4,3 % une fois l'inflation déduite.</p>
+    </div>
+    <div class="foot" id="m03-bompard-foot"><span class="src">Éducation nationale (DEPP) ↗</span><span class="verdict">✗ démenti · 90%</span></div>
+  </div>
+</div>
+<div class="wipe" id="m03-bompard-wipe" data-layout-allow-overflow></div>
+
+<script>
+(function () {
+  const tl = gsap.timeline({ paused: true });
+  tl.fromTo('#m03-bompard-wipe', { xPercent: 0 }, { xPercent: -100, duration: 0.7, ease: 'power3.inOut' }, 0);
+  // Calque de l'extension : badge, puce, pastilles
+  tl.fromTo('#m03-bompard-badge', { opacity: 0, y: -10 }, { opacity: 1, y: 0, duration: 0.4, ease: 'power3.out' }, 0.55);
+  tl.fromTo('#m03-bompard-chip', { opacity: 0, y: -10 }, { opacity: 1, y: 0, duration: 0.4, ease: 'power3.out' }, 0.61);
+  tl.fromTo('#m03-bompard-dots', { opacity: 0, y: -10 }, { opacity: 1, y: 0, duration: 0.4, ease: 'power3.out' }, 0.67);
+  [0, 1, 2].forEach((i) => {
+    tl.fromTo('#m03-bompard-eq' + i, { scaleY: 0.3 }, { scaleY: 1, duration: 0.5, ease: 'sine.inOut', yoyo: true, repeat: 51 }, i * 0.2);
+  });
+  tl.fromTo('#m03-bompard-ring', { scale: 0.6, opacity: 0.8 }, { scale: 2.4, opacity: 0, duration: 1.8, ease: 'power1.out', repeat: 13 }, 0);
+  tl.fromTo('#m03-bompard-dot0', { scale: 0, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.45, ease: 'back.out(2.2)' }, 14.70);
+
+  // La carte entre (overlay.css : translateX(34px) scale(.97) blur(7px), ×1,7)
+  tl.fromTo('#m03-bompard-card', { opacity: 0, x: -58, scale: 0.97, filter: 'blur(7px)' },
+    { opacity: 1, x: 0, scale: 1, filter: 'blur(0px)', duration: 0.62, ease: 'expo.out' }, 13.75);
+  tl.fromTo(['#m03-bompard-spin1', '#m03-bompard-spin2'], { rotation: 0 }, { rotation: 720, duration: 1.4, ease: 'none' }, 13.65);
+  tl.fromTo('#m03-bompard-shimmer', { xPercent: -120 }, { xPercent: 420, duration: 2.04, ease: 'sine.inOut', repeat: 2, repeatDelay: 1.36 }, 14.05);
+  tl.fromTo('#m03-bompard-tagv', { opacity: 0 }, { opacity: 1, duration: 0.25 }, 14.65);
+  tl.fromTo('#m03-bompard-body', { opacity: 0, y: 8 }, { opacity: 1, y: 0, duration: 0.4, ease: 'power2.out' }, 14.70);
+  tl.fromTo('#m03-bompard-foot', { opacity: 0, y: 8 }, { opacity: 1, y: 0, duration: 0.4, ease: 'power2.out' }, 14.80);
+  tl.fromTo('#m03-bompard-tagp', { opacity: 1 }, { opacity: 0, duration: 0.2 }, 14.65);
+  tl.fromTo('#m03-bompard-checking', { opacity: 1 }, { opacity: 0, duration: 0.2 }, 14.65);
+  tl.fromTo('#m03-bompard-card', { '--accent': '#9aa6b4' }, { '--accent': '#ee6060', duration: 0.55, ease: 'power1.inOut', immediateRender: false }, 14.65);
+
+  // Sortie de la carte avant la coupe
+  tl.to('#m03-bompard-card', { opacity: 0, x: -58, scale: 0.97, filter: 'blur(7px)', duration: 0.45, ease: 'power2.in' }, 25.65);
+
+  // Qui parle
+  tl.set('#m03-bompard-name0', { opacity: 1 }, 0);
+
+  window.__timelines['m03-bompard'] = tl;
+})();
+</script>
+</div>
+</template>
+</body>
+</html>

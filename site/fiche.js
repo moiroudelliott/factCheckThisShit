@@ -175,12 +175,15 @@
       écart de ${plural(c.ecart, 'point')} — ${c.significatif ? "au-delà de la marge d'erreur" : "dans la marge d'erreur : pas de différence établie"}.</li>`).join('');
     const notes = [];
     if (fiche.non_identifies) {
-      notes.push(`${plural(fiche.non_identifies, 'affirmation n’a pas pu être attribuée', 'affirmations n’ont pas pu être attribuées')} à un débatteur (voix non reconnue) : elles ne comptent pour personne.`);
+      const one = fiche.non_identifies === 1;
+      notes.push(`${plural(fiche.non_identifies, 'affirmation n’a pas pu être attribuée', 'affirmations n’ont pas pu être attribuées')} à un débatteur (voix non reconnue) : ${one ? 'elle ne compte' : 'elles ne comptent'} pour personne.`);
     }
     const hosts = fiche.animateurs || [];
     if (hosts.length) {
       const many = hosts.length > 1;
-      notes.push(`${hosts.join(' et ')} ${many ? 'mènent' : 'mène'} le débat : ${many ? 'leurs' : 'ses'} propos ne comptent pas dans la fiche.`);
+      // « A, B et C »
+      const names = many ? `${hosts.slice(0, -1).join(', ')} et ${hosts[hosts.length - 1]}` : hosts[0];
+      notes.push(`${names} ${many ? 'mènent' : 'mène'} le débat : ${many ? 'leurs' : 'ses'} propos ne comptent pas dans la fiche.`);
     }
     if (notes.length) {
       $('f-unknown').textContent = notes.join(' ');

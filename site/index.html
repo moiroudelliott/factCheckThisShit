@@ -11,7 +11,7 @@
   <meta property="og:locale" content="fr_FR">
   <meta property="og:title" content="SOURCÉ — vérification des faits pendant les débats politiques">
   <meta property="og:description" content="Prototype de recherche : les affirmations d'un débat sont vérifiées pendant qu'il a lieu, avec leur source.">
-  <link rel="stylesheet" href="style.css?v=a3b95604df">
+  <link rel="stylesheet" href="style.css?v=ef8e7586b3">
 </head>
 <body>
   <header class="site-header">
@@ -27,33 +27,25 @@
     </div>
   </header>
 
-  <main>
-    <p class="kicker">Prototype de recherche</p>
-    <h1>Vérifier les affirmations d'un débat politique pendant qu'il a lieu</h1>
-    <p class="lede">SOURCÉ écoute un débat diffusé en vidéo, repère les affirmations factuelles et les confronte à des sources publiques. Le verdict s'affiche sur la vidéo quelques secondes après la phrase, avec la source qui le justifie.</p>
-    <p><a class="button" href="relecture.html">Voir la démonstration</a></p>
-    <p class="more">Ou, sans regarder la vidéo : <a href="fiche.html">les fiches des débats analysés</a> — ce que chacun a affirmé, et ce qui était exact.</p>
-
-    <h2>Fonctionnement</h2>
-    <ol class="steps">
-      <li><strong>Transcrire</strong>Le son du débat est transcrit en continu, sur l'ordinateur de l'utilisateur, et chaque phrase est attribuée à l'intervenant qui la prononce.</li>
-      <li><strong>Repérer</strong>Toutes les vingt secondes environ, un modèle de langue relève les affirmations vérifiables qui comptent dans le débat : chiffres, dates, votes, faits précis. Les opinions et les détails sans enjeu ne sont pas vérifiés.</li>
-      <li><strong>Vérifier</strong>Chaque affirmation est comparée aux statistiques officielles, à la presse et aux vérifications déjà publiées. Le verdict indique sa source et son degré de confiance.</li>
-    </ol>
+  <main class="wide home">
+    <section class="hero">
+      <p class="kicker">Prototype de recherche</p>
+      <h1>Vérifier les affirmations d'un débat politique pendant qu'il a lieu</h1>
+      <p class="lede">SOURCÉ repère les affirmations factuelles d'un débat et affiche, quelques secondes après la phrase, un verdict et sa source.</p>
+    </section>
 
     <figure class="demo-video">
       <video controls preload="none" playsinline poster="media/demo-source.jpg" width="1920" height="1080">
         <source src="media/demo-source.mp4" type="video/mp4">
         <a href="media/demo-source.mp4">Télécharger la vidéo de démonstration (MP4)</a>
       </video>
-      <figcaption>SOURCÉ en deux minutes : quatre débats, quatre verdicts — faux, partiellement vrai, trompeur, vrai. Montage : le délai de vérification est raccourci ; les verdicts sont ceux publiés sur ce site. Extraits : France 2, LCI, Franc-jeu (France Inter, France Télévisions). Musique : « Jungle Waves », dimmysad (Pixabay).</figcaption>
+      <figcaption>Extraits : France 2, LCI, Franc-jeu (France Inter, France Télévisions) · Musique : « Jungle Waves », dimmysad (Pixabay)</figcaption>
     </figure>
 
-    <p class="more"><a href="methode.html">Méthode détaillée</a> · <a href="sources.html">Politique des sources</a></p>
-
-    <h2>Le projet</h2>
-    <p>SOURCÉ est un prototype mené par Elliott Moiroud, étudiant à l'Université Savoie Mont Blanc. Ce n'est pas un produit commercial. Les verdicts sont produits automatiquement et peuvent comporter des erreurs ; ils indiquent toujours leur source, pour que chacun puisse les contrôler.</p>
-    <p class="more"><a href="a-propos.html">À propos et contact</a></p>
+    <p class="actions">
+      <a class="button" href="relecture.html">Voir un débat en entier</a>
+      <a class="button secondary" href="fiche.html">Les fiches des débats</a>
+    </p>
   </main>
 
   <footer class="site-footer">

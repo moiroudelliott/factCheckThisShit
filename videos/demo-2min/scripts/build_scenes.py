@@ -62,7 +62,7 @@ MOMENTS = {
         src="leg-bardella-tva-1380.mp4", media_start=3.5, card_in=8.2, hold=11.0, index=2, verdict="trompeur", tag="TROMPEUR",
         who="Jordan Bardella", ts="23:04",
         claim="Dès l'été, baisser la TVA de 20 % à 5,5 % sur l'électricité, le gaz, le fioul et le carburant",
-        body="La directive européenne sur la TVA autorise un taux réduit sur l'électricité et le gaz, mais pas sur le fioul ni les carburants : pour eux, une TVA à 5,5 % contreviendrait au droit européen.",
+        body="La directive européenne sur la TVA autorise un taux réduit sur l'électricité et le gaz. Pour le fioul et les carburants, en revanche, une TVA à 5,5 % serait contraire au droit européen.",
         source="Les Surligneurs", foot="⚠ trompeur · 90%",
         speakers=[(0, "Jordan Bardella")],
     ),

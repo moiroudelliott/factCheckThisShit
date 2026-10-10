@@ -34,6 +34,9 @@
 [hidden] { display: none !important; }
 
 html { -webkit-text-size-adjust: 100%; }
+/* Place de la barre de défilement toujours réservée : une page courte ne se
+   décale pas par rapport aux autres (sauf le résumé, plein écran). */
+html:not(:has(.r-body)) { scrollbar-gutter: stable; }
 body {
   margin: 0;
   background: var(--bg);
@@ -67,8 +70,11 @@ a:hover { color: var(--accent-hover); }
 
 /* ── Contenu ───────────────────────────────────────────────────────────── */
 
-main { max-width: var(--measure); margin: 0 auto; padding: 3rem 1.5rem 4rem; }
-main.wide { max-width: 62rem; }
+/* Même gabarit sur toutes les pages : la colonne s'aligne sur l'en-tête et
+   le pied de page. Les pages de lecture gardent une ligne de texte courte,
+   calée à gauche ; .wide libère la largeur (fiches, démonstration, accueil). */
+main { max-width: 62rem; margin: 0 auto; padding: 3rem 1.5rem 4rem; }
+main:not(.wide) > * { max-width: var(--measure); }
 
 h1, h2, h3 { font-family: var(--serif); font-weight: 500; line-height: 1.25; color: var(--text); }
 h1 { font-size: clamp(1.9rem, 4.5vw, 2.5rem); margin: 0 0 1rem; letter-spacing: -0.005em; }
@@ -89,36 +95,22 @@ strong { font-weight: 600; }
 .small { font-size: 0.9rem; }
 .more { font-family: var(--sans); font-size: 0.95rem; }
 
-/* Bouton principal (un seul par page, au plus) */
+/* Bouton principal (un seul par page, au plus) ; .secondary à côté de lui */
 .button {
   display: inline-block; font-family: var(--sans); font-size: 0.95rem; font-weight: 600;
   color: #fff; background: var(--accent); padding: 0.65rem 1.3rem; border-radius: 2px; text-decoration: none;
 }
 .button:hover { background: var(--accent-hover); color: #fff; }
+.button.secondary { color: var(--text); background: transparent; box-shadow: inset 0 0 0 1px var(--rule); }
+.button.secondary:hover { color: var(--accent); background: transparent; box-shadow: inset 0 0 0 1px var(--accent); }
 
-/* Étapes numérotées */
-.steps { list-style: none; padding: 0; counter-reset: step; margin: 1.4rem 0 1.4rem; }
-.steps li { counter-increment: step; position: relative; padding-left: 2.6rem; margin: 0 0 1rem; }
-.steps li::before {
-  content: counter(step); position: absolute; left: 0; top: 0.05rem;
-  font-family: var(--sans); font-size: 0.85rem; font-weight: 600; color: var(--accent);
-  width: 1.7rem; height: 1.7rem; border: 1px solid var(--accent); border-radius: 50%;
-  display: grid; place-items: center;
-}
-.steps strong { display: block; }
-
-/* Encadré : exemple de vérification */
-.example {
-  background: var(--surface); border-left: 3px solid var(--rule); padding: 1.1rem 1.3rem; margin: 1.6rem 0 1.8rem;
-}
-.example .meta { font-family: var(--sans); font-size: 0.8rem; color: var(--muted); margin: 0 0 0.5rem; }
-.example blockquote { margin: 0 0 0.7rem; font-size: 1.15rem; font-style: italic; }
-.example p { margin: 0; }
-
-/* Vidéo de démonstration (page d'accueil) */
-.demo-video { margin: 1.6rem 0 1.8rem; }
-.demo-video video { display: block; width: 100%; height: auto; aspect-ratio: 16 / 9; background: #111; border: 1px solid var(--rule); }
-.demo-video figcaption { font-family: var(--sans); font-size: 0.8rem; color: var(--muted); margin-top: 0.5rem; line-height: 1.45; }
+/* Accueil : titre, vidéo de démonstration, deux liens */
+.hero h1 { max-width: 40rem; }
+.hero .lede { max-width: var(--measure); margin-bottom: 1.8rem; }
+.demo-video { margin: 0 0 1.4rem; }
+.demo-video video { display: block; width: 100%; height: auto; aspect-ratio: 16 / 9; background: #111; }
+.demo-video figcaption { font-family: var(--sans); font-size: 0.75rem; color: var(--muted); margin-top: 0.45rem; line-height: 1.4; }
+.actions { display: flex; flex-wrap: wrap; gap: 0.7rem; margin: 0; }
 
 /* Étiquettes de verdict */
 .verdict {

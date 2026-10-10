@@ -48,7 +48,7 @@ MOMENTS = {
         claim="Le salaire des enseignants n'a pas été augmenté",
         body="Selon le ministère de l'Éducation nationale (DEPP), le salaire net moyen des enseignants fonctionnaires a augmenté de 6,4 % entre 2023 et 2024, soit +4,3 % une fois l'inflation déduite.",
         source="Éducation nationale (DEPP)", foot="✗ démenti · 90%",
-        speakers=[(0, "Manuel Bompard")],
+        speakers=[(0, "Manuel Bompard")], card_h=460,
     ),
     "m04-attal": dict(
         src="fj-attal-farage-171.mp4", media_start=8.6, card_in=17.6, hold=13.0, index=1, verdict="partiel", tag="PARTIEL",
@@ -56,7 +56,7 @@ MOMENTS = {
         claim="Jordan Bardella a accepté, dans un accord avec Nigel Farage, que la France reçoive l'intégralité des personnes migrantes au Royaume-Uni",
         body="Le protocole signé avec Nigel Farage le 4 septembre 2026 prévoit bien que la France reprenne les personnes interceptées dans les eaux britanniques après être parties de ses côtes, mais pas l'ensemble des migrants présents au Royaume-Uni ; il ne s'appliquerait qu'en cas d'arrivée au pouvoir des deux partis.",
         source="Sud Ouest", foot="≈ nuancé · 85%",
-        speakers=[(0, "Gabriel Attal")],
+        speakers=[(0, "Gabriel Attal")], card_h=612,
     ),
     "m05-bardella": dict(
         src="leg-bardella-tva-1380.mp4", media_start=3.5, card_in=8.2, hold=11.0, index=2, verdict="trompeur", tag="TROMPEUR",
@@ -64,7 +64,7 @@ MOMENTS = {
         claim="Dès l'été, baisser la TVA de 20 % à 5,5 % sur l'électricité, le gaz, le fioul et le carburant",
         body="La directive européenne sur la TVA autorise un taux réduit sur l'électricité et le gaz. Pour le fioul et les carburants, en revanche, une TVA à 5,5 % serait contraire au droit européen.",
         source="Les Surligneurs", foot="⚠ trompeur · 90%",
-        speakers=[(0, "Jordan Bardella")],
+        speakers=[(0, "Jordan Bardella")], card_h=462, push=(-140, 1.16),
     ),
     "m06-geffray": dict(
         src="fj-geffray-mandela-1435.mp4", media_start=33.05, card_in=5.05, hold=9.0, index=3, verdict="vrai", tag="VRAI",
@@ -72,10 +72,17 @@ MOMENTS = {
         claim="Les dégâts au lycée Mandela de Nantes s'élèvent à 2 millions d'euros",
         body="La Région Pays de la Loire estime le coût des travaux de remise en état du lycée Nelson-Mandela, incendié le 1er octobre, à au moins 2 millions d'euros.",
         source="France 3 Régions", foot="✓ confirmé · 95%",
-        speakers=[(0, "Édouard Geffray")],
+        speakers=[(0, "Édouard Geffray")], card_h=422,
         outro_to_fiche=True,
     ),
 }
+
+
+# Lecture : une fois le son du débat baissé, la carte reste 1,5 s à sa taille,
+# puis grandit (×1,4) et se recentre dans la hauteur, l'image derrière s'assombrit.
+CARD_GROW = 1.4
+GROW_DELAY = 1.5
+GROW_ZONE = (170, 1056)     # sous les pastilles du haut
 
 
 def moment_dur(m):
@@ -132,7 +139,19 @@ def moment_html(sid, dur, m):
     over_in = 0.55 if m.get("wipe_in") else 0.0
     left = m.get("side") == "left"
     x_in = -58 if left else 58
-    side_css = (f"{p} .card {{ right: auto; left: 24px; top: 190px; }}\n"
+    g = CARD_GROW
+    duck_end = m.get("duck_at", ci + 0.6) + 0.5
+    t_grow = round(duck_end + GROW_DELAY, 2)
+    top_css = 190 if left else 104
+    z0, z1 = GROW_ZONE
+    y_grow = round(max(z0, z0 + (z1 - z0 - m["card_h"] * g) / 2) - top_css)
+    push = m.get("push")
+    push_open = f'<div class="push" id="{sid}-push" data-layout-allow-overflow>' if push else ""
+    push_close = "</div>" if push else ""
+    push_js = (f"tl.fromTo('#{sid}-push', {{ x: 0, scale: 1 }}, {{ x: {push[0]}, scale: {push[1]}, duration: 1.1, ease: 'power3.inOut' }}, {t_grow - 0.1:.2f});"
+               if push else "")
+    dim_dir = "270deg" if left else "90deg"
+    side_css = (f"{p} .card {{ right: auto; left: 24px; top: 190px; transform-origin: left top; }}\n"
                 f"{p} .scrim {{ background: linear-gradient(270deg, rgba(0,0,0,0) 52%, rgba(0,0,0,0.30) 100%); }}") if left else ""
     speakers = m["speakers"]
     uniq = []
@@ -179,8 +198,10 @@ def moment_html(sid, dur, m):
 {p} .dots {{ top: 112px; left: 24px; width: 134px; height: 42px; display: flex; align-items: center; gap: 10px; padding: 0 18px; transform-origin: 50% 50%; }}
 {p} .dot {{ position: relative; display: block; width: 16px; height: 16px; border-radius: 50%; border: 2px solid rgba(255,255,255,0.35); box-sizing: border-box; }}
 {p} .dot-fill {{ position: absolute; inset: -2px; border-radius: 50%; display: block; }}
-{p} .card {{ position: absolute; top: 104px; right: 24px; width: 650px; border-radius: 27px; overflow: hidden; z-index: 4;
-  background: linear-gradient(180deg, rgba(22,24,29,0.93), rgba(15,16,20,0.92)); border: 2px solid rgba(255,255,255,0.1);
+{p} .push {{ position: absolute; inset: 0; }}
+{p} .dim {{ position: absolute; inset: 0; opacity: 0; background: linear-gradient({dim_dir}, rgba(0,0,0,0.18) 0%, rgba(0,0,0,0.55) 100%); }}
+{p} .card {{ position: absolute; top: 104px; right: 24px; width: 650px; border-radius: 27px; overflow: hidden; z-index: 4; transform-origin: right top;
+  --bga: 0.93; background: linear-gradient(180deg, rgba(22,24,29,var(--bga)), rgba(15,16,20,calc(var(--bga) - 0.01))); border: 2px solid rgba(255,255,255,0.1);
   box-shadow: 0 40px 110px rgba(0,0,0,0.55), 0 12px 60px color-mix(in srgb, var(--accent) 14%, transparent); color: rgba(255,255,255,0.95); }}
 {p} .bar {{ position: relative; height: 5px; overflow: hidden; }}
 {p} .bar .fill {{ position: absolute; inset: 0; background: var(--accent); }}
@@ -211,11 +232,12 @@ def moment_html(sid, dur, m):
 {side_css}
 </style>
 
-<div class="vwrap" data-layout-allow-overflow>
+<div class="vwrap" data-layout-allow-overflow>{push_open}
   <video id="{sid}-video" class="clip" src="assets/clips/{m['src']}" data-start="0" data-duration="{dur}" data-media-start="{m['media_start']}"
-    data-track-index="{2 + m['index']}" playsinline data-has-audio="true" data-automation='{automation}'></video>
+    data-track-index="{2 + m['index']}" playsinline data-has-audio="true" data-automation='{automation}'></video>{push_close}
 </div>
 <div class="scrim"></div>
+<div class="dim" id="{sid}-dim"></div>
 {outro}
 <div class="pill badge" id="{sid}-badge"><span class="eq"><i id="{sid}-eq0"></i><i id="{sid}-eq1"></i><i id="{sid}-eq2"></i></span><span class="names">{names_html}</span></div>
 <div class="pill dots" id="{sid}-dots">{dots_html(sid, m['index'])}</div>
@@ -268,8 +290,15 @@ def moment_html(sid, dur, m):
   tl.fromTo('#{sid}-checking', {{ opacity: 1 }}, {{ opacity: 0, duration: 0.2 }}, {resolve:.2f});
   tl.fromTo('#{sid}-card', {{ '--accent': '{ACCENT['pending']}' }}, {{ '--accent': '{ACCENT[v]}', duration: 0.55, ease: 'power1.inOut', immediateRender: false }}, {resolve:.2f});
 
+  // Lecture : la carte grandit et se recentre, l'image s'assombrit derrière elle
+  tl.fromTo('#{sid}-card', {{ scale: 1, y: 0, '--bga': 0.93 }}, {{ scale: {g}, y: {y_grow}, '--bga': 0.985, duration: 0.9, ease: 'power3.inOut', immediateRender: false }}, {t_grow:.2f});
+  tl.fromTo('#{sid}-dim', {{ opacity: 0 }}, {{ opacity: 1, duration: 0.9, ease: 'power2.inOut' }}, {t_grow:.2f});
+  {push_js}
+
   // Sortie de la carte avant la coupe
-  tl.to('#{sid}-card', {{ opacity: 0, x: {x_in}, scale: 0.97, filter: 'blur(7px)', duration: 0.45, ease: 'power2.in' }}, {card_out:.2f});{js_outro}
+  tl.fromTo('#{sid}-card', {{ opacity: 1, x: 0, scale: {g}, filter: 'blur(0px)' }},
+    {{ opacity: 0, x: {x_in}, scale: {round(g * 0.97, 3)}, filter: 'blur(7px)', duration: 0.45, ease: 'power2.in', immediateRender: false }}, {card_out:.2f});
+  tl.fromTo('#{sid}-dim', {{ opacity: 1 }}, {{ opacity: 0, duration: 0.45, ease: 'power2.in', immediateRender: false }}, {card_out:.2f});{js_outro}
 
   // Qui parle
   {switch_js}

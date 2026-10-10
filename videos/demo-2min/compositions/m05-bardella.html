@@ -34,8 +34,10 @@
 [data-composition-id="m05-bardella"] .dots { top: 112px; left: 24px; width: 134px; height: 42px; display: flex; align-items: center; gap: 10px; padding: 0 18px; transform-origin: 50% 50%; }
 [data-composition-id="m05-bardella"] .dot { position: relative; display: block; width: 16px; height: 16px; border-radius: 50%; border: 2px solid rgba(255,255,255,0.35); box-sizing: border-box; }
 [data-composition-id="m05-bardella"] .dot-fill { position: absolute; inset: -2px; border-radius: 50%; display: block; }
-[data-composition-id="m05-bardella"] .card { position: absolute; top: 104px; right: 24px; width: 650px; border-radius: 27px; overflow: hidden; z-index: 4;
-  background: linear-gradient(180deg, rgba(22,24,29,0.93), rgba(15,16,20,0.92)); border: 2px solid rgba(255,255,255,0.1);
+[data-composition-id="m05-bardella"] .push { position: absolute; inset: 0; }
+[data-composition-id="m05-bardella"] .dim { position: absolute; inset: 0; opacity: 0; background: linear-gradient(90deg, rgba(0,0,0,0.18) 0%, rgba(0,0,0,0.55) 100%); }
+[data-composition-id="m05-bardella"] .card { position: absolute; top: 104px; right: 24px; width: 650px; border-radius: 27px; overflow: hidden; z-index: 4; transform-origin: right top;
+  --bga: 0.93; background: linear-gradient(180deg, rgba(22,24,29,var(--bga)), rgba(15,16,20,calc(var(--bga) - 0.01))); border: 2px solid rgba(255,255,255,0.1);
   box-shadow: 0 40px 110px rgba(0,0,0,0.55), 0 12px 60px color-mix(in srgb, var(--accent) 14%, transparent); color: rgba(255,255,255,0.95); }
 [data-composition-id="m05-bardella"] .bar { position: relative; height: 5px; overflow: hidden; }
 [data-composition-id="m05-bardella"] .bar .fill { position: absolute; inset: 0; background: var(--accent); }
@@ -66,11 +68,12 @@
 
 </style>
 
-<div class="vwrap" data-layout-allow-overflow>
+<div class="vwrap" data-layout-allow-overflow><div class="push" id="m05-bardella-push" data-layout-allow-overflow>
   <video id="m05-bardella-video" class="clip" src="assets/clips/leg-bardella-tva-1380.mp4" data-start="0" data-duration="20.65" data-media-start="3.5"
-    data-track-index="4" playsinline data-has-audio="true" data-automation='{"version": 1, "lanes": [{"target": "volume", "points": [{"t": 0, "v": 0}, {"t": 0.12, "v": 1}, {"t": 8.799999999999999, "v": 1}, {"t": 9.3, "v": 0.25}, {"t": 12.3, "v": 0.08}, {"t": 20.15, "v": 0.08}, {"t": 20.65, "v": 0}]}]}'></video>
+    data-track-index="4" playsinline data-has-audio="true" data-automation='{"version": 1, "lanes": [{"target": "volume", "points": [{"t": 0, "v": 0}, {"t": 0.12, "v": 1}, {"t": 8.799999999999999, "v": 1}, {"t": 9.3, "v": 0.25}, {"t": 12.3, "v": 0.08}, {"t": 20.15, "v": 0.08}, {"t": 20.65, "v": 0}]}]}'></video></div>
 </div>
 <div class="scrim"></div>
+<div class="dim" id="m05-bardella-dim"></div>
 
 <div class="pill badge" id="m05-bardella-badge"><span class="eq"><i id="m05-bardella-eq0"></i><i id="m05-bardella-eq1"></i><i id="m05-bardella-eq2"></i></span><span class="names"><span id="m05-bardella-name0">Jordan Bardella</span></span></div>
 <div class="pill dots" id="m05-bardella-dots"><i class="dot"><span class="dot-fill" id="m05-bardella-dot0" style="background:#ee6060;"></span></i><i class="dot"><span class="dot-fill" id="m05-bardella-dot1" style="background:#d4ac32;"></span></i><i class="dot"><span class="dot-fill" id="m05-bardella-dot2" style="background:#eba941;"></span></i><i class="dot"></i></div>
@@ -123,8 +126,15 @@
   tl.fromTo('#m05-bardella-checking', { opacity: 1 }, { opacity: 0, duration: 0.2 }, 9.10);
   tl.fromTo('#m05-bardella-card', { '--accent': '#9aa6b4' }, { '--accent': '#eba941', duration: 0.55, ease: 'power1.inOut', immediateRender: false }, 9.10);
 
+  // Lecture : la carte grandit et se recentre, l'image s'assombrit derrière elle
+  tl.fromTo('#m05-bardella-card', { scale: 1, y: 0, '--bga': 0.93 }, { scale: 1.4, y: 186, '--bga': 0.985, duration: 0.9, ease: 'power3.inOut', immediateRender: false }, 10.80);
+  tl.fromTo('#m05-bardella-dim', { opacity: 0 }, { opacity: 1, duration: 0.9, ease: 'power2.inOut' }, 10.80);
+  tl.fromTo('#m05-bardella-push', { x: 0, scale: 1 }, { x: -140, scale: 1.16, duration: 1.1, ease: 'power3.inOut' }, 10.70);
+
   // Sortie de la carte avant la coupe
-  tl.to('#m05-bardella-card', { opacity: 0, x: 58, scale: 0.97, filter: 'blur(7px)', duration: 0.45, ease: 'power2.in' }, 20.10);
+  tl.fromTo('#m05-bardella-card', { opacity: 1, x: 0, scale: 1.4, filter: 'blur(0px)' },
+    { opacity: 0, x: 58, scale: 1.358, filter: 'blur(7px)', duration: 0.45, ease: 'power2.in', immediateRender: false }, 20.10);
+  tl.fromTo('#m05-bardella-dim', { opacity: 1 }, { opacity: 0, duration: 0.45, ease: 'power2.in', immediateRender: false }, 20.10);
 
   // Qui parle
   tl.set('#m05-bardella-name0', { opacity: 1 }, 0);

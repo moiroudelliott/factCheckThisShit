@@ -115,6 +115,11 @@ strong { font-weight: 600; }
 .example blockquote { margin: 0 0 0.7rem; font-size: 1.15rem; font-style: italic; }
 .example p { margin: 0; }
 
+/* Vidéo de démonstration (page d'accueil) */
+.demo-video { margin: 1.6rem 0 1.8rem; }
+.demo-video video { display: block; width: 100%; height: auto; aspect-ratio: 16 / 9; background: #111; border: 1px solid var(--rule); }
+.demo-video figcaption { font-family: var(--sans); font-size: 0.8rem; color: var(--muted); margin-top: 0.5rem; line-height: 1.45; }
+
 /* Étiquettes de verdict */
 .verdict {
   display: inline-block; font-family: var(--sans); font-size: 0.72rem; font-weight: 700;

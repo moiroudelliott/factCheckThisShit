@@ -433,7 +433,7 @@ write("s08-fin", paper_scene("s08-fin", 8.0,
 <div class="abs url" id="s08-url">{"".join(f'<span id="s08-c{i}">{c}</span>' for i, c in enumerate(URL))}</div>
 <span class="abs rule" id="s08-rule" style="left:146px; top:556px; width:{len(URL) * 38.4:.0f}px; height:4px;"></span>
 <div class="abs tagline" id="s08-tag">Débats en relecture · fiches · méthode</div>
-<div class="abs fine" id="s08-fine">Montage : délai de vérification raccourci. Verdicts tels que publiés sur le site. Extraits : France 2, LCI.</div>
+<div class="abs fine" id="s08-fine">Montage : délai de vérification raccourci. Verdicts tels que publiés sur le site. Extraits : France 2, LCI, Franc-jeu (France Inter, France Télévisions). Musique : Jungle Waves, dimmysad (Pixabay).</div>
 </div>""",
     f"""  tl.fromTo('#s08-wm', {{ opacity: 0, y: 16 }}, {{ opacity: 1, y: 0, duration: 0.6, ease: 'power3.out' }}, 0.2);
   tl.fromTo('#s08-wm', {{ scale: 1 }}, {{ scale: 1.012, duration: 1.6, ease: 'sine.inOut', yoyo: true, repeat: 3, immediateRender: false }}, 0.9);

@@ -35,7 +35,9 @@ def files_to_publish() -> list:
     """Chemins relatifs à site/, dans une liste explicite."""
     out = [f for f in sorted(os.listdir(SITE)) if f.endswith(".html")]
     out += ["style.css", "relecture.js", "fiche.js", "resume.js", "favicon.svg", "robots.txt",
-            "overlay/content.js", "overlay/overlay.css", "sessions/index.json"]
+            "overlay/content.js", "overlay/overlay.css", "sessions/index.json",
+            # Vidéo de démonstration de la page d'accueil (videos/demo-2min, version web)
+            "media/demo-source.mp4", "media/demo-source.jpg"]
     out += [f"fonts/{f}" for f in sorted(os.listdir(os.path.join(SITE, "fonts"))) if f.endswith(".woff2")]
     out += [f"fonts/licenses/{f}" for f in sorted(os.listdir(os.path.join(SITE, "fonts", "licenses")))]
     with open(os.path.join(SITE, "sessions", "index.json"), encoding="utf-8") as f:

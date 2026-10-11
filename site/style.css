@@ -104,13 +104,93 @@ strong { font-weight: 600; }
 .button.secondary { color: var(--text); background: transparent; box-shadow: inset 0 0 0 1px var(--rule); }
 .button.secondary:hover { color: var(--accent); background: transparent; box-shadow: inset 0 0 0 1px var(--accent); }
 
-/* Accueil : titre, vidéo de démonstration, deux liens */
-.hero h1 { max-width: 40rem; }
-.hero .lede { max-width: var(--measure); margin-bottom: 1.8rem; }
-.demo-video { margin: 0 0 1.4rem; }
-.demo-video video { display: block; width: 100%; height: auto; aspect-ratio: 16 / 9; background: #111; }
-.demo-video figcaption { font-family: var(--sans); font-size: 0.75rem; color: var(--muted); margin-top: 0.45rem; line-height: 1.4; }
+/* ── Accueil ───────────────────────────────────────────────────────────
+   Accroche animée, carte de vérification qui « tombe » en boucle (les vrais
+   verdicts de la vidéo de démo), vidéo, compteurs. Tout s'arrête avec
+   prefers-reduced-motion. */
+.home .hero { display: grid; grid-template-columns: minmax(0, 1.08fr) minmax(0, 0.92fr); gap: 2rem 3.5rem; align-items: center; margin: 0.5rem 0 3.2rem; }
+.live { display: inline-flex; align-items: center; gap: 0.6rem; }
+.live-dot { position: relative; width: 0.5rem; height: 0.5rem; border-radius: 50%; background: var(--accent); flex: none; }
+.live-dot::after { content: ""; position: absolute; inset: 0; border-radius: 50%; background: var(--accent); animation: ping 1.8s ease-out infinite; }
+@keyframes ping { from { transform: scale(1); opacity: 0.55; } to { transform: scale(3.2); opacity: 0; } }
+.hero-title { margin: 0.4rem 0 1.3rem; line-height: 1; }
+.hero-q { display: block; font-family: var(--sans); font-size: clamp(1.1rem, 2.1vw, 1.45rem); font-weight: 500; color: var(--muted); margin-bottom: 0.5rem; }
+.hero-a { display: block; font-style: italic; font-size: clamp(2.7rem, 6.4vw, 5rem); letter-spacing: -0.02em; }
+.hero-info { position: relative; color: var(--accent); white-space: nowrap; }
+.hero-swoosh { position: absolute; left: -3%; bottom: -0.16em; width: 106%; height: 0.3em; overflow: visible; pointer-events: none; }
+.hero-swoosh path { fill: none; stroke: var(--accent); stroke-width: 5; stroke-linecap: round; stroke-dasharray: 240; stroke-dashoffset: 240; animation: draw 0.9s 1.25s cubic-bezier(0.65, 0, 0.35, 1) forwards; }
+@keyframes draw { to { stroke-dashoffset: 0; } }
+.rise { display: inline-block; opacity: 0; transform: translateY(0.35em); animation: rise 0.7s var(--d, 0s) cubic-bezier(0.2, 0.7, 0.2, 1) forwards; }
+@keyframes rise { to { opacity: 1; transform: none; } }
+.home .lede { max-width: 34rem; margin-bottom: 1.8rem; }
 .actions { display: flex; flex-wrap: wrap; gap: 0.7rem; margin: 0; }
+
+/* La scène : la carte et ses pastilles */
+.vstage { position: relative; display: grid; justify-items: center; gap: 1rem; isolation: isolate; }
+.vstage::before { content: ""; position: absolute; inset: 8% 4% 14%; border-radius: 40%; background: radial-gradient(closest-side, color-mix(in srgb, var(--glow, #9aa6b4) 32%, transparent), transparent); filter: blur(28px); transition: background 0.6s; z-index: -1; }
+.vcard {
+  --acc: #9aa6b4;
+  width: min(100%, 26rem); min-height: 19.5rem; border-radius: 18px; overflow: hidden; font-family: var(--sans);
+  color: rgba(255, 255, 255, 0.95); background: linear-gradient(180deg, #17191e, #0f1014); border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 28px 70px rgba(15, 16, 20, 0.32), 0 10px 34px color-mix(in srgb, var(--acc) 22%, transparent);
+  opacity: 0; transform: translateX(26px) scale(0.97); filter: blur(6px);
+  transition: opacity 0.55s, transform 0.65s cubic-bezier(0.2, 0.8, 0.2, 1), filter 0.55s, box-shadow 0.6s;
+}
+.vcard.is-in { opacity: 1; transform: none; filter: none; }
+.vcard.is-out { opacity: 0; transform: translateX(-26px) scale(0.97); filter: blur(6px); transition-duration: 0.45s; }
+.vcard-bar { position: relative; height: 4px; background: var(--acc); overflow: hidden; transition: background 0.55s; }
+.vcard-bar::after { content: ""; position: absolute; top: 0; left: -30%; width: 30%; height: 100%; background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.7), transparent); animation: shimmer 1.3s ease-in-out infinite; }
+.vcard.is-done .vcard-bar::after { display: none; }
+@keyframes shimmer { to { left: 130%; } }
+.vcard-in { padding: 1.05rem 1.3rem 1.15rem; }
+.vcard-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.85rem; }
+.vcard-brand { font-family: var(--serif); font-style: italic; font-size: 1.02rem; color: rgba(255, 255, 255, 0.82); }
+.vcard-brand b { font-weight: 500; color: var(--acc); transition: color 0.55s; }
+.vcard-tag { display: inline-flex; align-items: center; gap: 0.45rem; padding: 0.22rem 0.7rem; border-radius: 999px; font-size: 0.7rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; white-space: nowrap;
+  color: var(--acc); background: color-mix(in srgb, var(--acc) 15%, transparent); border: 1px solid color-mix(in srgb, var(--acc) 42%, transparent); transition: color 0.55s, background 0.55s, border-color 0.55s; }
+.vspin { width: 0.7rem; height: 0.7rem; border-radius: 50%; border: 2px solid rgba(255, 255, 255, 0.25); border-top-color: rgba(255, 255, 255, 0.85); animation: spin 0.8s linear infinite; }
+.vcard.is-done .vspin { display: none; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.vcard-who { margin: 0 0 0.35rem; font-size: 0.72rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--acc); transition: color 0.55s; }
+.vcard-claim { margin: 0 0 0.9rem; font-family: var(--serif); font-style: italic; font-size: 1.22rem; line-height: 1.32; color: #fff; }
+.vcard-stack { display: grid; }
+.vcard-stack > * { grid-area: 1 / 1; transition: opacity 0.4s, transform 0.45s; }
+.vcard-check { display: flex; align-items: center; gap: 0.6rem; align-self: start; font-size: 0.88rem; color: rgba(255, 255, 255, 0.6); }
+.vcard-body { margin: 0; font-size: 0.88rem; line-height: 1.5; color: rgba(255, 255, 255, 0.78); opacity: 0; transform: translateY(6px); }
+.vcard.is-done .vcard-check { opacity: 0; }
+.vcard.is-done .vcard-body { opacity: 1; transform: none; }
+.vcard-foot { display: flex; justify-content: space-between; gap: 1rem; margin-top: 0.95rem; padding-top: 0.8rem; border-top: 1px solid rgba(255, 255, 255, 0.09); font-size: 0.78rem; opacity: 0; transition: opacity 0.45s 0.15s; }
+.vcard.is-done .vcard-foot { opacity: 1; }
+.vcard-foot a { color: rgba(255, 255, 255, 0.72); text-decoration-color: rgba(255, 255, 255, 0.3); }
+.vcard-foot a:hover { color: #fff; }
+.vdots { display: flex; gap: 0.55rem; }
+.vdots button { width: 0.65rem; height: 0.65rem; padding: 0; border-radius: 50%; border: 1.5px solid #c9c6bd; background: transparent; cursor: pointer; transition: background 0.3s, border-color 0.3s, transform 0.3s; }
+.vdots button[aria-current="true"] { background: var(--c); border-color: var(--c); transform: scale(1.2); }
+
+/* Vidéo de démonstration */
+.demo-video { margin: 0 0 1rem; scroll-margin-top: 1.5rem; }
+.demo-video video { display: block; width: 100%; height: auto; aspect-ratio: 16 / 9; background: #111; border-radius: 6px; box-shadow: 0 24px 60px rgba(15, 16, 20, 0.18); }
+.demo-video figcaption { font-family: var(--sans); font-size: 0.75rem; color: var(--muted); margin-top: 0.55rem; line-height: 1.4; }
+
+/* Compteurs */
+.stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1rem 2rem; margin: 2.6rem 0 0; padding: 1.8rem 0 0; border-top: 1px solid var(--rule); }
+.stat b { display: block; font-family: var(--sans); font-weight: 800; font-size: clamp(2.1rem, 5.2vw, 3.6rem); line-height: 1; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
+.stat:nth-child(2) b { color: var(--accent); }
+.stat span { display: block; margin-top: 0.45rem; font-family: var(--sans); font-size: 0.78rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+
+@media (max-width: 860px) {
+  .home .hero { grid-template-columns: 1fr; margin-bottom: 2.4rem; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  html:has(.home) { scroll-behavior: smooth; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .rise, .hero-swoosh path { animation: none; opacity: 1; transform: none; stroke-dashoffset: 0; }
+  .live-dot::after, .vcard-bar::after { display: none; }
+  .vspin { animation: none; }
+  .vcard, .vcard-stack > *, .vcard-foot { transition: none; }
+  .vcard { filter: none; }
+}
 
 /* Étiquettes de verdict */
 .verdict {

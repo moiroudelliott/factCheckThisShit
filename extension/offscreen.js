@@ -1,5 +1,5 @@
 // ══════════════════════════════════════════════════════════════════════════════
-// SOURCÉ — document offscreen
+// vachecker.info — document offscreen
 // Capture l'audio de l'onglet, le découpe en chunks WebM, streame au backend
 // via socket.io, et remonte résultats + état de connexion au content script.
 //

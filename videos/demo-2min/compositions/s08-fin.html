@@ -3,7 +3,7 @@
 <head><meta charset="UTF-8" /></head>
 <body>
 <template id="s08-fin-template">
-<div data-composition-id="s08-fin" data-width="1920" data-height="1080" data-duration="8.0">
+<div data-composition-id="s08-fin" data-width="1920" data-height="1080" data-duration="10.0">
 <style>
 
 @font-face { font-family: 'SRC Archivo'; font-style: normal; font-weight: 100 900; src: url('assets/fonts/archivo-latin.woff2') format('woff2'); }
@@ -19,30 +19,55 @@
 [data-composition-id="s08-fin"] .wordmark b { font-weight: 500; color: #a3172c; }
 [data-composition-id="s08-fin"] .rule { display: block; background: #a3172c; transform-origin: 0 50%; }
 [data-composition-id="s08-fin"] .content { position: absolute; inset: 0; }
-[data-composition-id="s08-fin"] .wm { left: 140px; top: 230px; font-size: 150px; transform-origin: 0 60%; }
-[data-composition-id="s08-fin"] .url { left: 146px; top: 470px; font-family: 'SRC Plex Mono', monospace; font-size: 64px; color: #a3172c; white-space: nowrap; }
-[data-composition-id="s08-fin"] .tagline { left: 146px; top: 610px; font-size: 40px; }
+[data-composition-id="s08-fin"] .doute { left: 146px; top: 300px; font-size: 64px; line-height: 1; color: #5e5e5e; }
+[data-composition-id="s08-fin"] .morph { left: 140px; top: 430px; width: 1143px; height: 188px; }
+[data-composition-id="s08-fin"] .ch { position: absolute; top: 0; font-family: 'SRC Newsreader', serif; font-style: italic; font-weight: 500; font-size: 150px;
+  line-height: 1.25; color: #1c1c1c; white-space: pre; font-kerning: none; }
+[data-composition-id="s08-fin"] .ch.red { color: #a3172c; }
+[data-composition-id="s08-fin"] .tagline { left: 146px; top: 558px; font-size: 40px; }
 [data-composition-id="s08-fin"] .fine { left: 146px; bottom: 80px; font-size: 24px; color: #5e5e5e; }
 </style>
 <div class="content" id="s08-content">
-<div class="abs wordmark wm" id="s08-wm">SOURC<b>É</b></div>
-<div class="abs url" id="s08-url"><span id="s08-c0">s</span><span id="s08-c1">o</span><span id="s08-c2">u</span><span id="s08-c3">r</span><span id="s08-c4">c</span><span id="s08-c5">e</span><span id="s08-c6">.</span><span id="s08-c7">c</span><span id="s08-c8">o</span><span id="s08-c9">d</span><span id="s08-c10">e</span><span id="s08-c11">m</span><span id="s08-c12">i</span><span id="s08-c13">n</span><span id="s08-c14">d</span><span id="s08-c15">s</span><span id="s08-c16">.</span><span id="s08-c17">f</span><span id="s08-c18">r</span></div>
-<span class="abs rule" id="s08-rule" style="left:146px; top:556px; width:730px; height:4px;"></span>
+<div class="abs doute" id="s08-doute">Un doute&nbsp;?</div>
+<div class="abs morph" id="s08-morph"><span class="ch" id="s08-p0" style="left:0.00px;">V</span><span class="ch" id="s08-p1" style="left:105.30px;">a</span><span class="ch" id="s08-p3" style="left:221.55px;">c</span><span class="ch" id="s08-p4" style="left:283.65px;">h</span><span class="ch" id="s08-p5" style="left:366.30px;">e</span><span class="ch" id="s08-p6" style="left:430.42px;">c</span><span class="ch" id="s08-p7" style="left:492.52px;">k</span><span class="ch" id="s08-p8" style="left:570.30px;">e</span><span class="ch" id="s08-p9" style="left:634.42px;">r</span><span class="ch" id="s08-p11" style="left:736.27px;">l</span><span class="ch" id="s08-p12" style="left:778.50px;">’</span><span class="ch" id="s08-p13" style="left:813.83px;">i</span><span class="ch" id="s08-p14" style="left:860.25px;">n</span><span class="ch" id="s08-p15" style="left:949.27px;">f</span><span class="ch" id="s08-p16" style="left:996.23px;">o</span><span class="ch" id="s08-p18" style="left:1103.55px;">!</span><span class="ch" id="s08-lv" style="left:0px;">v</span><span class="ch red" id="s08-dot" style="left:636.98px;">.</span></div>
 <div class="abs tagline" id="s08-tag">Débats en relecture · fiches · méthode</div>
 <div class="abs fine" id="s08-fine">Montage : délai de vérification raccourci. Verdicts tels que publiés sur le site. Extraits : France 2, LCI, Franc-jeu (France Inter, France Télévisions). Musique : Jungle Waves, dimmysad (Pixabay).</div>
 </div>
 <script>
 (function () {
   const tl = gsap.timeline({ paused: true });
-  tl.fromTo('#s08-wm', { opacity: 0, y: 16 }, { opacity: 1, y: 0, duration: 0.6, ease: 'power3.out' }, 0.2);
-  tl.fromTo('#s08-wm', { scale: 1 }, { scale: 1.012, duration: 1.6, ease: 'sine.inOut', yoyo: true, repeat: 3, immediateRender: false }, 0.9);
-  for (let i = 0; i < 19; i++) {
-    tl.fromTo('#s08-c' + i, { opacity: 0 }, { opacity: 1, duration: 0.05 }, 0.8 + i * 0.045);
-  }
-  tl.fromTo('#s08-rule', { scaleX: 0 }, { scaleX: 1, duration: 0.55, ease: 'power3.out' }, 1.66);
-  tl.fromTo('#s08-tag', { opacity: 0, y: 12 }, { opacity: 1, y: 0, duration: 0.5, ease: 'power2.out' }, 2.2);
-  tl.fromTo('#s08-fine', { opacity: 0 }, { opacity: 1, duration: 0.6 }, 2.7);
-  tl.to('#s08-content', { opacity: 0, duration: 0.6, ease: 'power1.in' }, 7.35);
+  gsap.set(['#s08-lv', '#s08-dot'], { opacity: 0 });
+  tl.fromTo('#s08-doute', { opacity: 0, y: 16 }, { opacity: 1, y: 0, duration: 0.55, ease: 'power3.out' }, 0.2);
+  // « Va checker l'info ! » se tape
+  [0, 1, 3, 4, 5, 6, 7, 8, 9, 11, 12, 13, 14, 15, 16, 18].forEach((i, k) => {
+    tl.fromTo('#s08-p' + i, { opacity: 0 }, { opacity: 1, duration: 0.05 }, 0.85 + k * 0.045);
+  });
+  // … puis se replie en adresse
+  tl.to('#s08-doute', { opacity: 0, y: -14, duration: 0.4, ease: 'power2.in' }, 2.95);
+  tl.to('#s08-p1', { x: -30.00, duration: 0.9, ease: 'power3.inOut' }, 3.05);
+  tl.to('#s08-p3', { x: -64.65, duration: 0.9, ease: 'power3.inOut' }, 3.05);
+  tl.to('#s08-p4', { x: -64.65, duration: 0.9, ease: 'power3.inOut' }, 3.05);
+  tl.to('#s08-p5', { x: -64.65, duration: 0.9, ease: 'power3.inOut' }, 3.05);
+  tl.to('#s08-p6', { x: -64.65, duration: 0.9, ease: 'power3.inOut' }, 3.05);
+  tl.to('#s08-p7', { x: -64.64, duration: 0.9, ease: 'power3.inOut' }, 3.05);
+  tl.to('#s08-p8', { x: -64.65, duration: 0.9, ease: 'power3.inOut' }, 3.05);
+  tl.to('#s08-p9', { x: -64.65, duration: 0.9, ease: 'power3.inOut' }, 3.05);
+  tl.to('#s08-p11', { opacity: 0, y: 46, duration: 0.35, ease: 'power2.in' }, 2.95);
+  tl.to('#s08-p12', { x: -141.52, y: 63, opacity: 0, duration: 0.9, ease: 'power3.inOut' }, 3.05);
+  tl.to('#s08-p13', { x: -141.31, duration: 0.9, ease: 'power3.inOut' }, 3.05);
+  tl.to('#s08-p14', { x: -141.30, duration: 0.9, ease: 'power3.inOut' }, 3.05);
+  tl.to('#s08-p15', { x: -141.30, duration: 0.9, ease: 'power3.inOut' }, 3.05);
+  tl.to('#s08-p16', { x: -141.31, duration: 0.9, ease: 'power3.inOut' }, 3.05);
+  tl.to('#s08-p18', { opacity: 0, y: 46, duration: 0.35, ease: 'power2.in' }, 2.95);
+  tl.to('#s08-p0', { opacity: 0, duration: 0.3 }, 3.25);
+  tl.to('#s08-lv', { opacity: 1, duration: 0.3 }, 3.25);
+  tl.to('#s08-p13, #s08-p14, #s08-p15, #s08-p16', { color: '#a3172c', duration: 0.6, ease: 'power1.inOut' }, 3.35);
+  tl.fromTo('#s08-dot', { opacity: 0, y: -22 }, { opacity: 1, y: 0, duration: 0.35, ease: 'back.out(2)' }, 3.80);
+  tl.to('#s08-morph', { y: -110, duration: 0.8, ease: 'power3.inOut' }, 4.10);
+  tl.fromTo('#s08-morph', { scale: 1 }, { scale: 1.012, duration: 1.4, ease: 'sine.inOut', yoyo: true, repeat: 2, immediateRender: false }, 4.95);
+  tl.fromTo('#s08-tag', { opacity: 0, y: 12 }, { opacity: 1, y: 0, duration: 0.5, ease: 'power2.out' }, 4.70);
+  tl.fromTo('#s08-fine', { opacity: 0 }, { opacity: 1, duration: 0.6 }, 5.20);
+  tl.to('#s08-content', { opacity: 0, duration: 0.6, ease: 'power1.in' }, 9.35);
   window.__timelines['s08-fin'] = tl;
 })();
 </script>

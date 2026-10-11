@@ -1,5 +1,5 @@
 // ══════════════════════════════════════════════════════════════════════════════
-// SOURCÉ — popup
+// vachecker.info — popup
 // À l'ouverture : lit l'état réel de capture (storage.session via le SW) puis
 // health-check le backend. Toute erreur est affichée, jamais silencieuse.
 // Les champs saisis (et les intervenants détectés) sont gardés par vidéo :

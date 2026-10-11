@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "SOURCÉ",
+  "name": "vachecker.info",
   "version": "3.5",
   "description": "Fact-checking en temps réel des débats politiques, sur YouTube et les lecteurs vidéo des chaînes",
   "minimum_chrome_version": "116",

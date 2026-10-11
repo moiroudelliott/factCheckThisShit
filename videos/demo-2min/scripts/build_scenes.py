@@ -34,8 +34,8 @@ SCENES = [
     ("m04-attal", None),
     ("m05-bardella", None),
     ("m06-geffray", None),
-    ("s07-fiche", 16.0),
-    ("s08-fin", 8.0),
+    ("s07-fiche", 14.0),
+    ("s08-fin", 10.0),
 ]
 
 # Quatre débats, quatre politiques, quatre verdicts. Citations retranscrites au
@@ -241,13 +241,13 @@ def moment_html(sid, dur, m):
 {outro}
 <div class="pill badge" id="{sid}-badge"><span class="eq"><i id="{sid}-eq0"></i><i id="{sid}-eq1"></i><i id="{sid}-eq2"></i></span><span class="names">{names_html}</span></div>
 <div class="pill dots" id="{sid}-dots">{dots_html(sid, m['index'])}</div>
-<div class="pill chip" id="{sid}-chip"><span class="ping"><i id="{sid}-ring"></i><i></i></span><span class="brand">SOURC<b>É</b></span><span class="sub">analyse en direct</span></div>
+<div class="pill chip" id="{sid}-chip"><span class="ping"><i id="{sid}-ring"></i><i></i></span><span class="brand">vachecker<b>.info</b></span><span class="sub">analyse en direct</span></div>
 
 <div class="card" id="{sid}-card" style="--accent: {ACCENT['pending']};">
   <div class="bar"><div class="fill"></div><div class="shimmer" id="{sid}-shimmer" data-layout-allow-overflow></div></div>
   <div class="inner">
     <div class="head">
-      <span class="cbrand"><span class="d">◆</span>SOURC<b>É</b></span>
+      <span class="cbrand"><span class="d">◆</span>vachecker<b>.info</b></span>
       <span class="tag">
         <span id="{sid}-tagp"><span class="spin" id="{sid}-spin1"></span>VÉRIFICATION</span>
         <span id="{sid}-tagv"><span class="tdot"></span>{m['tag']}</span>
@@ -379,7 +379,7 @@ write("s02-promesse", paper_scene("s02-promesse", 5.0,
 § .steps .ar { color: #a3172c; }
 § .content { position: absolute; inset: 0; }""",
     """<div class="content" id="s02-content">
-<div class="abs wordmark wm" id="s02-wm">SOURC<b>É</b></div>
+<div class="abs wordmark wm" id="s02-wm">vachecker<b>.info</b></div>
 <div class="abs phrase" id="s02-phrase">Chaque affirmation vérifiée en direct, sources à l'appui, sur la vidéo.</div>
 <div class="abs mono steps"><span class="st" id="s02-st0">01 Transcription</span><span class="ar" id="s02-ar0">→</span><span class="st" id="s02-st1">02 Recherche des sources</span><span class="ar" id="s02-ar1">→</span><span class="st" id="s02-st2">03 Verdict</span></div>
 <span class="abs rule" id="s02-rule" style="left:146px; top:820px; width:1100px; height:2px; background:#e2e0da;"></span>
@@ -406,7 +406,7 @@ def rect(x0, y0, x1, y1):
     return f"left:{OX + x0 * S:.0f}px; top:{OY + y0 * S:.0f}px; width:{(x1 - x0) * S:.0f}px; height:{(y1 - y0) * S:.0f}px;"
 
 
-write("s07-fiche", paper_scene("s07-fiche", 16.0,
+write("s07-fiche", paper_scene("s07-fiche", 14.0,
     f"""§ {{ background: #f6f5f1; }}
 § .content {{ position: absolute; inset: 0; }}
 § .title {{ left: 120px; top: 104px; font-family: 'SRC Newsreader', serif; font-size: 74px; line-height: 1.1; }}
@@ -442,37 +442,103 @@ write("s07-fiche", paper_scene("s07-fiche", 16.0,
   tl.fromTo('#s07-label', { opacity: 0, y: 10 }, { opacity: 1, y: 0, duration: 0.4, ease: 'power2.out' }, 0.45);
   tl.fromTo('#s07-title', { opacity: 0, y: 18 }, { opacity: 1, y: 0, duration: 0.6, ease: 'power3.out' }, 0.55);
   tl.fromTo('#s07-shot', { opacity: 0, y: 50 }, { opacity: 1, y: 0, duration: 0.9, ease: 'expo.out' }, 0.8);
-  tl.fromTo('#s07-shotin', { scale: 1 }, { scale: 1.035, duration: 15, ease: 'none' }, 0.8);
+  tl.fromTo('#s07-shotin', { scale: 1 }, { scale: 1.03, duration: 13, ease: 'none' }, 0.8);
   [['#s07-hl1', '#s07-c1', 3.0], ['#s07-hl2', '#s07-c2', 5.4], ['#s07-hl3', '#s07-c3', 7.8]].forEach(([hl, c, t]) => {
     tl.fromTo(hl, { opacity: 0, scale: 1.04 }, { opacity: 1, scale: 1, duration: 0.45, ease: 'power3.out' }, t);
     tl.fromTo(c, { opacity: 0, x: 24 }, { opacity: 1, x: 0, duration: 0.5, ease: 'power3.out' }, t + 0.1);
   });
-  tl.to('#s07-content', { opacity: 0, duration: 0.5, ease: 'power1.in' }, 15.45);"""))
+  tl.to('#s07-content', { opacity: 0, duration: 0.5, ease: 'power1.in' }, 13.45);"""))
 
 # ── 08 · Où la trouver ───────────────────────────────────────────────────────
-URL = "source.codeminds.fr"
-write("s08-fin", paper_scene("s08-fin", 8.0,
-    """§ .content { position: absolute; inset: 0; }
-§ .wm { left: 140px; top: 230px; font-size: 150px; transform-origin: 0 60%; }
-§ .url { left: 146px; top: 470px; font-family: 'SRC Plex Mono', monospace; font-size: 64px; color: #a3172c; white-space: nowrap; }
-§ .tagline { left: 146px; top: 610px; font-size: 40px; }
-§ .fine { left: 146px; bottom: 80px; font-size: 24px; color: #5e5e5e; }""",
+# « Un doute ? Va checker l'info ! » se replie en « vachecker.info », le logo.
+# Chaque lettre est un élément placé à la main : sa position vient de la chasse
+# de la police (Newsreader italique, graisse 500, taille optique = corps, comme
+# le fait le navigateur), lue dans le fichier. Elle glisse de sa place dans la
+# phrase à sa place dans l'adresse ; « l » et « ! » tombent, l'apostrophe
+# descend et devient le point.
+from fontTools.ttLib import TTFont
+from fontTools.varLib import instancer
+
+PHRASE = "Va checker l’info !"
+URL = "vachecker.info"
+FS = 150
+_font = instancer.instantiateVariableFont(TTFont(os.path.join(ROOT, "assets/fonts/newsreader-italic-latin.woff2")),
+                                          {"wght": 500, "opsz": min(72, FS)})
+_cmap, _hmtx, _upm = _font.getBestCmap(), _font["hmtx"], _font["head"].unitsPerEm
+
+
+def _xs(text):
+    out, x = [], 0.0
+    for c in text:
+        out.append(round(x, 2))
+        x += _hmtx[_cmap[ord(c)]][0] * FS / _upm
+    return out, round(x, 2)
+
+
+PX, PW = _xs(PHRASE)
+UX, UW = _xs(URL)
+TARGET = {0: 0, 1: 1, 3: 2, 4: 3, 5: 4, 6: 5, 7: 6, 8: 7, 9: 8, 12: 9, 13: 10, 14: 11, 15: 12, 16: 13}
+DROP = (11, 18)                # « l » et « ! »
+RED = (12, 13, 14, 15, 16)     # l'apostrophe (devenue point) et « info »
+T_TYPE, T_MORPH = 0.85, 2.95
+LIFT = -110                    # le logo remonte une fois « Un doute ? » parti
+
+chars = []
+for i, c in enumerate(PHRASE):
+    if c in "  ":
+        continue
+    chars.append(f'<span class="ch" id="s08-p{i}" style="left:{PX[i]:.2f}px;">{c}</span>')
+chars.append('<span class="ch" id="s08-lv" style="left:0px;">v</span>')                        # V → v
+chars.append(f'<span class="ch red" id="s08-dot" style="left:{UX[9]:.2f}px;">.</span>')         # ’ → .
+typed = [i for i, c in enumerate(PHRASE) if c not in "  "]
+
+morph_js = []
+for i in typed:
+    sel = f"#s08-p{i}"
+    if i in DROP:
+        morph_js.append(f"tl.to('{sel}', {{ opacity: 0, y: 46, duration: 0.35, ease: 'power2.in' }}, {T_MORPH:.2f});")
+    elif i == 12:
+        morph_js.append(f"tl.to('{sel}', {{ x: {UX[9] - PX[12]:.2f}, y: {FS * 0.42:.0f}, opacity: 0, duration: 0.9, ease: 'power3.inOut' }}, {T_MORPH + 0.1:.2f});")
+    else:
+        dx = UX[TARGET[i]] - PX[i]
+        if abs(dx) > 0.01:
+            morph_js.append(f"tl.to('{sel}', {{ x: {dx:.2f}, duration: 0.9, ease: 'power3.inOut' }}, {T_MORPH + 0.1:.2f});")
+morph_js = "\n  ".join(morph_js)
+red_sel = ", ".join(f"#s08-p{i}" for i in RED if i != 12)
+
+write("s08-fin", paper_scene("s08-fin", 10.0,
+    f"""§ .content {{ position: absolute; inset: 0; }}
+§ .doute {{ left: 146px; top: 300px; font-size: 64px; line-height: 1; color: #5e5e5e; }}
+§ .morph {{ left: 140px; top: 430px; width: {PW:.0f}px; height: {FS * 1.25:.0f}px; }}
+§ .ch {{ position: absolute; top: 0; font-family: 'SRC Newsreader', serif; font-style: italic; font-weight: 500; font-size: {FS}px;
+  line-height: 1.25; color: #1c1c1c; white-space: pre; font-kerning: none; }}
+§ .ch.red {{ color: #a3172c; }}
+§ .tagline {{ left: 146px; top: {430 + LIFT + FS * 1.25 + 50:.0f}px; font-size: 40px; }}
+§ .fine {{ left: 146px; bottom: 80px; font-size: 24px; color: #5e5e5e; }}""",
     f"""<div class="content" id="s08-content">
-<div class="abs wordmark wm" id="s08-wm">SOURC<b>É</b></div>
-<div class="abs url" id="s08-url">{"".join(f'<span id="s08-c{i}">{c}</span>' for i, c in enumerate(URL))}</div>
-<span class="abs rule" id="s08-rule" style="left:146px; top:556px; width:{len(URL) * 38.4:.0f}px; height:4px;"></span>
+<div class="abs doute" id="s08-doute">Un doute&nbsp;?</div>
+<div class="abs morph" id="s08-morph">{"".join(chars)}</div>
 <div class="abs tagline" id="s08-tag">Débats en relecture · fiches · méthode</div>
 <div class="abs fine" id="s08-fine">Montage : délai de vérification raccourci. Verdicts tels que publiés sur le site. Extraits : France 2, LCI, Franc-jeu (France Inter, France Télévisions). Musique : Jungle Waves, dimmysad (Pixabay).</div>
 </div>""",
-    f"""  tl.fromTo('#s08-wm', {{ opacity: 0, y: 16 }}, {{ opacity: 1, y: 0, duration: 0.6, ease: 'power3.out' }}, 0.2);
-  tl.fromTo('#s08-wm', {{ scale: 1 }}, {{ scale: 1.012, duration: 1.6, ease: 'sine.inOut', yoyo: true, repeat: 3, immediateRender: false }}, 0.9);
-  for (let i = 0; i < {len(URL)}; i++) {{
-    tl.fromTo('#s08-c' + i, {{ opacity: 0 }}, {{ opacity: 1, duration: 0.05 }}, 0.8 + i * 0.045);
-  }}
-  tl.fromTo('#s08-rule', {{ scaleX: 0 }}, {{ scaleX: 1, duration: 0.55, ease: 'power3.out' }}, {0.8 + len(URL) * 0.045:.2f});
-  tl.fromTo('#s08-tag', {{ opacity: 0, y: 12 }}, {{ opacity: 1, y: 0, duration: 0.5, ease: 'power2.out' }}, 2.2);
-  tl.fromTo('#s08-fine', {{ opacity: 0 }}, {{ opacity: 1, duration: 0.6 }}, 2.7);
-  tl.to('#s08-content', {{ opacity: 0, duration: 0.6, ease: 'power1.in' }}, 7.35);"""))
+    f"""  gsap.set(['#s08-lv', '#s08-dot'], {{ opacity: 0 }});
+  tl.fromTo('#s08-doute', {{ opacity: 0, y: 16 }}, {{ opacity: 1, y: 0, duration: 0.55, ease: 'power3.out' }}, 0.2);
+  // « Va checker l'info ! » se tape
+  {typed}.forEach((i, k) => {{
+    tl.fromTo('#s08-p' + i, {{ opacity: 0 }}, {{ opacity: 1, duration: 0.05 }}, {T_TYPE} + k * 0.045);
+  }});
+  // … puis se replie en adresse
+  tl.to('#s08-doute', {{ opacity: 0, y: -14, duration: 0.4, ease: 'power2.in' }}, {T_MORPH:.2f});
+  {morph_js}
+  tl.to('#s08-p0', {{ opacity: 0, duration: 0.3 }}, {T_MORPH + 0.3:.2f});
+  tl.to('#s08-lv', {{ opacity: 1, duration: 0.3 }}, {T_MORPH + 0.3:.2f});
+  tl.to('{red_sel}', {{ color: '#a3172c', duration: 0.6, ease: 'power1.inOut' }}, {T_MORPH + 0.4:.2f});
+  tl.fromTo('#s08-dot', {{ opacity: 0, y: -22 }}, {{ opacity: 1, y: 0, duration: 0.35, ease: 'back.out(2)' }}, {T_MORPH + 0.85:.2f});
+  tl.to('#s08-morph', {{ y: {LIFT}, duration: 0.8, ease: 'power3.inOut' }}, {T_MORPH + 1.15:.2f});
+  tl.fromTo('#s08-morph', {{ scale: 1 }}, {{ scale: 1.012, duration: 1.4, ease: 'sine.inOut', yoyo: true, repeat: 2, immediateRender: false }}, {T_MORPH + 2.0:.2f});
+  tl.fromTo('#s08-tag', {{ opacity: 0, y: 12 }}, {{ opacity: 1, y: 0, duration: 0.5, ease: 'power2.out' }}, {T_MORPH + 1.75:.2f});
+  tl.fromTo('#s08-fine', {{ opacity: 0 }}, {{ opacity: 1, duration: 0.6 }}, {T_MORPH + 2.25:.2f});
+  tl.to('#s08-content', {{ opacity: 0, duration: 0.6, ease: 'power1.in' }}, 9.35);"""))
 
 # ── index.html ───────────────────────────────────────────────────────────────
 t = 0.0

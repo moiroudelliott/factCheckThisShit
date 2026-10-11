@@ -1,5 +1,5 @@
 // ══════════════════════════════════════════════════════════════════════════════
-// SOURCÉ — service worker
+// vachecker.info — service worker
 // AUCUN état en mémoire : Chrome tue le worker après ~30 s d'inactivité, donc
 // tout vit dans chrome.storage.session. Chaque handler relit l'état.
 // ══════════════════════════════════════════════════════════════════════════════

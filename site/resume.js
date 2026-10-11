@@ -1,5 +1,5 @@
 // ══════════════════════════════════════════════════════════════════════════════
-// SOURCÉ — résumé d'un débat en un écran
+// vachecker.info — résumé d'un débat en un écran
 //
 // Une page au format paysage (1600 × 900, mise à l'échelle de la fenêtre,
 // sans défilement) : l'exactitude de chaque débatteur, les thèmes, les
@@ -156,7 +156,7 @@
   }
 
   function render(f, id) {
-    document.title = `${f.titre || 'Débat'} — résumé SOURCÉ`;
+    document.title = `${f.titre || 'Débat'} — résumé vachecker.info`;
     const t = f.totaux || {};
     const v = t.verdicts || {};
     const debs = f.debatteurs || [];
@@ -166,7 +166,7 @@
     canvas.innerHTML = `
       <header class="r-head">
         <div>
-          <p class="r-kicker"><span class="r-brand">SOURC<span>É</span></span><span>Fiche du débat</span>${date ? `<span>${esc(date)}</span>` : ''}</p>
+          <p class="r-kicker"><span class="r-brand">vachecker<span>.info</span></span><span>Fiche du débat</span>${date ? `<span>${esc(date)}</span>` : ''}</p>
           <h1 class="r-title">${esc(f.titre || 'Débat').replace(/(\w)-(\w)/g, '$1\u2011$2')}</h1>
         </div>
         <div class="r-kpis">
@@ -181,7 +181,7 @@
       <footer class="r-foot">
         <span>Indice d'exactitude : vrai 1, partiel ½, trompeur et faux 0, sur les verdicts tranchés ; ± : marge d'erreur à 95 %.
           Calculé par le programme à partir de verdicts automatiques, qui peuvent se tromper.${topSources ? ` Sources les plus citées : ${esc(topSources)}.` : ''}</span>
-        <span class="r-url">source.codeminds.fr/fiche.html?s=${esc(id)}</span>
+        <span class="r-url">vachecker.info/fiche.html?s=${esc(id)}</span>
       </footer>`;
   }
 })();

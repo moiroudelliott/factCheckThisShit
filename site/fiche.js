@@ -1,5 +1,5 @@
 // ══════════════════════════════════════════════════════════════════════════════
-// SOURCÉ — fiche d'un débat
+// vachecker.info — fiche d'un débat
 //
 // Ce que chaque débatteur a affirmé, ce qui était exact, sur quels thèmes —
 // lisible sans regarder la vidéo. Met en forme sessions/<id>.fiche.json,
@@ -104,7 +104,7 @@
   function render() {
     for (const a of fiche.affirmations || []) affById.set(a.id, a);
     for (const t of fiche.themes || []) themeLabel[t.id] = t.label;
-    document.title = `${fiche.titre || 'Débat'} — fiche SOURCÉ`;
+    document.title = `${fiche.titre || 'Débat'} — fiche vachecker.info`;
     $('fiche').hidden = false;
     renderHead();
     renderDebaters();

@@ -1,5 +1,5 @@
 // ══════════════════════════════════════════════════════════════════════════════
-// SOURCÉ — content script
+// vachecker.info — content script
 //
 // Workflow : seules les AFFIRMATIONS vérifiables apparaissent en carte
 // (spinner → verdict). Tout le reste (questions, opinions, remarques…) va
@@ -729,7 +729,7 @@ function injectChip() {
       <span class="fct-ping-core"></span>
       <span class="fct-ping-ring"></span>
     </span>
-    <span class="fct-chip-brand">SOURC<span class="fct-chip-dot">É</span></span>
+    <span class="fct-chip-brand">vachecker<span class="fct-chip-dot">.info</span></span>
     <span class="fct-chip-sub" id="fct-chip-sub" role="status">connexion…</span>
     <button class="fct-chip-recap" id="fct-recap-btn" aria-expanded="false" aria-controls="fct-recap">Récap <span id="fct-count"></span></button>
     <button class="fct-chip-stop" id="fct-stop-btn"></button>
@@ -758,7 +758,7 @@ function updateChipControls() {
   if (!btn || !chip) return;
   const live = S.phase === 'live';
   btn.textContent = live ? '■' : '✕';
-  btn.title = live ? "Arrêter l'analyse" : 'Fermer SOURCÉ';
+  btn.title = live ? "Arrêter l'analyse" : 'Fermer vachecker.info';
   btn.setAttribute('aria-label', btn.title);
   chip.classList.toggle('fct-chip--ended', S.phase === 'ended');
 }
@@ -1273,7 +1273,7 @@ function showCard(id, entry) {
     <div class="fct-card-inner" data-point-id="${esc(id)}">
       <div class="fct-card-head">
         <span class="fct-brand">
-          <span class="fct-brand-diamond">◆</span>SOURC<span class="fct-brand-dot">É</span>
+          <span class="fct-brand-diamond">◆</span>vachecker<span class="fct-brand-dot">.info</span>
         </span>
         <span class="fct-tag">
           <span class="fct-tag-icon fct-spinner-icon"></span>
@@ -1452,7 +1452,7 @@ function exportRecap() {
   const title = exportTitle();
   const pageUrl = IS_YOUTUBE ? `https://www.youtube.com/watch?v=${vid}` : vid;
 
-  const lines = [`# SOURCÉ — Récapitulatif (${new Date().toLocaleDateString('fr-FR')})`, ''];
+  const lines = [`# vachecker.info — Récapitulatif (${new Date().toLocaleDateString('fr-FR')})`, ''];
   if (vid) lines.push(`Vidéo : [${title || vid}](${pageUrl})`, '');
   const affs = [], others = [];
   for (const entry of S.points.values()) {
@@ -1649,10 +1649,10 @@ function openRecap() {
   const panel = document.createElement('div');
   panel.id = 'fct-recap';
   panel.setAttribute('role', 'region');
-  panel.setAttribute('aria-label', 'Récapitulatif SOURCÉ');
+  panel.setAttribute('aria-label', 'Récapitulatif vachecker.info');
   panel.innerHTML = `
     <div class="fct-recap-header">
-      <span class="fct-recap-title">◆ SOURC<span style="color:#e0324f">É</span> — Récap</span>
+      <span class="fct-recap-title">◆ vachecker<span style="color:#e0324f">.info</span> — Récap</span>
       <div style="display:flex;gap:6px">
         <span class="fct-seg" role="group" aria-label="Filtrer le récapitulatif">
           <button type="button" data-filter="all">Tout</button>

@@ -1,5 +1,5 @@
 // ══════════════════════════════════════════════════════════════════════════════
-// SOURCÉ — relecture d'une session enregistrée
+// vachecker.info — relecture d'une session enregistrée
 //
 // Rejoue, par-dessus le lecteur YouTube intégré, les messages que le backend
 // a envoyés pendant une analyse en direct, chacun à la position vidéo où il

@@ -463,21 +463,19 @@ write("s075-methode", paper_scene("s075-methode", 5.5,
 § .step .n { font-weight: 800; font-size: 96px; line-height: 1; letter-spacing: -0.03em; color: #a3172c; }
 § .step .h { font-family: 'SRC Newsreader', serif; font-size: 70px; line-height: 1.05; color: #1c1c1c; }
 § .step .d { grid-column: 2; margin-top: 10px; font-size: 34px; line-height: 1.3; color: #5e5e5e; }
-§ .badges { left: 140px; top: 905px; display: flex; gap: 22px; }
-§ .badge { display: inline-flex; align-items: center; gap: 14px; padding: 14px 26px; border-radius: 999px; border: 2px solid #a3172c;
-  font-weight: 700; font-size: 26px; letter-spacing: 0.06em; text-transform: uppercase; color: #a3172c; }
-§ .badge i { width: 12px; height: 12px; border-radius: 50%; background: #a3172c; }""",
+§ .made { left: 140px; top: 915px; display: flex; align-items: center; gap: 16px; font-size: 30px; color: #5e5e5e; }
+§ .flag { width: 45px; height: 30px; border-radius: 4px; background: linear-gradient(90deg, #0055a4 0 33.34%, #fff 33.34% 66.67%, #ef4135 66.67%);
+  box-shadow: 0 0 0 2px rgba(0,0,0,0.12); }""",
     f"""<div class="content" id="s075-content">
 <div class="abs mono" id="s075-label" style="left:140px; top:96px;">Comment on vérifie</div>
 {"".join(f'<div class="abs step" id="s075-st{i}" style="top:{190 + i * 225}px;"><span class="n">{n}</span><span class="h">{h}</span><span class="d">{d}</span></div>' for i, (n, h, d) in enumerate(STEPS))}
-<div class="abs badges"><span class="badge" id="s075-b0"><i></i>IA française · Mistral AI</span><span class="badge" id="s075-b1"><i></i>Son traité en local</span></div>
+<div class="abs made" id="s075-made"><span class="flag"></span>IA française</div>
 </div>""",
     """  tl.fromTo('#s075-label', { opacity: 0, y: 10 }, { opacity: 1, y: 0, duration: 0.4, ease: 'power2.out' }, 0.1);
   [0, 1, 2].forEach((i) => {
     tl.fromTo('#s075-st' + i, { opacity: 0, x: -36 }, { opacity: 1, x: 0, duration: 0.55, ease: 'power3.out' }, 0.3 + i * 0.55);
   });
-  tl.fromTo('#s075-b0', { opacity: 0, y: 14 }, { opacity: 1, y: 0, duration: 0.45, ease: 'back.out(1.8)' }, 2.1);
-  tl.fromTo('#s075-b1', { opacity: 0, y: 14 }, { opacity: 1, y: 0, duration: 0.45, ease: 'back.out(1.8)' }, 2.3);
+  tl.fromTo('#s075-made', { opacity: 0 }, { opacity: 1, duration: 0.5, ease: 'power1.out' }, 2.1);
   tl.to('#s075-content', { opacity: 0, duration: 0.45, ease: 'power1.in' }, 5.0);"""))
 
 # ── 08 · Où la trouver ───────────────────────────────────────────────────────

@@ -3,7 +3,7 @@
 <head><meta charset="UTF-8" /></head>
 <body>
 <template id="s07-fiche-template">
-<div data-composition-id="s07-fiche" data-width="1920" data-height="1080" data-duration="14.0">
+<div data-composition-id="s07-fiche" data-width="1920" data-height="1080" data-duration="9.0">
 <style>
 
 @font-face { font-family: 'SRC Archivo'; font-style: normal; font-weight: 100 900; src: url('assets/fonts/archivo-latin.woff2') format('woff2'); }
@@ -57,12 +57,12 @@
   tl.fromTo('#s07-label', { opacity: 0, y: 10 }, { opacity: 1, y: 0, duration: 0.4, ease: 'power2.out' }, 0.45);
   tl.fromTo('#s07-title', { opacity: 0, y: 18 }, { opacity: 1, y: 0, duration: 0.6, ease: 'power3.out' }, 0.55);
   tl.fromTo('#s07-shot', { opacity: 0, y: 50 }, { opacity: 1, y: 0, duration: 0.9, ease: 'expo.out' }, 0.8);
-  tl.fromTo('#s07-shotin', { scale: 1 }, { scale: 1.03, duration: 13, ease: 'none' }, 0.8);
-  [['#s07-hl1', '#s07-c1', 3.0], ['#s07-hl2', '#s07-c2', 5.4], ['#s07-hl3', '#s07-c3', 7.8]].forEach(([hl, c, t]) => {
+  tl.fromTo('#s07-shotin', { scale: 1 }, { scale: 1.025, duration: 8, ease: 'none' }, 0.8);
+  [['#s07-hl1', '#s07-c1', 2.1], ['#s07-hl2', '#s07-c2', 3.7], ['#s07-hl3', '#s07-c3', 5.3]].forEach(([hl, c, t]) => {
     tl.fromTo(hl, { opacity: 0, scale: 1.04 }, { opacity: 1, scale: 1, duration: 0.45, ease: 'power3.out' }, t);
     tl.fromTo(c, { opacity: 0, x: 24 }, { opacity: 1, x: 0, duration: 0.5, ease: 'power3.out' }, t + 0.1);
   });
-  tl.to('#s07-content', { opacity: 0, duration: 0.5, ease: 'power1.in' }, 13.45);
+  tl.to('#s07-content', { opacity: 0, duration: 0.45, ease: 'power1.in' }, 8.5);
   window.__timelines['s07-fiche'] = tl;
 })();
 </script>

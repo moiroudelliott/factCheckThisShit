@@ -109,6 +109,8 @@ strong { font-weight: 600; }
    verdicts de la vidéo de démo), vidéo, compteurs. Tout s'arrête avec
    prefers-reduced-motion. */
 .home .hero { display: grid; grid-template-columns: minmax(0, 1.08fr) minmax(0, 0.92fr); gap: 2rem 3.5rem; align-items: center; margin: 0.5rem 0 3.2rem; }
+main.home { overflow-x: clip; }   /* la carte entre par la droite : pas de défilement horizontal passager */
+.home .hero > * { min-width: 0; }   /* le nom du débat (une ligne, coupée) ne doit pas élargir la colonne */
 .live { display: inline-flex; align-items: center; gap: 0.6rem; }
 .live-dot { position: relative; width: 0.5rem; height: 0.5rem; border-radius: 50%; background: var(--accent); flex: none; }
 .live-dot::after { content: ""; position: absolute; inset: 0; border-radius: 50%; background: var(--accent); animation: ping 1.8s ease-out infinite; }
@@ -123,7 +125,7 @@ strong { font-weight: 600; }
 .actions { display: flex; flex-wrap: wrap; gap: 0.7rem; margin: 0; }
 
 /* La scène : la carte et ses pastilles */
-.vstage { position: relative; display: grid; justify-items: center; gap: 1rem; isolation: isolate; }
+.vstage { position: relative; display: grid; grid-template-columns: minmax(0, 1fr); justify-items: center; gap: 1rem; isolation: isolate; }
 .vstage::before { content: ""; position: absolute; inset: 8% 4% 14%; border-radius: 40%; background: radial-gradient(closest-side, color-mix(in srgb, var(--glow, #9aa6b4) 32%, transparent), transparent); filter: blur(28px); transition: background 0.6s; z-index: -1; }
 .vcard {
   --acc: #9aa6b4;
@@ -173,6 +175,26 @@ strong { font-weight: 600; }
 .vnav button { width: 1.9rem; height: 1.9rem; padding: 0; border-radius: 50%; border: 1px solid var(--rule); background: var(--bg); color: var(--text); font: inherit; font-size: 1.05rem; line-height: 1; cursor: pointer; }
 .vnav button:hover { border-color: var(--accent); color: var(--accent); }
 .vstage.static .vprogress, .vstage.static .vnav { display: none; }
+
+/* Comment on vérifie : trois étapes, une ligne chacune */
+.how { margin: 0 0 3.2rem; }
+.how-head { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
+.how-link { font-family: var(--sans); font-size: 0.9rem; font-weight: 600; text-decoration: none; }
+.how-link:hover { text-decoration: underline; }
+.how-steps { list-style: none; padding: 0; margin: 0.6rem 0 1.4rem; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1.4rem 2rem; }
+.how-steps li { margin: 0; padding-top: 1rem; border-top: 2px solid var(--text); }
+.how-steps b { display: block; font-family: var(--sans); font-weight: 800; font-size: 2.3rem; line-height: 1; letter-spacing: -0.03em; color: var(--accent); }
+.how-steps strong { display: block; margin: 0.45rem 0 0.25rem; font-family: var(--serif); font-weight: 500; font-size: 1.45rem; }
+.how-steps span { display: block; font-family: var(--sans); font-size: 0.92rem; line-height: 1.5; color: var(--muted); }
+.how-badges { display: flex; flex-wrap: wrap; gap: 0.6rem; margin: 0; }
+.how-badges span { display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.35rem 0.85rem; border-radius: 999px; border: 1.5px solid var(--accent);
+  font-family: var(--sans); font-size: 0.74rem; font-weight: 700; letter-spacing: 0.07em; text-transform: uppercase; color: var(--accent); }
+.how-badges i { width: 0.45rem; height: 0.45rem; border-radius: 50%; background: var(--accent); }
+.js-reveal .reveal { opacity: 0; transform: translateY(18px); transition: opacity 0.6s var(--d, 0s), transform 0.7s var(--d, 0s) cubic-bezier(0.2, 0.7, 0.2, 1); }
+.js-reveal .reveal.in { opacity: 1; transform: none; }
+@media (max-width: 720px) {
+  .how-steps { grid-template-columns: 1fr; }
+}
 
 /* Vidéo de démonstration */
 .demo-video { margin: 0 0 1rem; scroll-margin-top: 1.5rem; }

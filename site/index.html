@@ -18,7 +18,7 @@
   <meta property="og:image:height" content="630">
   <meta property="og:image:alt" content="vachecker.info — Un doute ? Va checker l’info.">
   <meta name="twitter:card" content="summary_large_image">
-  <link rel="stylesheet" href="style.css?v=4218e30558">
+  <link rel="stylesheet" href="style.css?v=b2153c8c3c">
 </head>
 <body>
   <header class="site-header">
@@ -70,11 +70,24 @@
       </div>
     </section>
 
+    <section class="how" aria-labelledby="how-t">
+      <div class="how-head">
+        <p class="kicker" id="how-t">Comment on vérifie</p>
+        <a class="how-link" href="methode.html">La méthode en détail →</a>
+      </div>
+      <ol class="how-steps">
+        <li class="reveal"><b>01</b><strong>Écouter</strong><span>Le débat est transcrit en direct, sur l’ordinateur, orateur par orateur.</span></li>
+        <li class="reveal" style="--d:.12s"><b>02</b><strong>Repérer</strong><span>L’IA relève les chiffres, dates et faits vérifiables.</span></li>
+        <li class="reveal" style="--d:.24s"><b>03</b><strong>Vérifier</strong><span>Sources officielles, presse, fact-checks&nbsp;: le verdict cite sa source.</span></li>
+      </ol>
+      <p class="how-badges reveal" style="--d:.36s"><span><i></i>IA française · Mistral AI</span><span><i></i>Son traité en local</span><span><i></i>Chaque verdict sourcé</span></p>
+    </section>
+
     <p class="kicker">La démo · 2 min</p>
     <figure class="demo-video" id="demo">
-      <video controls preload="none" playsinline poster="media/demo-source.jpg?v=1588b4903d" width="1920" height="1080">
-        <source src="media/demo-source.mp4?v=bfd09f58ca" type="video/mp4">
-        <a href="media/demo-source.mp4?v=bfd09f58ca">Télécharger la vidéo de démonstration (MP4)</a>
+      <video controls preload="none" playsinline poster="media/demo-source.jpg?v=e1ea99bfd5" width="1920" height="1080">
+        <source src="media/demo-source.mp4?v=924ff16ad8" type="video/mp4">
+        <a href="media/demo-source.mp4?v=924ff16ad8">Télécharger la vidéo de démonstration (MP4)</a>
       </video>
       <figcaption>Extraits : France 2, LCI, Franc-jeu (France Inter, France Télévisions) · Musique : « Jungle Waves », dimmysad (Pixabay)</figcaption>
     </figure>
@@ -96,6 +109,13 @@
     const BAR = { vrai: 'var(--v-vrai)', partiellement_vrai: 'var(--v-partiel)', trompeur: 'var(--v-trompeur)', faux: 'var(--v-faux)' };
     const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
     const $ = (id) => document.getElementById(id);
+    if ('IntersectionObserver' in window && !reduce) {
+      document.documentElement.classList.add('js-reveal');
+      const ro = new IntersectionObserver((es) => es.forEach((x) => {
+        if (x.isIntersecting) { x.target.classList.add('in'); ro.unobserve(x.target); }
+      }), { threshold: 0.3 });
+      document.querySelectorAll('.reveal').forEach((el) => ro.observe(el));
+    }
     const card = $('vcard'), stage = $('vstage'), bar = $('vbar');
     const HOLD = 7000, T_CHECK = reduce ? 0 : 1500, T_OUT = reduce ? 0 : 450;
     let list = [], i = 0, timers = [];

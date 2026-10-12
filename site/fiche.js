@@ -105,6 +105,10 @@
     for (const a of fiche.affirmations || []) affById.set(a.id, a);
     for (const t of fiche.themes || []) themeLabel[t.id] = t.label;
     document.title = `${fiche.titre || 'Débat'} — fiche vachecker.info`;
+    // Adresse de référence propre à ce débat (sinon : celle de la liste des fiches)
+    const url = `https://vachecker.info/fiche?s=${encodeURIComponent(sid)}`;
+    document.querySelector('link[rel="canonical"]')?.setAttribute('href', url);
+    document.querySelector('meta[property="og:url"]')?.setAttribute('content', url);
     $('fiche').hidden = false;
     renderHead();
     renderDebaters();

@@ -53,7 +53,9 @@ def files_to_publish() -> list:
     out += ["style.css", "relecture.js", "fiche.js", "resume.js", "favicon.svg", "robots.txt",
             "overlay/content.js", "overlay/overlay.css", "sessions/index.json",
             # Vidéo de démonstration de la page d'accueil (videos/demo-2min, version web)
-            "media/demo-source.mp4", "media/demo-source.jpg"]
+            "media/demo-source.mp4", "media/demo-source.jpg",
+            # Aperçu des liens partagés (og:image) et exemples de l'accueil (publish_session.py)
+            "media/og.jpg", "sessions/exemples.json"]
     out += [f"fonts/{f}" for f in sorted(os.listdir(os.path.join(SITE, "fonts"))) if f.endswith(".woff2")]
     out += [f"fonts/licenses/{f}" for f in sorted(os.listdir(os.path.join(SITE, "fonts", "licenses")))]
     with open(os.path.join(SITE, "sessions", "index.json"), encoding="utf-8") as f:

@@ -84,6 +84,12 @@
     const wanted = new URLSearchParams(location.search).get('s');
     const current = list.find((s) => s.id === wanted) || list[0];
     renderDebates(list, current);
+    if (current.id === wanted) {
+      // Adresse de référence propre à ce débat
+      const url = `https://vachecker.info/relecture?s=${encodeURIComponent(current.id)}`;
+      document.querySelector('link[rel="canonical"]')?.setAttribute('href', url);
+      document.querySelector('meta[property="og:url"]')?.setAttribute('content', url);
+    }
     if (current.fiche) {
       $('fiche-link').querySelector('a').href = `fiche.html?s=${encodeURIComponent(current.id)}`;
       $('fiche-link').hidden = false;

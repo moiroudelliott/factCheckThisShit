@@ -263,6 +263,63 @@ def publish(path: str, title: str = "", offset: float = 0.0) -> dict:
     return entry
 
 
+EXAMPLES = os.path.join(SESSIONS, "exemples.json")
+EXAMPLE_RANK = {"faux": 0, "trompeur": 1, "partiellement_vrai": 2, "vrai": 3}
+# Verdicts laissés tels quels dans leur fiche, mais pas mis en vitrine sur
+# l'accueil : relus et jugés douteux (verdict ou explication).
+EXAMPLES_SKIPPED = {
+    "ae3f0d5c", "1761bbb0", "2cbdccf6", "686f7886", "d1e9b87b", "4637fc9a", "cacb4db9", "67f8b635", "9a67224a",
+    "9e856b4d", "97fac745", "027739c3", "7a86af2c", "c0c0489c", "a35d75d4", "f01c6a14", "8a6d14ab", "35a1d81a",
+    "14b1e0e2", "e6442e41", "931bb5cc", "cf3191fa", "f3c0d414", "2adbff3d", "134cb832", "615890ef", "701ad23a",
+    "01df268b", "02e18838", "e1b7c3c0", "652a3782", "3f3b2139", "70d2ca14", "946babda", "b00afee3", "559d46c9",
+    "0568c5e5", "a0498bc8", "6ddc6d8c", "9d09ca72", "c31e5b0a", "242146b4", "c4d7399c", "c771ca98", "00a65039",
+    "3eb9af33", "9d424d8f",
+}
+
+
+def write_examples(per_debate: int = 10) -> bool:
+    """Exemples de vérifications de l'accueil (sessions/exemples.json), choisis
+    dans les fiches publiées : verdict tranché, confiance ≥ 85, phrase d'un
+    débatteur (pas d'un animateur), source citée, textes de longueur lisible.
+    Les moments forts de la fiche d'abord, puis les erreurs ; au plus 4 par
+    débatteur et 3 « vrai » par débat. Textes tels quels. Renvoie True si le
+    fichier a changé."""
+    out = []
+    for s in load_index().get("sessions", []):
+        path = os.path.join(SESSIONS, f"{s['id']}.fiche.json")
+        if not s.get("fiche") or not os.path.exists(path):
+            continue
+        with open(path, encoding="utf-8") as f:
+            fiche = json.load(f)
+        hosts = set(fiche.get("animateurs") or [])
+        moments = {m.get("id") for m in (fiche.get("redaction") or {}).get("moments") or []}
+        ok = [a for a in fiche.get("affirmations") or []
+              if a.get("verdict") in EXAMPLE_RANK and a.get("id") not in EXAMPLES_SKIPPED
+              and a.get("qui") and not re.match(r"Intervenant [A-Z]$", a["qui"]) and a["qui"] not in hosts
+              and (a.get("confiance") or 0) >= 85 and a.get("url") and a.get("source")
+              and 25 <= len(a.get("texte") or "") <= 150 and 40 <= len(a.get("explication") or "") <= 280]
+        ok.sort(key=lambda a: (a["id"] not in moments, EXAMPLE_RANK[a["verdict"]], -(a.get("confiance") or 0), a.get("t") or 0))
+        chosen, per_qui, n_vrai = [], {}, 0
+        for a in ok:
+            if (a["verdict"] == "vrai" and n_vrai >= 3) or per_qui.get(a["qui"], 0) >= 4:
+                continue
+            chosen.append(a)
+            per_qui[a["qui"]] = per_qui.get(a["qui"], 0) + 1
+            n_vrai += a["verdict"] == "vrai"
+            if len(chosen) >= per_debate:
+                break
+        out += [{"s": s["id"], "debat": s.get("title") or "", "t": a.get("t") or 0, "qui": a["qui"],
+                 "verdict": a["verdict"], "texte": a["texte"], "explication": a["explication"],
+                 "source": a["source"], "url": a["url"]} for a in chosen]
+    new = json.dumps({"exemples": out}, ensure_ascii=False, separators=(",", ":"))
+    old = open(EXAMPLES, encoding="utf-8").read() if os.path.exists(EXAMPLES) else ""
+    if new == old:
+        return False
+    with open(EXAMPLES, "w", encoding="utf-8", newline="\n") as f:
+        f.write(new)
+    return True
+
+
 def main():
     if sys.stdout.encoding and sys.stdout.encoding.lower() != "utf-8":
         sys.stdout.reconfigure(encoding="utf-8", errors="replace")
@@ -275,6 +332,8 @@ def main():
     for f in sync():
         print(f"↻ {f}")
     if not args.session:
+        if write_examples():
+            print(f"↻ {os.path.relpath(EXAMPLES, ROOT)}")
         print("Overlay du site à jour.")
         return
     try:
@@ -282,6 +341,8 @@ def main():
     except (OSError, ValueError, json.JSONDecodeError) as e:
         print(f"✗ {e}")
         sys.exit(1)
+    if write_examples():
+        print(f"↻ {os.path.relpath(EXAMPLES, ROOT)}")
     print(f"✓ site/sessions/{entry['id']}.json — {entry['title'] or entry['id']}")
     print(f"  {entry['points']} points, {entry['affirmations']} affirmations, {entry['verdicts']} verdicts, "
           f"{int(entry['duration'] // 60)} min")

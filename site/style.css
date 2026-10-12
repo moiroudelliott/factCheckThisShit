@@ -111,12 +111,7 @@ strong { font-weight: 600; }
 .home .hero { display: grid; grid-template-columns: minmax(0, 1.08fr) minmax(0, 0.92fr); gap: 2rem 3.5rem; align-items: center; margin: 0.5rem 0 3.2rem; }
 main.home { overflow-x: clip; }   /* la carte entre par la droite : pas de défilement horizontal passager */
 .home .hero > * { min-width: 0; }   /* le nom du débat (une ligne, coupée) ne doit pas élargir la colonne */
-.live { display: inline-flex; align-items: center; flex-wrap: wrap; gap: 0.35rem 0.6rem; }
-.kicker-sep { color: var(--rule); }
-.live.rise { display: flex; }   /* .rise met inline-block : le point et le drapeau perdaient leur largeur */
-.live-dot { position: relative; width: 0.5rem; height: 0.5rem; border-radius: 50%; background: var(--accent); flex: none; }
-.live-dot::after { content: ""; position: absolute; inset: 0; border-radius: 50%; background: var(--accent); animation: ping 1.8s ease-out infinite; }
-@keyframes ping { from { transform: scale(1); opacity: 0.55; } to { transform: scale(3.2); opacity: 0; } }
+.made.rise { display: flex; align-items: center; gap: 0.55rem; }   /* .rise met inline-block : le drapeau perdrait sa largeur */
 .hero-title { margin: 0.4rem 0 1.3rem; line-height: 1; }
 .hero-q { display: block; font-family: var(--sans); font-size: clamp(1.1rem, 2.1vw, 1.45rem); font-weight: 500; color: var(--muted); margin-bottom: 0.5rem; }
 .hero-a { display: block; font-style: italic; font-size: clamp(2.7rem, 6.4vw, 5rem); letter-spacing: -0.02em; }
@@ -215,7 +210,7 @@ main.home { overflow-x: clip; }   /* la carte entre par la droite : pas de défi
 @media (prefers-reduced-motion: reduce) {
   .rise { animation: none; opacity: 1; transform: none; }
   .vprogress i.run { animation: none; transform: scaleX(1); }
-  .live-dot::after, .vcard-bar::after { display: none; }
+  .vcard-bar::after { display: none; }
   .vspin { animation: none; }
   .vcard, .vcard-stack > *, .vcard-foot { transition: none; }
   .vcard { filter: none; }

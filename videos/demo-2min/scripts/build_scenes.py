@@ -30,10 +30,10 @@ FONTS = """
 SCENES = [
     ("s01-volume", 5.0),
     ("s02-promesse", 5.0),
-    ("m03-bompard", None),
+    ("m03-zemmour", None),
     ("m04-attal", None),
     ("m05-bardella", None),
-    ("m06-geffray", None),
+    ("m06-bompard", None),
     ("s07-fiche", 9.0),
     ("s075-methode", 5.5),
     ("s08-fin", 9.5),
@@ -42,14 +42,15 @@ SCENES = [
 # Quatre débats, quatre politiques, quatre verdicts. Citations retranscrites au
 # mot près sur chaque extrait, verdicts contrôlés sur la source (voir STORYBOARD.md).
 LCI_CROP = "transform: scale(1.17); transform-origin: 20% 0;"   # sort le bandeau défilant de LCI, sans rapport
+BFM_CROP = "transform: scale(1.15); transform-origin: 50% 90%;"  # logos BFMTV et RMC sous le badge et la puce
 MOMENTS = {
-    "m03-bompard": dict(
-        src="lci-bompard-salaire-1878.mp4", media_start=4.15, card_in=13.75, hold=11.0, index=0, verdict="faux", tag="FAUX",
-        who="Manuel Bompard", ts="31:34", side="left", crop=LCI_CROP, wipe_in=True,
-        claim="Le salaire des enseignants n'a pas été augmenté",
-        body="Selon le ministère de l'Éducation nationale (DEPP), le salaire net moyen des enseignants fonctionnaires a augmenté de 6,4 % entre 2023 et 2024, soit +4,3 % une fois l'inflation déduite.",
-        source="Éducation nationale (DEPP)", foot="✗ démenti · 90%",
-        speakers=[(0, "Manuel Bompard")], card_h=460,
+    "m03-zemmour": dict(
+        src="bfm-zemmour-terroristes-2421.mp4", media_start=30.35, card_in=9.58, hold=10.0, index=0, verdict="faux", tag="FAUX",
+        who="Éric Zemmour", ts="40:56", side="left", crop=BFM_CROP, wipe_in=True,
+        claim="Tous les terroristes sont musulmans",
+        body="La France a connu des attentats terroristes non islamistes (ex : attentats d'extrême droite, séparatistes corses, etc.).",
+        source="Wikipédia", foot="✗ démenti · 90%",
+        speakers=[(0, "Éric Zemmour")], card_h=400,
     ),
     "m04-attal": dict(
         src="fj-attal-farage-171.mp4", media_start=8.6, card_in=17.6, hold=13.0, index=1, verdict="partiel", tag="PARTIEL",
@@ -67,13 +68,13 @@ MOMENTS = {
         source="Les Surligneurs", foot="⚠ trompeur · 90%",
         speakers=[(0, "Jordan Bardella")], card_h=462, push=(-140, 1.16),
     ),
-    "m06-geffray": dict(
-        src="fj-geffray-mandela-1435.mp4", media_start=33.05, card_in=5.05, hold=9.0, index=3, verdict="vrai", tag="VRAI",
-        who="Édouard Geffray", ts="24:30",
-        claim="Les dégâts au lycée Mandela de Nantes s'élèvent à 2 millions d'euros",
-        body="La Région Pays de la Loire estime le coût des travaux de remise en état du lycée Nelson-Mandela, incendié le 1er octobre, à au moins 2 millions d'euros.",
-        source="France 3 Régions", foot="✓ confirmé · 95%",
-        speakers=[(0, "Édouard Geffray")], card_h=422,
+    "m06-bompard": dict(
+        src="lci-bompard-onu-1019.mp4", media_start=35.95, card_in=9.36, hold=9.0, index=3, verdict="vrai", tag="VRAI",
+        who="Manuel Bompard", ts="17:34", side="left", crop=LCI_CROP,
+        claim="L'ONU a pointé un problème structurel de racisme dans la police française",
+        body="Le Haut-Commissariat des Nations unies aux droits de l’homme a effectivement pointé en juin 2023 des « profonds problèmes de racisme et de discrimination raciale parmi les forces de l’ordre » en France.",
+        source="Le Monde", foot="✓ confirmé · 95%",
+        speakers=[(0, "Manuel Bompard")], card_h=500,
         outro_to_fiche=True,
     ),
 }
@@ -463,19 +464,16 @@ write("s075-methode", paper_scene("s075-methode", 5.5,
 § .step .n { font-weight: 800; font-size: 96px; line-height: 1; letter-spacing: -0.03em; color: #a3172c; }
 § .step .h { font-family: 'SRC Newsreader', serif; font-size: 70px; line-height: 1.05; color: #1c1c1c; }
 § .step .d { grid-column: 2; margin-top: 10px; font-size: 34px; line-height: 1.3; color: #5e5e5e; }
-§ .made { left: 140px; top: 915px; display: flex; align-items: center; gap: 16px; font-size: 30px; color: #5e5e5e; }
-§ .flag { width: 45px; height: 30px; border-radius: 4px; background: linear-gradient(90deg, #0055a4 0 33.34%, #fff 33.34% 66.67%, #ef4135 66.67%);
-  box-shadow: 0 0 0 2px rgba(0,0,0,0.12); }""",
+""",
     f"""<div class="content" id="s075-content">
 <div class="abs mono" id="s075-label" style="left:140px; top:96px;">Comment on vérifie</div>
 {"".join(f'<div class="abs step" id="s075-st{i}" style="top:{190 + i * 225}px;"><span class="n">{n}</span><span class="h">{h}</span><span class="d">{d}</span></div>' for i, (n, h, d) in enumerate(STEPS))}
-<div class="abs made" id="s075-made"><span class="flag"></span>IA française</div>
+
 </div>""",
     """  tl.fromTo('#s075-label', { opacity: 0, y: 10 }, { opacity: 1, y: 0, duration: 0.4, ease: 'power2.out' }, 0.1);
   [0, 1, 2].forEach((i) => {
     tl.fromTo('#s075-st' + i, { opacity: 0, x: -36 }, { opacity: 1, x: 0, duration: 0.55, ease: 'power3.out' }, 0.3 + i * 0.55);
   });
-  tl.fromTo('#s075-made', { opacity: 0 }, { opacity: 1, duration: 0.5, ease: 'power1.out' }, 2.1);
   tl.to('#s075-content', { opacity: 0, duration: 0.45, ease: 'power1.in' }, 5.0);"""))
 
 # ── 08 · Où la trouver ───────────────────────────────────────────────────────
@@ -543,11 +541,15 @@ write("s08-fin", paper_scene("s08-fin", 9.5,
   line-height: 1.25; color: #1c1c1c; white-space: pre; font-kerning: none; }}
 § .ch.red {{ color: #a3172c; }}
 § .tagline {{ left: 146px; top: {430 + LIFT + FS * 1.25 + 50:.0f}px; font-size: 40px; }}
+§ .made {{ left: 146px; top: {430 + LIFT + FS * 1.25 + 140:.0f}px; display: flex; align-items: center; gap: 16px; font-size: 30px; color: #5e5e5e; }}
+§ .flag {{ width: 45px; height: 30px; border-radius: 4px; background: linear-gradient(90deg, #0055a4 0 33.34%, #fff 33.34% 66.67%, #ef4135 66.67%);
+  box-shadow: 0 0 0 2px rgba(0,0,0,0.12); }}
 § .fine {{ left: 146px; bottom: 80px; font-size: 24px; color: #5e5e5e; }}""",
     f"""<div class="content" id="s08-content">
 <div class="abs doute" id="s08-doute">Un doute&nbsp;?</div>
 <div class="abs morph" id="s08-morph">{"".join(chars)}</div>
 <div class="abs tagline" id="s08-tag">Rejoue les débats en entier et lis leurs fiches.</div>
+<div class="abs made" id="s08-made"><span class="flag"></span>Projet français · IA française</div>
 <div class="abs fine" id="s08-fine">Montage : délai de vérification raccourci. Verdicts tels que publiés sur le site. Extraits : France 2, LCI, Franc-jeu (France Inter, France Télévisions). Musique : Jungle Waves, dimmysad (Pixabay).</div>
 </div>""",
     f"""  gsap.set(['#s08-lv', '#s08-dot'], {{ opacity: 0 }});
@@ -566,7 +568,8 @@ write("s08-fin", paper_scene("s08-fin", 9.5,
   tl.to('#s08-morph', {{ y: {LIFT}, duration: 0.8, ease: 'power3.inOut' }}, {T_MORPH + 1.15:.2f});
   tl.fromTo('#s08-morph', {{ scale: 1 }}, {{ scale: 1.012, duration: 1.4, ease: 'sine.inOut', yoyo: true, repeat: 2, immediateRender: false }}, {T_MORPH + 2.0:.2f});
   tl.fromTo('#s08-tag', {{ opacity: 0, y: 12 }}, {{ opacity: 1, y: 0, duration: 0.5, ease: 'power2.out' }}, {T_MORPH + 1.75:.2f});
-  tl.fromTo('#s08-fine', {{ opacity: 0 }}, {{ opacity: 1, duration: 0.6 }}, {T_MORPH + 2.25:.2f});
+  tl.fromTo('#s08-made', {{ opacity: 0, y: 10 }}, {{ opacity: 1, y: 0, duration: 0.5, ease: 'power2.out' }}, {T_MORPH + 2.05:.2f});
+  tl.fromTo('#s08-fine', {{ opacity: 0 }}, {{ opacity: 1, duration: 0.6 }}, {T_MORPH + 2.45:.2f});
   tl.to('#s08-content', {{ opacity: 0, duration: 0.6, ease: 'power1.in' }}, 8.85);"""))
 
 # ── index.html ───────────────────────────────────────────────────────────────

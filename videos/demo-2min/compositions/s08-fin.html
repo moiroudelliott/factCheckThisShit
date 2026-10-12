@@ -25,12 +25,16 @@
   line-height: 1.25; color: #1c1c1c; white-space: pre; font-kerning: none; }
 [data-composition-id="s08-fin"] .ch.red { color: #a3172c; }
 [data-composition-id="s08-fin"] .tagline { left: 146px; top: 558px; font-size: 40px; }
+[data-composition-id="s08-fin"] .made { left: 146px; top: 648px; display: flex; align-items: center; gap: 16px; font-size: 30px; color: #5e5e5e; }
+[data-composition-id="s08-fin"] .flag { width: 45px; height: 30px; border-radius: 4px; background: linear-gradient(90deg, #0055a4 0 33.34%, #fff 33.34% 66.67%, #ef4135 66.67%);
+  box-shadow: 0 0 0 2px rgba(0,0,0,0.12); }
 [data-composition-id="s08-fin"] .fine { left: 146px; bottom: 80px; font-size: 24px; color: #5e5e5e; }
 </style>
 <div class="content" id="s08-content">
 <div class="abs doute" id="s08-doute">Un doute&nbsp;?</div>
 <div class="abs morph" id="s08-morph"><span class="ch" id="s08-p0" style="left:0.00px;">V</span><span class="ch" id="s08-p1" style="left:105.30px;">a</span><span class="ch" id="s08-p3" style="left:221.55px;">c</span><span class="ch" id="s08-p4" style="left:283.65px;">h</span><span class="ch" id="s08-p5" style="left:366.30px;">e</span><span class="ch" id="s08-p6" style="left:430.42px;">c</span><span class="ch" id="s08-p7" style="left:492.52px;">k</span><span class="ch" id="s08-p8" style="left:570.30px;">e</span><span class="ch" id="s08-p9" style="left:634.42px;">r</span><span class="ch" id="s08-p11" style="left:736.27px;">l</span><span class="ch" id="s08-p12" style="left:778.50px;">’</span><span class="ch" id="s08-p13" style="left:813.83px;">i</span><span class="ch" id="s08-p14" style="left:860.25px;">n</span><span class="ch" id="s08-p15" style="left:949.27px;">f</span><span class="ch" id="s08-p16" style="left:996.23px;">o</span><span class="ch" id="s08-p18" style="left:1103.55px;">!</span><span class="ch" id="s08-lv" style="left:0px;">v</span><span class="ch red" id="s08-dot" style="left:636.98px;">.</span></div>
 <div class="abs tagline" id="s08-tag">Rejoue les débats en entier et lis leurs fiches.</div>
+<div class="abs made" id="s08-made"><span class="flag"></span>Projet français · IA française</div>
 <div class="abs fine" id="s08-fine">Montage : délai de vérification raccourci. Verdicts tels que publiés sur le site. Extraits : France 2, LCI, Franc-jeu (France Inter, France Télévisions). Musique : Jungle Waves, dimmysad (Pixabay).</div>
 </div>
 <script>
@@ -66,7 +70,8 @@
   tl.to('#s08-morph', { y: -110, duration: 0.8, ease: 'power3.inOut' }, 4.10);
   tl.fromTo('#s08-morph', { scale: 1 }, { scale: 1.012, duration: 1.4, ease: 'sine.inOut', yoyo: true, repeat: 2, immediateRender: false }, 4.95);
   tl.fromTo('#s08-tag', { opacity: 0, y: 12 }, { opacity: 1, y: 0, duration: 0.5, ease: 'power2.out' }, 4.70);
-  tl.fromTo('#s08-fine', { opacity: 0 }, { opacity: 1, duration: 0.6 }, 5.20);
+  tl.fromTo('#s08-made', { opacity: 0, y: 10 }, { opacity: 1, y: 0, duration: 0.5, ease: 'power2.out' }, 5.00);
+  tl.fromTo('#s08-fine', { opacity: 0 }, { opacity: 1, duration: 0.6 }, 5.40);
   tl.to('#s08-content', { opacity: 0, duration: 0.6, ease: 'power1.in' }, 8.85);
   window.__timelines['s08-fin'] = tl;
 })();

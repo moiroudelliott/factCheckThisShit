@@ -111,7 +111,9 @@ strong { font-weight: 600; }
 .home .hero { display: grid; grid-template-columns: minmax(0, 1.08fr) minmax(0, 0.92fr); gap: 2rem 3.5rem; align-items: center; margin: 0.5rem 0 3.2rem; }
 main.home { overflow-x: clip; }   /* la carte entre par la droite : pas de défilement horizontal passager */
 .home .hero > * { min-width: 0; }   /* le nom du débat (une ligne, coupée) ne doit pas élargir la colonne */
-.live { display: inline-flex; align-items: center; gap: 0.6rem; }
+.live { display: inline-flex; align-items: center; flex-wrap: wrap; gap: 0.35rem 0.6rem; }
+.kicker-sep { color: var(--rule); }
+.live.rise { display: flex; }   /* .rise met inline-block : le point et le drapeau perdaient leur largeur */
 .live-dot { position: relative; width: 0.5rem; height: 0.5rem; border-radius: 50%; background: var(--accent); flex: none; }
 .live-dot::after { content: ""; position: absolute; inset: 0; border-radius: 50%; background: var(--accent); animation: ping 1.8s ease-out infinite; }
 @keyframes ping { from { transform: scale(1); opacity: 0.55; } to { transform: scale(3.2); opacity: 0; } }
@@ -186,8 +188,7 @@ main.home { overflow-x: clip; }   /* la carte entre par la droite : pas de défi
 .how-steps b { display: block; font-family: var(--sans); font-weight: 800; font-size: 2.3rem; line-height: 1; letter-spacing: -0.03em; color: var(--accent); }
 .how-steps strong { display: block; margin: 0.45rem 0 0.25rem; font-family: var(--serif); font-weight: 500; font-size: 1.45rem; }
 .how-steps span { display: block; font-family: var(--sans); font-size: 0.92rem; line-height: 1.5; color: var(--muted); }
-.how-made { display: flex; align-items: center; gap: 0.5rem; margin: 0; font-family: var(--sans); font-size: 0.82rem; color: var(--muted); }
-.flag { flex: none; width: 1.2em; height: 0.8em; border-radius: 2px; background: linear-gradient(90deg, #0055a4 0 33.34%, #fff 33.34% 66.67%, #ef4135 66.67%); box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.14); }
+.flag { display: inline-block; flex: none; width: 1.2em; height: 0.8em; border-radius: 2px; background: linear-gradient(90deg, #0055a4 0 33.34%, #fff 33.34% 66.67%, #ef4135 66.67%); box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.14); }
 .js-reveal .reveal { opacity: 0; transform: translateY(18px); transition: opacity 0.6s var(--d, 0s), transform 0.7s var(--d, 0s) cubic-bezier(0.2, 0.7, 0.2, 1); }
 .js-reveal .reveal.in { opacity: 1; transform: none; }
 @media (max-width: 720px) {

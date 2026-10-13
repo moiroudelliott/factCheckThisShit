@@ -1,0 +1,12 @@
+# Extraits des chaînes (BFMTV, France 2, LCI…) et transcriptions : hors dépôt
+assets/clips/
+assets/words/
+snapshots/
+renders/
+.hyperframes/
+node_modules/
+*.mp4
+.thumbnails/
+# Musique : fichier sous droits, hors dépôt
+assets/music/
+beats/

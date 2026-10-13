@@ -33,9 +33,9 @@
   --v-nv: #5b6270;
 }
 
-/* Thème sombre (fiche et résumé) : bouton « Thème sombre » ou ?theme=sombre
-   (theme.js). Mêmes couleurs que les vidéos : fond presque noir, verdicts
-   éclaircis pour rester lisibles. */
+/* Thème sombre du résumé d'un débat (resume.html : Thème → Sombre, ou
+   ?theme=sombre ; theme.js). Mêmes couleurs que les vidéos : fond presque
+   noir, verdicts éclaircis pour rester lisibles. */
 :root[data-theme="sombre"] {
   color-scheme: dark;
   --bg: #0d0e12;
@@ -347,10 +347,7 @@ td:first-child { white-space: nowrap; }
 .f-meta { font-family: var(--sans); font-size: 0.92rem; color: var(--muted); margin: -0.4rem 0 1.2rem; }
 .f-ai { font-family: var(--sans); font-size: 0.8rem; color: var(--muted); margin: -1.1rem 0 1.4rem; }
 .f-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 0.6rem 1.4rem; font-family: var(--sans); font-size: 0.95rem; }
-/* Bouton du thème : se présente comme un lien */
-.theme-toggle { font: inherit; color: var(--accent); background: none; border: 0; padding: 0; cursor: pointer;
-  text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 0.18em; }
-.theme-toggle:hover { color: var(--accent-hover); }
+
 .f-toc { display: flex; flex-wrap: wrap; gap: 0.3rem 1.2rem; font-family: var(--sans); font-size: 0.88rem; padding: 0.7rem 0; margin: 1.4rem 0 0; border-top: 1px solid var(--rule); border-bottom: 1px solid var(--rule); }
 /* Une section par h2 : la règle générale (pas de filet au-dessus du premier
    h2 de son parent) les retirerait tous */
@@ -472,9 +469,17 @@ td:first-child { white-space: nowrap; }
 
 .r-body { margin: 0; background: #e7e5df; overflow: hidden; }
 :root[data-theme="sombre"] .r-body { background: #050608; }
-.r-tools { position: fixed; top: 8px; left: 12px; z-index: 2; display: flex; gap: 18px; font-family: var(--sans); font-size: 13px; }
-.r-tools a, .r-tools .theme-toggle { color: var(--muted); text-decoration: none; }
-.r-tools a:hover, .r-tools .theme-toggle:hover { color: var(--accent); }
+.r-tools { position: fixed; top: 8px; left: 12px; right: 12px; z-index: 2; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 22px;
+  font-family: var(--sans); font-size: 13px; color: var(--muted); }
+.r-tools a { color: var(--muted); text-decoration: none; }
+.r-tools a:hover { color: var(--accent); }
+/* Format et thème : deux choix chacun, le choix en cours marqué */
+.r-opt { display: inline-flex; align-items: center; gap: 8px; }
+.r-opt a, .r-opt button { font: inherit; color: var(--muted); background: none; border: 1px solid var(--rule); border-radius: 999px;
+  padding: 2px 10px; cursor: pointer; text-decoration: none; }
+.r-opt > a + a, .r-opt > button + button { margin-left: -4px; }
+.r-opt a:hover, .r-opt button:hover { color: var(--accent); border-color: var(--accent); }
+.r-opt [aria-current="true"], .r-opt [aria-pressed="true"] { color: var(--text); border-color: var(--text); }
 .r-export .r-tools { display: none; }
 .r-export .r-canvas { box-shadow: none; }
 .r-stage { position: fixed; inset: 0; overflow: hidden; }

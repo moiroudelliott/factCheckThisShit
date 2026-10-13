@@ -1,4 +1,5 @@
-// vachecker.info — thème clair ou sombre (fiche et résumé).
+// vachecker.info — thème clair ou sombre du résumé d'un débat (resume.html) ;
+// le reste du site reste clair.
 // Chargé dans <head>, avant l'affichage : pas d'éclair blanc en thème sombre.
 // ?theme=sombre (ou clair) dans l'adresse l'emporte sur le choix mémorisé.
 (function () {
@@ -25,16 +26,5 @@
     }
   }
 
-  // Un bouton « Thème sombre » / « Thème clair » ; onChange : liens à mettre à jour
-  function bind(button, onChange) {
-    const label = () => { button.textContent = isDark() ? 'Thème clair' : 'Thème sombre'; };
-    button.addEventListener('click', () => {
-      set(!isDark());
-      label();
-      if (onChange) onChange();
-    });
-    label();
-  }
-
-  window.vcTheme = { isDark, bind };
+  window.vcTheme = { isDark, set };
 })();

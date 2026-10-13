@@ -67,18 +67,28 @@
       canvas.innerHTML = '<p class="r-loading">Aucun débat publié.</p>';
       return;
     }
-    // Liens de la barre : fiche complète, autre format, dans le thème choisi
-    const links = () => {
+    // Barre : fiche complète, format (paysage ou vertical), thème (clair ou sombre)
+    const $ = (x) => document.getElementById(x);
+    const tools = () => {
       const q = `?s=${encodeURIComponent(entry.id)}`;
-      const theme = window.vcTheme?.isDark() ? '&theme=sombre' : '';
-      document.getElementById('r-back').href = `fiche.html${q}`;
-      const other = document.getElementById('r-format');
-      other.href = `resume.html${q}${VERTICAL ? '' : '&format=vertical'}${theme}`;
-      other.textContent = VERTICAL ? 'Format paysage' : 'Format vertical';
+      const dark = !!window.vcTheme?.isDark();
+      const theme = dark ? '&theme=sombre' : '';
+      $('r-back').href = `fiche.html${q}`;
+      $('r-f-paysage').href = `resume.html${q}${theme}`;
+      $('r-f-vertical').href = `resume.html${q}&format=vertical${theme}`;
+      const on = (el, yes) => (yes ? el.setAttribute('aria-current', 'true') : el.removeAttribute('aria-current'));
+      on($('r-f-paysage'), !VERTICAL);
+      on($('r-f-vertical'), VERTICAL);
+      $('r-t-clair').setAttribute('aria-pressed', String(!dark));
+      $('r-t-sombre').setAttribute('aria-pressed', String(dark));
     };
-    links();
-    if (window.vcTheme) window.vcTheme.bind(document.getElementById('r-theme'), links);
-    else document.getElementById('r-theme').hidden = true;
+    if (window.vcTheme) {
+      $('r-t-clair').addEventListener('click', () => { window.vcTheme.set(false); tools(); });
+      $('r-t-sombre').addEventListener('click', () => { window.vcTheme.set(true); tools(); });
+    } else {
+      $('r-t-clair').parentElement.hidden = true;
+    }
+    tools();
     try {
       const r = await fetch(`sessions/${entry.id}.fiche.json`, { cache: 'no-cache' });
       if (!r.ok) throw new Error(r.status);

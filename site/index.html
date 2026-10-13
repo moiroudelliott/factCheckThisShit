@@ -19,7 +19,7 @@
   <meta property="og:image:height" content="630">
   <meta property="og:image:alt" content="vachecker.info — Un doute ? Va checker l’info.">
   <meta name="twitter:card" content="summary_large_image">
-  <link rel="stylesheet" href="style.css?v=086bbff512">
+  <link rel="stylesheet" href="style.css?v=2c1d6e474b">
 </head>
 <body>
   <header class="site-header">
@@ -160,17 +160,27 @@
     $('vprev').addEventListener('click', () => show(i - 1));
     $('vnext').addEventListener('click', () => show(i + 1));
 
-    fetch('sessions/exemples.json').then((r) => r.json()).then(({ exemples = [] }) => {
-      if (!exemples.length) throw new Error('aucun exemple');
-      list = exemples.slice();
-      for (let k = list.length - 1; k > 0; k--) {          // ordre au hasard
-        const j = Math.floor(Math.random() * (k + 1));
-        [list[k], list[j]] = [list[j], list[k]];
-      }
-      const first = list.findIndex((x) => x.verdict === 'faux' || x.verdict === 'trompeur');
-      if (first > 0) list.unshift(list.splice(first, 1)[0]);  // on commence par une erreur relevée
-      setTimeout(() => show(0), reduce ? 0 : 700);
-    }).catch(() => { card.classList.add('is-in', 'is-done'); stage.classList.add('static'); });
+    // Sur mobile la carte est masquée (CSS) : rien à charger ni à animer, sauf si
+    // la fenêtre s'élargit ensuite
+    const mobile = matchMedia('(max-width: 640px)');
+    let started = false;
+    function start() {
+      if (started || mobile.matches) return;
+      started = true;
+      fetch('sessions/exemples.json').then((r) => r.json()).then(({ exemples = [] }) => {
+        if (!exemples.length) throw new Error('aucun exemple');
+        list = exemples.slice();
+        for (let k = list.length - 1; k > 0; k--) {          // ordre au hasard
+          const j = Math.floor(Math.random() * (k + 1));
+          [list[k], list[j]] = [list[j], list[k]];
+        }
+        const first = list.findIndex((x) => x.verdict === 'faux' || x.verdict === 'trompeur');
+        if (first > 0) list.unshift(list.splice(first, 1)[0]);  // on commence par une erreur relevée
+        setTimeout(() => show(0), reduce ? 0 : 700);
+      }).catch(() => { card.classList.add('is-in', 'is-done'); stage.classList.add('static'); });
+    }
+    start();
+    mobile.addEventListener('change', start);
 
     // Compteurs, d'après les débats publiés
     const stats = $('stats');

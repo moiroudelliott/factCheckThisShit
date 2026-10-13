@@ -232,6 +232,10 @@ main.home { overflow-x: clip; }   /* la carte entre par la droite : pas de défi
 @media (max-width: 860px) {
   .home .hero { grid-template-columns: 1fr; margin-bottom: 2.4rem; }
 }
+/* Sur mobile, pas de carte d'exemples : l'accroche, puis directement la suite */
+@media (max-width: 640px) {
+  .home .vstage { display: none; }
+}
 @media (prefers-reduced-motion: no-preference) {
   html:has(.home) { scroll-behavior: smooth; }
 }

@@ -13,3 +13,5 @@ beats/
 # Généré par scripts/build_reels.py (un réel à la fois) : le script fait foi
 compositions/
 index.html
+# Son de la coche : synthétisé par scripts/build_reels.py
+assets/sfx/

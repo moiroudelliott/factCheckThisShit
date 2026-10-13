@@ -336,22 +336,124 @@ def quote(sid, clip_id, a, b, dur, track, at=0.0):
     return toks
 
 
-def vraifaux(sid, dur):
-    """Pendant le creux avant le drop : « Vrai ? » / « Faux ? » en alternance, sur les noires."""
-    style = f"""§ .w {{ left: 0; width: {W}px; top: 760px; text-align: center; font-family: 'SRC Newsreader', serif; font-style: italic; font-weight: 500;
-  font-size: 210px; line-height: 1; opacity: 0; }}
-§ .v {{ color: {ACCENT["vrai"]}; }}
-§ .f {{ color: {ACCENT["faux"]}; }}"""
-    labels = [("Vrai&nbsp;?", "v"), ("Faux&nbsp;?", "f"), ("Vrai&nbsp;?", "v"), ("Faux&nbsp;?", "f")]
-    markup = '<div class="glow"></div>\n' + "\n".join(f'<div class="abs w {c}" id="vf-{i}">{t}</div>' for i, (t, c) in enumerate(labels))
+VERDICT_TAGS = [("Vrai", "#73c076"), ("Partiellement vrai", "#d4ac32"), ("Trompeur", "#f08a3c"), ("Faux", "#ee6060")]
+
+
+def verdicts(sid, dur):
+    """Pendant le creux avant le drop : les quatre verdicts tombent comme des tampons, un par temps."""
+    style = """§ .stack { left: 0; width: 100%; top: 0; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 44px; }
+§ .tag { display: inline-flex; align-items: center; gap: 26px; padding: 22px 46px; border-radius: 999px; opacity: 0;
+  font-size: 60px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: var(--c);
+  background: color-mix(in srgb, var(--c) 16%, transparent); border: 5px solid color-mix(in srgb, var(--c) 60%, transparent);
+  box-shadow: 0 0 70px color-mix(in srgb, var(--c) 30%, transparent); }
+§ .tag i { width: 26px; height: 26px; border-radius: 50%; background: var(--c); }"""
+    tags = "\n".join(f'  <div class="tag" id="vd-{i}" style="--c: {c};"><i></i>{t}</div>' for i, (t, c) in enumerate(VERDICT_TAGS))
+    markup = f'<div class="glow"></div>\n<div class="abs stack" id="vd-s">\n{tags}\n</div>'
     js = []
     for i in range(4):
         t0 = round(i * Q, 3)
-        js.append(f"  tl.fromTo('#vf-{i}', {{ opacity: 0, scale: 1.25 }}, {{ opacity: 1, scale: 1, duration: 0.16, ease: 'power3.out' }}, {t0});")
-        if i < 3:
-            js.append(f"  tl.set('#vf-{i}', {{ opacity: 0 }}, {round((i + 1) * Q, 3)});")
-    js.append(f"  tl.to('#vf-3', {{ opacity: 0, scale: 0.92, duration: 0.18, ease: 'power2.in' }}, {round(dur - 0.18, 3)});")
+        rot = (-7, 6, -5, 4)[i]
+        # le tampon s'écrase, la pile tremble un instant
+        js.append(f"  tl.fromTo('#vd-{i}', {{ opacity: 0, scale: 1.8, rotation: {rot} }}, {{ opacity: 1, scale: 1, rotation: 0, duration: 0.2, ease: 'back.out(2.2)' }}, {t0});")
+        js.append(f"  tl.to('#vd-s', {{ x: {(-9, 9)[i % 2]}, duration: 0.035, yoyo: true, repeat: 3, ease: 'none' }}, {round(t0 + 0.15, 3)});")
+    js.append(f"  tl.to(['#vd-0', '#vd-1', '#vd-2', '#vd-3'], {{ opacity: 0, scale: 0.9, duration: 0.16, ease: 'power2.in', stagger: 0.02 }}, {round(dur - 0.2, 3)});")
     write(sid, scene(sid, dur, style, markup, "\n".join(js)))
+
+
+# ── Outro commune : « va. », le point devient une coche verte, avec un « ding » ─
+SFX_CHECK = "assets/sfx/check.wav"
+LOGO_JSON = os.path.join(ROOT, "..", "..", "social", "logo-va.json")
+GREEN = "#73c076"
+
+
+def check_sound():
+    """Le « ding » de la coche, synthétisé ici (deux notes, mi6 puis si6) : aucun fichier sous licence."""
+    path = os.path.join(ROOT, SFX_CHECK)
+    if os.path.exists(path):
+        return
+    import struct
+    import wave
+    sr, n = 48000, int(0.9 * 48000)
+    notes = [(0.0, 1318.51, 0.55), (0.075, 1975.53, 0.45)]
+    out = []
+    for i in range(n):
+        t, v = i / sr, 0.0
+        for t0, f, a in notes:
+            if t >= t0:
+                u = t - t0
+                env = a * min(1.0, u / 0.004) * math.exp(-u * 7.5)
+                v += env * (math.sin(2 * math.pi * f * u) + 0.25 * math.sin(4 * math.pi * f * u) * math.exp(-u * 12))
+        out.append(v)
+    g = 0.5 / max(abs(x) for x in out)              # crête vers −6 dBFS
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with wave.open(path, "wb") as w:
+        w.setnchannels(2)
+        w.setsampwidth(2)
+        w.setframerate(sr)
+        w.writeframes(b"".join(struct.pack("<hh", int(x * g * 32767), int(x * g * 32767)) for x in out))
+
+
+def sting(sid, dur, check_at, lines, track=40, pulse=()):
+    """Le « va. » au centre ; à check_at, le point rouge devient une coche verte (« va checker »),
+    avec le ding. lines : [(html, classe, instant)] sous le logo ; pulse : instants où il bat."""
+    import re
+    check_sound()
+    with open(LOGO_JSON, encoding="utf-8") as f:
+        logo = json.load(f)
+    nums = [float(x) for x in re.findall(r"-?\d+(?:\.\d+)?", logo["dot"])]
+    xs, ys = nums[0::2], nums[1::2]
+    dcx, base = (min(xs) + max(xs)) / 2, max(ys)        # centre du point, ligne de base
+    h = logo["height"]
+    slant = math.tan(math.radians(12))                   # la coche penche comme l'italique
+
+    def pt(dx, dy):
+        x, y = dcx + dx * h, base + dy * h
+        return x + (base - y) * slant, y
+
+    p1, p2, p3 = pt(-0.16, -0.36), pt(0.02, -0.06), pt(0.42, -0.86)
+    sw = 0.12 * h
+    length = math.dist(p1, p2) + math.dist(p2, p3)
+    # cadrage : le « va » et la coche finale, centrés
+    x0 = -logo["width"] / 2
+    x1 = max(p3[0], dcx) + sw / 2
+    y0, y1 = min(-h / 2, p3[1] - sw / 2), h / 2
+    s = 600 / (x1 - x0)
+    tx, ty = W / 2 - s * (x0 + x1) / 2, 820 - s * (y0 + y1) / 2
+    ring_r = 0.55 * h
+    svg = f"""<svg class="mk" width="{W}" height="{H}" viewBox="0 0 {W} {H}" aria-hidden="true"><g transform="translate({tx:.1f} {ty:.1f}) scale({s:.4f})">
+  <path fill="#fff" d="{logo["v"]} {logo["a"]}"/>
+  <path id="st-dot" fill="{RED}" d="{logo["dot"]}"/>
+  <circle id="st-ring" cx="{(p1[0] + p3[0]) / 2:.1f}" cy="{(p1[1] + p2[1]) / 2:.1f}" r="{ring_r:.1f}" fill="none" stroke="{GREEN}" stroke-width="{sw * 0.35:.1f}" opacity="0"/>
+  <path id="st-ck" fill="none" stroke="{RED}" stroke-width="{sw:.1f}" stroke-linecap="round" stroke-linejoin="round"
+    d="M{p1[0]:.1f} {p1[1]:.1f} L{p2[0]:.1f} {p2[1]:.1f} L{p3[0]:.1f} {p3[1]:.1f}" stroke-dasharray="{length:.1f} {length + 2 * sw:.1f}" stroke-dashoffset="{length + sw:.1f}"/>
+</g></svg>"""
+    style = f"""§ .wrap {{ left: 0; top: 0; width: {W}px; height: {H}px; }}
+§ .mk {{ position: absolute; inset: 0; }}
+§ .ln {{ left: 0; width: {W}px; text-align: center; opacity: 0; }}
+§ .ln.url {{ top: 1040px; font-family: 'SRC Newsreader', serif; font-style: italic; font-weight: 500; font-size: 70px; }}
+§ .ln.url b {{ font-weight: 500; color: {RED}; }}
+§ .ln.t {{ top: 1040px; font-size: 48px; font-weight: 600; color: rgba(255,255,255,0.82); }}
+§ .ln.bio {{ top: 1150px; font-family: 'SRC Plex Mono', monospace; font-size: 32px; letter-spacing: 0.12em; text-transform: uppercase; color: rgba(255,255,255,0.62); }}
+§ .ln.made {{ top: 1330px; display: flex; justify-content: center; align-items: center; gap: 16px; font-size: 32px; color: rgba(255,255,255,0.7); }}
+§ .ln.made .flag {{ width: 45px; height: 30px; }}"""
+    markup = (f'<div class="glow"></div>\n<div class="abs wrap" id="st-w">{svg}</div>\n'
+              + "\n".join(f'<div class="abs ln {c}" id="st-l{i}">{t}</div>' for i, (t, c, _) in enumerate(lines))
+              + f'\n<audio id="{sid}-ding" src="{SFX_CHECK}" data-start="{round(check_at - 0.03, 3)}" data-duration="0.9" data-track-index="{track}" data-hf-media-start-basis="local"></audio>')
+    c = check_at
+    js = [f"  tl.fromTo('#st-w', {{ opacity: 0, scale: 0.94 }}, {{ opacity: 1, scale: 1, duration: 0.4, ease: 'power3.out' }}, 0);",
+          # le point gonfle, s'efface, et la coche se trace depuis sa place
+          f"  tl.to('#st-dot', {{ scale: 1.35, transformOrigin: '50% 50%', duration: 0.12, ease: 'power2.out' }}, {round(c - 0.45, 3)});",
+          f"  tl.to('#st-dot', {{ scale: 0, transformOrigin: '50% 50%', duration: 0.14, ease: 'power2.in' }}, {round(c - 0.31, 3)});",
+          f"  tl.to('#st-ck', {{ strokeDashoffset: 0, duration: 0.3, ease: 'power2.inOut' }}, {round(c - 0.3, 3)});",
+          f"  tl.to('#st-ck', {{ stroke: '{GREEN}', duration: 0.22, ease: 'none' }}, {round(c - 0.12, 3)});",
+          f"  tl.to('#st-w', {{ scale: 1.06, duration: 0.08, yoyo: true, repeat: 1, ease: 'power2.out' }}, {c});",
+          f"  tl.set('#st-ring', {{ opacity: 0.85, scale: 0.4, transformOrigin: '50% 50%' }}, {c});",
+          f"  tl.to('#st-ring', {{ opacity: 0, scale: 1.9, duration: 0.55, ease: 'power2.out' }}, {c});"]
+    js += [f"  tl.fromTo('#st-l{i}', {{ opacity: 0, y: 14 }}, {{ opacity: 1, y: 0, duration: 0.4, ease: 'power3.out' }}, {round(at, 3)});"
+           for i, (_, _, at) in enumerate(lines)]
+    js += [f"  tl.to('#st-w', {{ scale: 1.03, duration: 0.07, yoyo: true, repeat: 1, ease: 'power2.out' }}, {round(t, 3)});" for t in pulse]
+    write(sid, scene(sid, dur, style, markup, "\n".join(js)))
+    return dur
 
 
 # ── Sous-titres (une seule piste) ────────────────────────────────────────────
@@ -554,23 +656,12 @@ def fiche(sid, debat, dur=5.0):
     return dur
 
 
-def cta(sid, dur=3.6):
-    style = f"""§ .t {{ left: 0; width: {W}px; top: 640px; text-align: center; font-size: 52px; font-weight: 600; color: rgba(255,255,255,0.8); }}
-§ .lg {{ left: 0; width: {W}px; top: 740px; text-align: center; font-size: 132px; }}
-§ .bio {{ left: 0; width: {W}px; top: 930px; text-align: center; font-family: 'SRC Plex Mono', monospace; font-size: 32px; letter-spacing: 0.12em; text-transform: uppercase; color: rgba(255,255,255,0.6); }}
-§ .made {{ left: 0; width: {W}px; top: 1300px; display: flex; justify-content: center; align-items: center; gap: 16px; font-size: 32px; color: rgba(255,255,255,0.7); }}
-§ .made .flag {{ width: 45px; height: 30px; }}"""
-    markup = f"""<div class="glow"></div>
-<div class="abs t" id="c-t">La fiche complète du débat</div>
-<div class="abs logo lg" id="c-lg">vachecker<b>.info</b></div>
-<div class="abs bio" id="c-bio">Lien en bio</div>
-<div class="abs made" id="c-made"><span class="flag"></span>{SIGNATURE}</div>"""
-    script = """  tl.fromTo('#c-t', { opacity: 0, y: 16 }, { opacity: 1, y: 0, duration: 0.45, ease: 'power3.out' }, 0.1);
-  tl.fromTo('#c-lg', { opacity: 0, scale: 0.94 }, { opacity: 1, scale: 1, duration: 0.55, ease: 'back.out(1.6)' }, 0.35);
-  tl.fromTo('#c-bio', { opacity: 0 }, { opacity: 1, duration: 0.4 }, 0.8);
-  tl.fromTo('#c-made', { opacity: 0 }, { opacity: 1, duration: 0.4 }, 1.0);"""
-    write(sid, scene(sid, dur, style, markup, script))
-    return dur
+def cta(sid, dur=3.8):
+    """Fin d'un réel « moment » : l'outro commune, et où trouver la fiche du débat."""
+    return sting(sid, dur, check_at=1.0, lines=[
+        ("La fiche complète du débat", "t", 1.25),
+        ("vachecker.info · lien en bio", "bio", 1.5),
+        (f'<span class="flag"></span>{SIGNATURE}', "made", 1.8)])
 
 
 # ── Montage ──────────────────────────────────────────────────────────────────
@@ -648,7 +739,8 @@ def write_index(reel, scenes, spans, total, music):
 
 TEASER = [  # (orateur, début, fin de la phrase) — repère des mots
     ("bardella", 3.56, 6.84),                 # « Dès l'été, j'entends baisser la TVA de 20 % à 5,5 % »
-    ("attal", 191.32, 193.88),                # « …que la France soit le réceptacle »
+    ("attal", 191.32, 197.06),                # « …que la France soit le réceptacle, reçoive l'intégralité des
+                                              #   personnes migrantes au Royaume-Uni. »
     ("bompard-salaire", 16.16, 17.98),        # « Vous n'avez pas augmenté le salaire des enseignants. »
     ("zemmour", 2456.76, 2461.18),            # « Et il y a heureusement des millions de musulmans qui ne sont pas
                                               #   terroristes. Seulement, tous les terroristes sont musulmans. » (de face, puis de dos)
@@ -679,8 +771,8 @@ def build_teaser():
         spans.append((t, toks, d))
         scenes.append((sid, t, d)); t = round(t + d, 3)
     d = round(4 * Q, 3)
-    vraifaux(f"{reel}-vraifaux", d)
-    scenes.append((f"{reel}-vraifaux", t, d)); t = round(t + d, 3)
+    verdicts(f"{reel}-verdicts", d)
+    scenes.append((f"{reel}-verdicts", t, d)); t = round(t + d, 3)
     drop_at = t
     # Après le drop, une phrase musicale entière : 8 mesures de 4 temps, 2 par scène
     bars2 = round(8 * Q, 3)
@@ -783,22 +875,13 @@ def qui(sid, dur):
 
 
 def outro(sid, dur):
-    """Le logo revient, sur les temps ; « Abonne-toi », la signature."""
-    style = f"""§ .lg {{ left: 0; width: {W}px; top: 760px; text-align: center; font-size: 150px; }}
-§ .bio {{ left: 0; width: {W}px; top: 980px; text-align: center; font-family: 'SRC Plex Mono', monospace; font-size: 34px; letter-spacing: 0.12em; text-transform: uppercase; color: rgba(255,255,255,0.7); }}
-§ .made {{ left: 0; width: {W}px; top: 1300px; display: flex; justify-content: center; align-items: center; gap: 16px; font-size: 32px; color: rgba(255,255,255,0.7); }}
-§ .made .flag {{ width: 45px; height: 30px; }}"""
-    markup = f"""<div class="glow"></div>
-<div class="abs logo lg" id="o-lg"><span id="o-lgi" style="display: inline-block;">vachecker<b>.info</b></span></div>
-<div class="abs bio" id="o-bio">Abonne-toi · lien en bio</div>
-<div class="abs made" id="o-made"><span class="flag"></span>{SIGNATURE}</div>"""
-    js = ["  tl.fromTo('#o-lg', { opacity: 0, scale: 0.9 }, { opacity: 1, scale: 1, duration: 0.35, ease: 'back.out(1.8)' }, 0);",
-          f"  tl.fromTo('#o-bio', {{ opacity: 0, y: 14 }}, {{ opacity: 1, y: 0, duration: 0.35, ease: 'power3.out' }}, {round(Q, 3)});",
-          f"  tl.fromTo('#o-made', {{ opacity: 0 }}, {{ opacity: 1, duration: 0.4 }}, {round(2 * Q, 3)});"]
-    # Le logo bat la mesure jusqu'à la fin
-    for b in range(2, int(dur / Q)):
-        js.append(f"  tl.to('#o-lgi', {{ scale: 1.045, duration: 0.07, yoyo: true, repeat: 1, ease: 'power2.out' }}, {round(b * Q, 3)});")
-    write(sid, scene(sid, dur, style, markup, "\n".join(js)))
+    """Fin du teaser : l'outro commune, la coche sur le 3e temps, puis l'adresse et « Abonne-toi » ;
+    le logo bat la mesure jusqu'à la fin."""
+    sting(sid, dur, check_at=round(2 * Q, 3), lines=[
+        ("vachecker<b>.info</b>", "url", round(3 * Q, 3)),
+        ("Abonne-toi · lien en bio", "bio", round(4 * Q, 3)),
+        (f'<span class="flag"></span>{SIGNATURE}', "made", round(5 * Q, 3))],
+        pulse=[round(b * Q, 3) for b in range(4, int(dur / Q))])
 
 
 def hook_text(sid, dur):

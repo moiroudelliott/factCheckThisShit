@@ -413,7 +413,7 @@ def logo_outro(sid, dur=3.0, check_at=1.5, track=40):
         return x + (dcy - y) * slant, y
 
     p1, p2, p3 = pt(0, 0), pt(0.09, 0.09), pt(0.42, -0.50)
-    k = 0.7                                                  # trait plus fin que le point
+    k = 0.5                                                  # trait plus fin que le point (≈ les pleins des lettres)
     sw = 2 * r * k
     length = math.dist(p1, p2) + math.dist(p2, p3)
     # cadrage : la forme finale (« va » + coche) centrée ; au départ, le « va. » seul est centré
@@ -437,9 +437,9 @@ def logo_outro(sid, dur=3.0, check_at=1.5, track=40):
     c0 = round(check_at - draw, 3)
     js = [f"  tl.fromTo('#lo-w', {{ opacity: 0, scale: 0.97, x: {shift:.1f} }}, {{ opacity: 1, scale: 1, duration: 0.55, ease: 'power3.out' }}, 0);",
           # la coche sort du point : le point se resserre à la largeur du trait, le trait part, le point s'efface
-          f"  tl.to('#lo-dot', {{ scale: {k}, transformOrigin: '50% 50%', duration: 0.16, ease: 'power2.inOut' }}, {round(c0 - 0.12, 3)});",
+          f"  tl.to('#lo-dot', {{ scale: {k}, transformOrigin: '50% 50%', duration: 0.2, ease: 'power2.inOut' }}, {round(c0 - 0.24, 3)});",
           f"  tl.to('#lo-ck', {{ strokeDashoffset: 0, duration: {draw}, ease: 'power3.out' }}, {c0});",
-          f"  tl.to('#lo-dot', {{ opacity: 0, duration: 0.08, ease: 'none' }}, {round(c0 + 0.06, 3)});",
+          f"  tl.to('#lo-dot', {{ opacity: 0, duration: 0.05, ease: 'none' }}, {round(c0 + 0.01, 3)});",
           # tracée en rouge, elle passe au vert d'un coup, avec le ding
           f"  tl.to('#lo-ck', {{ stroke: '{GREEN}', duration: 0.18, ease: 'power1.inOut' }}, {round(check_at - 0.08, 3)});",
           f"  tl.to('#lo-w', {{ x: 0, duration: {draw + 0.1}, ease: 'power2.inOut' }}, {c0});",

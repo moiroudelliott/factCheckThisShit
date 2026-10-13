@@ -559,6 +559,9 @@ td:first-child { white-space: nowrap; }
 
 .r-foot { display: flex; justify-content: space-between; align-items: end; gap: 40px; padding-top: 12px; border-top: 1px solid var(--rule); font-size: 13px; line-height: 1.4; color: var(--muted); }
 .r-url { font-family: var(--mono); white-space: nowrap; color: var(--text); }
+/* Pastille « va. » (media/logo-va-*.svg) : coin bas droit en paysage, haut droit en vertical */
+.r-foot-end { display: flex; align-items: center; gap: 18px; flex: none; }
+.r-badge { display: block; width: 52px; height: 52px; }
 
 /* ── Fiche verticale (resume.html?format=vertical) ─────────────────────── */
 /* Canevas 1080 × 1920 : la fin des vidéos verticales (réels, shorts). Les
@@ -567,6 +570,7 @@ td:first-child { white-space: nowrap; }
 
 .r-canvas--v { width: 1080px; height: 1920px; padding: 96px 72px 64px; grid-template-rows: auto auto auto auto 1fr auto; gap: 40px; }
 .rv-head { padding-bottom: 34px; border-bottom: 2px solid var(--text); }
+.rv-badge { position: absolute; top: 80px; right: 72px; width: 82px; height: 82px; }
 .r-canvas--v .r-kicker { gap: 22px; margin: 0 0 24px; font-size: 19px; }
 .r-canvas--v .r-brand { font-size: 40px; }
 /* padding-top : les accents des capitales (É) dépassent la ligne, que overflow couperait */

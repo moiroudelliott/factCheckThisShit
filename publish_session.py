@@ -60,7 +60,7 @@ SYNCED = [
 # modifiée — sans lui, les visiteurs gardaient l'ancienne en cache (cas vécu :
 # une correction du lecteur invisible après rechargement de la page)
 RELECTURE_HTML = os.path.join(SITE, "relecture.html")
-VERSIONED = ("style.css", "theme.js", "relecture.js", "fiche.js", "resume.js", "overlay/content.js", "overlay/overlay.css",
+VERSIONED = ("style.css", "theme.js", "favicon.svg", "relecture.js", "fiche.js", "resume.js", "overlay/content.js", "overlay/overlay.css",
              # Vidéo de l'accueil : le CDN de l'hébergeur garde l'ancienne en cache sans version
              "media/demo-source.mp4", "media/demo-source.jpg")
 

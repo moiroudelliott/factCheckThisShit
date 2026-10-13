@@ -41,6 +41,9 @@
     const m = Math.round((Number(s) || 0) / 60);
     return m >= 60 ? `${Math.floor(m / 60)} h ${pad(m % 60)}` : `${m} min`;
   };
+  // Pastille « va. » dans un coin : C en thème sombre, E en thème clair
+  const badge = (cls) => `<img class="${cls}" data-badge src="${badgeSrc()}" alt="" width="88" height="88">`;
+  const badgeSrc = () => `media/logo-va-${window.vcTheme?.isDark() ? 'sombre' : 'clair'}.svg`;
   const fmtDate = (iso) => (/^\d{4}-\d{2}-\d{2}$/.test(iso || '')
     ? new Date(`${iso}T12:00:00`).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }) : '');
 
@@ -81,6 +84,7 @@
       on($('r-f-vertical'), VERTICAL);
       $('r-t-clair').setAttribute('aria-pressed', String(!dark));
       $('r-t-sombre').setAttribute('aria-pressed', String(dark));
+      document.querySelectorAll('[data-badge]').forEach((img) => { img.src = badgeSrc(); });
     };
     if (window.vcTheme) {
       $('r-t-clair').addEventListener('click', () => { window.vcTheme.set(false); tools(); });
@@ -212,7 +216,7 @@
       <footer class="r-foot">
         <span>Indice d'exactitude : vrai 1, partiel ½, trompeur et faux 0, sur les verdicts tranchés ; ± : marge d'erreur à 95 %.
           Calculé par le programme à partir de verdicts automatiques, qui peuvent se tromper.${topSources ? ` Sources les plus citées : ${esc(topSources)}.` : ''}</span>
-        <span class="r-url">vachecker.info/fiche?s=${esc(id)}</span>
+        <span class="r-foot-end"><span class="r-url">vachecker.info/fiche?s=${esc(id)}</span>${badge('r-badge')}</span>
       </footer>`;
   }
 
@@ -227,7 +231,7 @@
     const many = debs.length > 2;
     const meta = [fmtDate(f.date), f.duree ? `${fmtDur(f.duree)} de débat` : ''].filter(Boolean).join(' · ');
     canvas.classList.toggle('rv-many', many);
-    canvas.innerHTML = `
+    canvas.innerHTML = `${badge('rv-badge')}
       <header class="rv-head">
         <p class="r-kicker"><span class="r-brand">vachecker<span>.info</span></span><span>Fiche du débat</span></p>
         <h1 class="rv-title">${esc(f.titre || 'Débat').replace(/(\w)-(\w)/g, '$1‑$2')}</h1>

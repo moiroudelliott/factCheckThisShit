@@ -103,10 +103,16 @@ def esc(s):
     return html.escape(s, quote=False)
 
 
+# Débuts de mots mal placés par la transcription, recalés sur le son (énergie par 20 ms)
+RETIME = {"attal": {191.32: 191.74}}      # « que » : Attal marque une pause après « anglaise »
+
+
 def words_of(clip):
     path = os.path.join(ROOT, "assets", "words", CLIPS[clip]["words"])
     d = json.load(open(path, encoding="utf-8"))
-    return d["words"] if isinstance(d, dict) else d
+    ws = d["words"] if isinstance(d, dict) else d
+    fix = RETIME.get(clip, {})
+    return [dict(w, s=fix.get(round(w["s"], 2), w["s"])) for w in ws]
 
 
 def tokens(clip, a, b):
@@ -306,14 +312,16 @@ def moment(sid, clip_id, a, b, guess, hold, track=3, card_id=None, at=0.0, hook=
 
 
 # ── Scène « citation » (teaser) : l'orateur et sa phrase, sans vérification ──
-def quote(sid, clip_id, a, b, dur, track, at=0.0):
-    """a, b : bornes de la phrase (repère des mots) ; dur : calée sur la grille de la musique."""
+def quote(sid, clip_id, a, b, dur, track, at=0.0, hold=0.08, tail=0.22):
+    """a, b : bornes de la phrase (repère des mots) ; dur : calée sur la grille de la musique.
+    hold, tail : le son reste plein jusqu'à speech + hold, puis s'éteint à speech + tail
+    (plus serré quand quelqu'un d'autre enchaîne aussitôt)."""
     clip = CLIPS[clip_id]
     x, y, cw, ch = clip["crop"]
     k = W / cw
     speech = round(b - a, 2)
     lane = {"version": 1, "lanes": [{"target": "volume", "points": [
-        {"t": 0, "v": 0}, {"t": 0.06, "v": 1}, {"t": round(speech + 0.08, 2), "v": 1}, {"t": round(speech + 0.22, 2), "v": 0},
+        {"t": 0, "v": 0}, {"t": 0.06, "v": 1}, {"t": round(speech + hold, 2), "v": 1}, {"t": round(speech + tail, 2), "v": 0},
         {"t": dur, "v": 0}]}]}
     media_start = round(a - 0.12 - clip["t0"], 2)
     style = f"""§ .nm {{ left: 72px; top: 178px; font-size: 64px; font-weight: 800; letter-spacing: -0.015em; line-height: 1; }}
@@ -772,8 +780,8 @@ def write_index(reel, scenes, spans, total, music):
 
 TEASER = [  # (orateur, début, fin de la phrase) — repère des mots
     ("bardella", 3.56, 6.84),                 # « Dès l'été, j'entends baisser la TVA de 20 % à 5,5 % »
-    ("attal", 191.32, 197.06),                # « …que la France soit le réceptacle, reçoive l'intégralité des
-                                              #   personnes migrantes au Royaume-Uni. »
+    ("attal", 191.74, 197.09,                 # « …que la France soit le réceptacle, reçoive l'intégralité des
+     {"hold": 0.12, "tail": 0.17}),           #   personnes migrantes au Royaume-Uni. » — la journaliste enchaîne à 197,16
     ("bompard-salaire", 16.16, 17.98),        # « Vous n'avez pas augmenté le salaire des enseignants. »
     ("zemmour", 2456.76, 2461.18),            # « Et il y a heureusement des millions de musulmans qui ne sont pas
                                               #   terroristes. Seulement, tous les terroristes sont musulmans. » (de face, puis de dos)
@@ -793,10 +801,10 @@ def build_teaser():
     d = snap(2.55)
     hook_mosaic(f"{reel}-hook", d)
     scenes.append((f"{reel}-hook", t, d)); t = round(t + d, 3)
-    for i, (clip_id, a, b) in enumerate(TEASER):
+    for i, (clip_id, a, b, *opt) in enumerate(TEASER):
         sid = f"{reel}-q{i + 1}"
         d = snap(b - a + 0.3)
-        toks = quote(sid, clip_id, a, b, d, track=3 + i, at=t)
+        toks = quote(sid, clip_id, a, b, d, track=3 + i, at=t, **(opt[0] if opt else {}))
         if clip_id == "attal":
             toks[0]["w"] = "…" + toks[0]["w"]
         if toks[-1]["w"].endswith(","):

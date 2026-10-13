@@ -206,8 +206,10 @@ def recrops(clip, a, dur, target, at):
 
 
 # ── Scène « moment » ─────────────────────────────────────────────────────────
-def moment(sid, clip_id, a, b, guess, hold, track=3, card_id=None, at=0.0):
-    """a, b : début et fin de la phrase (repère des mots). Renvoie (durée, mots minutés)."""
+def moment(sid, clip_id, a, b, guess, hold, track=3, card_id=None, at=0.0, hook=0.0):
+    """a, b : début et fin de la phrase (repère des mots). Renvoie (durée, mots minutés).
+    hook : durée de l'accroche (« Zemmour : « … » Vrai ou faux ? ») posée sur l'extrait
+    dès la première image — c'est aussi la miniature du réel."""
     clip, c = CLIPS[clip_id], CARDS[card_id or clip_id]
     v = c["verdict"]
     speech = round(b - a, 2)
@@ -229,6 +231,11 @@ def moment(sid, clip_id, a, b, guess, hold, track=3, card_id=None, at=0.0):
 § .inner {{ position: absolute; left: {-x * k:.1f}px; top: {-y * k:.1f}px; width: {1920 * k:.1f}px; height: {1080 * k:.1f}px; }}
 § video {{ position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }}
 § .shade {{ position: absolute; inset: 0; background: rgba(8,9,12,0.62); opacity: 0; }}
+§ .hshade {{ position: absolute; inset: 0; background: rgba(8,9,12,0.74); }}
+§ .hook {{ left: 60px; width: {W - 120}px; top: {FRAME_Y}px; height: {FRAME_H}px; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 30px; text-align: center; }}
+§ .hook .hw {{ font-size: 58px; font-weight: 800; letter-spacing: -0.01em; color: rgba(255,255,255,0.85); }}
+§ .hook .hq {{ font-family: 'SRC Newsreader', serif; font-style: italic; font-weight: 500; font-size: 100px; line-height: 1.06; }}
+§ .hook .hv {{ font-size: 76px; font-weight: 800; letter-spacing: -0.01em; color: #f5c84c; }}
 § .guess {{ left: 0; width: {W}px; top: {FRAME_Y + 330}px; text-align: center; }}
 § .guess .t {{ font-family: 'SRC Newsreader', serif; font-style: italic; font-weight: 500; font-size: 128px; line-height: 1; }}
 § .guess .bar {{ margin: 44px auto 0; width: 420px; height: 10px; border-radius: 5px; background: rgba(255,255,255,0.18); overflow: hidden; }}
@@ -253,13 +260,16 @@ def moment(sid, clip_id, a, b, guess, hold, track=3, card_id=None, at=0.0):
 § .card .foot {{ display: flex; justify-content: space-between; gap: 20px; margin-top: 24px; padding-top: 22px; border-top: 2px solid rgba(255,255,255,0.09); font-size: 24px; }}
 § .card .src {{ font-family: 'SRC Plex Mono', monospace; color: rgba(255,255,255,0.7); }}
 § .card .vd {{ font-weight: 600; color: {FOOT_COLOR[v]}; }}"""
+    hook_markup = (f"""
+<div class="abs hook" id="{sid}-hook"><div class="hw">{esc(clip["who"].split()[-1])}&nbsp;:</div>
+  <div class="hq">«&nbsp;{esc(c["claim"])}&nbsp;»</div><div class="hv">Vrai ou faux&nbsp;?</div></div>""" if hook else "")
     markup = f"""<div class="glow"></div>
 <div class="abs head" id="{sid}-head"><span class="logo">vachecker<b>.info</b></span><span class="q">Vrai ou faux&nbsp;?</span></div>
 <div class="abs who" id="{sid}-who"><b>{esc(clip["who"])}</b> · {esc(clip["where"])}</div>
 <div class="abs frame" data-layout-allow-overflow><div class="inner" id="{sid}-in" data-layout-allow-overflow>
   <video id="{sid}-video" class="clip" src="assets/clips/{clip["src"]}" data-start="0" data-duration="{dur}" data-media-start="{media_start}"
     data-track-index="{track}" playsinline data-has-audio="true" data-automation='{json.dumps(lane)}'></video>
-</div><div class="shade" id="{sid}-shade"></div></div>
+</div><div class="shade" id="{sid}-shade"></div>{f'<div class="hshade" id="{sid}-hshade"></div>' if hook else ''}</div>{hook_markup}
 <div class="abs guess" id="{sid}-guess"><div class="t">Vrai ou faux&nbsp;?</div><div class="bar"><i id="{sid}-gbar"></i></div></div>
 <div class="abs card" id="{sid}-card">
   <div class="bar"></div>
@@ -271,8 +281,10 @@ def moment(sid, clip_id, a, b, guess, hold, track=3, card_id=None, at=0.0):
     <div class="foot" id="{sid}-foot"><span class="src">{esc(c["source"])} ↗</span><span class="vd">{c["foot"]}</span></div>
   </div>
 </div>"""
-    script = f"""  tl.fromTo(['#{sid}-head', '#{sid}-who'], {{ opacity: 0, y: -12 }}, {{ opacity: 1, y: 0, duration: 0.45, ease: 'power3.out', stagger: 0.08 }}, 0.05);
-  gsap.set(['#{sid}-guess', '#{sid}-card'], {{ opacity: 0 }});
+    # Avec une accroche, l'en-tête est là dès la première image (la miniature)
+    head_in = "" if hook else f"""  tl.fromTo(['#{sid}-head', '#{sid}-who'], {{ opacity: 0, y: -12 }}, {{ opacity: 1, y: 0, duration: 0.45, ease: 'power3.out', stagger: 0.08 }}, 0.05);
+"""
+    script = head_in + f"""  gsap.set(['#{sid}-guess', '#{sid}-card'], {{ opacity: 0 }});
   // Vrai ou faux ? — le temps de deviner
   tl.to('#{sid}-shade', {{ opacity: 1, duration: 0.35, ease: 'power1.out' }}, {g0});
   tl.fromTo('#{sid}-guess', {{ opacity: 0, scale: 0.9 }}, {{ opacity: 1, scale: 1, duration: 0.35, ease: 'back.out(1.8)' }}, {g0});
@@ -282,7 +294,11 @@ def moment(sid, clip_id, a, b, guess, hold, track=3, card_id=None, at=0.0):
   tl.fromTo('#{sid}-card', {{ opacity: 0, y: -50, filter: 'blur(8px)' }}, {{ opacity: 1, y: 0, filter: 'blur(0px)', duration: 0.6, ease: 'expo.out' }}, {c0});
   tl.fromTo('#{sid}-tag', {{ scale: 1.7, rotation: -6 }}, {{ scale: 1, rotation: 0, duration: 0.5, ease: 'back.out(2.2)' }}, {round(c0 + 0.15, 2)});
   tl.fromTo(['#{sid}-body', '#{sid}-foot'], {{ opacity: 0, y: 10 }}, {{ opacity: 1, y: 0, duration: 0.45, ease: 'power2.out', stagger: 0.12 }}, {round(c0 + 0.35, 2)});
-  tl.to('#{sid}-shade', {{ opacity: 0.35, duration: 0.5 }}, {c0});""" + recrops(clip, a, dur, f"#{sid}-in", at)
+  tl.to('#{sid}-shade', {{ opacity: 0.35, duration: 0.5 }}, {c0});""" + (f"""
+  // Accroche : là dès la première image, puis elle s'efface sur l'extrait
+  tl.fromTo('#{sid}-hook', {{ scale: 1.04 }}, {{ scale: 1, duration: 0.6, ease: 'power2.out' }}, 0);
+  tl.to('#{sid}-hook', {{ opacity: 0, y: -40, duration: 0.3, ease: 'power2.in' }}, {round(hook - 0.3, 2)});
+  tl.to('#{sid}-hshade', {{ opacity: 0, duration: 0.45, ease: 'power1.out' }}, {round(hook - 0.3, 2)});""" if hook else "") + recrops(clip, a, dur, f"#{sid}-in", at)
     write(sid, scene(sid, dur, style, markup, script))
     # Mots minutés depuis le début de la scène (sous-titres)
     toks = [{"w": t["w"], "s": round(t["s"] - a + 0.12, 2), "e": round(t["e"] - a + 0.12, 2)} for t in tokens(clip_id, a, b)]
@@ -566,7 +582,7 @@ def build(reel):
     if reel == "presentation":
         return build_teaser()
     elif reel == "zemmour":
-        plan = [("moment", ("zemmour", 2451.95, 2461.18, 2.0, 7.0)),
+        plan = [("moment", ("zemmour", 2451.95, 2461.18, 2.0, 7.0, 2.4)),
                 ("fiche", lambda s: fiche(s, "IBZZAtCeH0k")),
                 ("cta", lambda s: cta(s))]
     else:
@@ -576,8 +592,8 @@ def build(reel):
         if callable(spec):
             dur = spec(sid)
         else:
-            clip_id, a, b, guess, hold = spec
-            dur, toks, g0 = moment(sid, clip_id, a, b, guess, hold, track=3 + len(spans), at=t)
+            clip_id, a, b, guess, hold, *hook = spec
+            dur, toks, g0 = moment(sid, clip_id, a, b, guess, hold, track=3 + len(spans), at=t, hook=hook[0] if hook else 0.0)
             spans.append((t, toks, g0))
         scenes.append((sid, t, dur))
         t = round(t + dur, 2)

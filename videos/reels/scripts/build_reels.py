@@ -104,7 +104,8 @@ def esc(s):
 
 
 # Débuts de mots mal placés par la transcription, recalés sur le son (énergie par 20 ms)
-RETIME = {"attal": {191.32: 191.74}}      # « que » : Attal marque une pause après « anglaise »
+RETIME = {"attal": {191.32: 191.74},     # « que » : Attal marque une pause après « anglaise »
+          "bardella": {6.92: 7.20}}         # « sur » : « …5,5 pour cent » ne finit qu'à 7,07
 
 
 def words_of(clip):
@@ -779,7 +780,8 @@ def write_index(reel, scenes, spans, total, music):
 
 
 TEASER = [  # (orateur, début, fin de la phrase) — repère des mots
-    ("bardella", 3.56, 6.84),                 # « Dès l'été, j'entends baisser la TVA de 20 % à 5,5 % »
+    ("bardella", 3.56, 7.08,                  # « Dès l'été, j'entends baisser la TVA de 20 % à 5,5 % »
+     {"hold": 0.12, "tail": 0.2}),            #   « …pour cent » finit à 7,07, « sur » commence à 7,20
     ("attal", 191.74, 197.09,                 # « …que la France soit le réceptacle, reçoive l'intégralité des
      {"hold": 0.12, "tail": 0.17}),           #   personnes migrantes au Royaume-Uni. » — la journaliste enchaîne à 197,16
     ("bompard-salaire", 16.16, 17.98),        # « Vous n'avez pas augmenté le salaire des enseignants. »

@@ -1,7 +1,7 @@
 <!doctype html>
 <!-- Photo de profil Instagram / TikTok de vachecker.info, 1080 × 1080.
-     ?v=a|b|c : variante ; ?apercu=1 : les trois en cercle, aux tailles réelles.
-     Capture : chrome --headless=new --window-size=1080,1080 --screenshot=… "profil.html?v=a" -->
+     ?v=a|b|c|d|e : variante ; ?apercu=1 : les variantes en cercle, aux tailles réelles.
+     Capture : chrome --headless=new --allow-file-access-from-files --window-size=1080,1080 --screenshot=… "profil.html?v=c" -->
 <html lang="fr">
 <head>
 <meta charset="utf-8">
@@ -12,20 +12,20 @@
   :root { --red: #ee6060; --ink: #0d0e12; }
   html, body { margin: 0; background: var(--ink); }
   .pic { position: relative; width: 1080px; height: 1080px; overflow: hidden; display: grid; place-items: center; }
-  /* a : « v. » blanc sur fond sombre, le point rouge comme le « .info » */
-  .a { background: radial-gradient(760px 640px at 18% 100%, rgba(163, 23, 44, 0.42), transparent 70%),
-                   radial-gradient(620px 520px at 92% 0%, rgba(238, 96, 96, 0.14), transparent 70%), var(--ink); }
-  /* b : même chose sur fond clair, comme le site */
-  .b { background: #ffffff; }
-  /* c : « va. » plus proche du nom */
-  .c { background: radial-gradient(760px 640px at 18% 100%, rgba(163, 23, 44, 0.42), transparent 70%), var(--ink); }
+  .dark { background: radial-gradient(760px 640px at 18% 100%, rgba(163, 23, 44, 0.42), transparent 70%),
+                      radial-gradient(620px 520px at 92% 0%, rgba(238, 96, 96, 0.14), transparent 70%), var(--ink); }
+  .light { background: #ffffff; }
   .mark { font-family: 'Newsreader', serif; font-style: italic; font-weight: 500; line-height: 1; letter-spacing: -0.02em; color: #fff;
     transform: translate(-3%, 0); white-space: nowrap; }
-  .a .mark { font-size: 760px; }
-  .b .mark { font-size: 760px; color: #1c1c1c; }
-  .c .mark { font-size: 560px; }
+  .light .mark { color: #1c1c1c; }
   .mark i { font-style: inherit; color: var(--red); }
-  .b .mark i { color: #a3172c; }
+  .light .mark i { color: #a3172c; }
+  /* a, b : « v. » ; c, e : « va. » ; d : « va » et une coche rouge (« va checker ») */
+  .a .mark, .b .mark { font-size: 760px; }
+  .c .mark, .e .mark { font-size: 560px; }
+  .d .mark { font-size: 490px; transform: translate(-4%, 0); }
+  .ck { display: inline-block; width: 0.36em; height: 0.36em; margin-left: 0.05em; vertical-align: 0; transform: skewX(-12deg); overflow: visible; }
+  .ck path { fill: none; stroke: var(--red); stroke-width: 19; stroke-linecap: round; stroke-linejoin: round; }
 
   /* Aperçu : cercles aux tailles d'Instagram (profil ≈ 150 px, fil ≈ 32 px) */
   .apercu { background: #fafafa; font-family: 'Archivo', sans-serif; padding: 40px; display: grid; gap: 36px; }
@@ -43,10 +43,14 @@
 <body>
 <script>
   const q = new URLSearchParams(location.search);
-  const pic = (v) => `<div class="pic ${v}"><div class="mark">${v === 'c' ? 'va<i>.</i>' : 'v<i>.</i>'}</div></div>`;
+  const CHECK = '<svg class="ck" viewBox="0 0 100 100" aria-hidden="true"><path d="M8 56 L38 86 L94 12"/></svg>';
+  const MARKS = { a: 'v<i>.</i>', b: 'v<i>.</i>', c: 'va<i>.</i>', d: 'va' + CHECK, e: 'va<i>.</i>' };
+  const BG = { a: 'dark', b: 'light', c: 'dark', d: 'dark', e: 'light' };
+  const pic = (v) => `<div class="pic ${v} ${BG[v]}"><div class="mark">${MARKS[v]}</div></div>`;
   if (q.get('apercu')) {
     document.body.className = 'apercu';
-    document.body.innerHTML = ['a', 'b', 'c'].map((v) => `<div class="row"><b>${v.toUpperCase()}</b>
+    const show = (q.get('apercu') === '1' ? 'abc' : q.get('apercu')).split('');
+    document.body.innerHTML = show.map((v) => `<div class="row"><b>${v.toUpperCase()}</b>
       <div class="big">${pic(v)}</div><div class="mid">${pic(v)}</div><div class="sm">${pic(v)}</div>
       <span>vachecker.info</span></div>`).join('');
   } else {

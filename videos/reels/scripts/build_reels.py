@@ -682,7 +682,8 @@ def build(reel):
     elif reel == "zemmour":
         plan = [("moment", ("zemmour", 2451.95, 2461.18, 2.0, 7.0, 2.4)),
                 ("fiche", lambda s: fiche(s, "IBZZAtCeH0k")),
-                ("cta", lambda s: cta(s))]
+                ("cta", lambda s: cta(s)),
+                ("logo", lambda s: logo_outro(s))]
     else:
         raise SystemExit(f"réel inconnu : {reel}")
     for name, spec in plan:
@@ -787,11 +788,15 @@ def build_teaser():
     for name, fn in (("promesse", kinetic), ("qui", qui), ("outro", outro)):
         fn(f"{reel}-{name}", bars2)
         scenes.append((f"{reel}-{name}", t, bars2)); t = round(t + bars2, 3)
+    # Outro commune (logo seul) : la musique s'éteint à la fin de la phrase musicale, juste avant
+    main_end = t
+    d = logo_outro(f"{reel}-logo")
+    scenes.append((f"{reel}-logo", t, d)); t = round(t + d, 3)
     total = t
     music_in = round(DROP - drop_at, 3)
     q_end = scenes[4][1] + scenes[4][2]           # fin des citations (après l'accroche et 4 citations)
     env = [(0, 0), (0.25, 0.85), (round(scenes[1][1] - 0.1, 3), 0.85), (round(scenes[1][1] + 0.1, 3), 0.3),
-           (round(q_end - 0.05, 3), 0.3), (round(q_end + 0.2, 3), 1.0), (round(total - 1.2, 3), 1.0), (total, 0)]
+           (round(q_end - 0.05, 3), 0.3), (round(q_end + 0.2, 3), 1.0), (round(main_end - 1.2, 3), 1.0), (round(main_end + 0.3, 3), 0), (total, 0)]
     music = (music_in, env)
     write_index(reel, scenes, spans, total, music)
 

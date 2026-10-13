@@ -630,6 +630,38 @@ def capture_fiche(debat):
     return out
 
 
+MOIS = ["janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août", "septembre", "octobre", "novembre", "décembre"]
+
+
+def intro_fiche(sid, debat, dur=2.6):
+    """Avant la fiche : on passe de la phrase au débat entier (chiffres lus dans la fiche publiée)."""
+    with open(os.path.join(SITE, "sessions", f"{debat}.fiche.json"), encoding="utf-8") as f:
+        fi = json.load(f)
+    n = fi["totaux"]["affirmations"]
+    y, m, d = (int(x) for x in fi["date"].split("-"))
+    titre = fi["titre"].replace(" — ", " · ")
+    style = """§ .ln { left: 72px; right: 72px; text-align: center; opacity: 0; }
+§ .k { top: 620px; font-size: 54px; font-weight: 700; color: rgba(255,255,255,0.75); }
+§ .num { top: 700px; font-family: 'SRC Newsreader', serif; font-style: italic; font-weight: 500; font-size: 250px; line-height: 1; color: #ee6060; font-variant-numeric: tabular-nums; }
+§ .lbl { top: 960px; font-family: 'SRC Newsreader', serif; font-style: italic; font-weight: 500; font-size: 92px; line-height: 1; }
+§ .sub { top: 1110px; font-size: 34px; line-height: 1.4; color: rgba(255,255,255,0.62); }"""
+    markup = f"""<div class="glow"></div>
+<div class="abs ln k" id="if-k">Et sur tout le débat&nbsp;?</div>
+<div class="abs ln num" id="if-n">{n}</div>
+<div class="abs ln lbl" id="if-l">affirmations vérifiées</div>
+<div class="abs ln sub" id="if-t">{esc(titre)}<br>{d} {MOIS[m - 1]} {y}</div>"""
+    js = ["  tl.fromTo('#if-k', { opacity: 0, y: 18 }, { opacity: 1, y: 0, duration: 0.45, ease: 'power3.out' }, 0.1);",
+          "  tl.fromTo('#if-n', { opacity: 0, y: 24 }, { opacity: 1, y: 0, duration: 0.45, ease: 'power3.out' }, 0.35);",
+          # le nombre monte jusqu'au total du débat
+          f"  const nEl = document.getElementById('if-n'); const cnt = {{ v: 0 }};",
+          f"  tl.fromTo(cnt, {{ v: 0 }}, {{ v: {n}, duration: 0.8, ease: 'power2.out', onUpdate: () => {{ nEl.textContent = String(Math.round(cnt.v)); }} }}, 0.35);",
+          "  tl.fromTo('#if-l', { opacity: 0, y: 18 }, { opacity: 1, y: 0, duration: 0.45, ease: 'power3.out' }, 0.6);",
+          "  tl.fromTo('#if-t', { opacity: 0 }, { opacity: 1, duration: 0.45, ease: 'power2.out' }, 0.95);",
+          f"  tl.to(['#if-k', '#if-n', '#if-l', '#if-t'], {{ opacity: 0, y: -40, duration: 0.3, ease: 'power2.in', stagger: 0.04 }}, {round(dur - 0.35, 3)});"]
+    write(sid, scene(sid, dur, style, markup, "\n".join(js)))
+    return dur
+
+
 def fiche(sid, debat, dur=5.0):
     """La fiche du débat monte du bas, comme un écran de téléphone, puis se rapproche."""
     if not os.path.exists(fiche_png(debat)):
@@ -681,6 +713,7 @@ def build(reel):
         plan = [("logo", lambda s: logo_outro(s))]
     elif reel == "zemmour":
         plan = [("moment", ("zemmour", 2451.95, 2461.18, 2.0, 7.0, 2.4)),
+                ("transition", lambda s: intro_fiche(s, "IBZZAtCeH0k")),
                 ("fiche", lambda s: fiche(s, "IBZZAtCeH0k")),
                 ("cta", lambda s: cta(s)),
                 ("logo", lambda s: logo_outro(s))]

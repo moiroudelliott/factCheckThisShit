@@ -1,0 +1,57 @@
+<!doctype html>
+<!-- Photo de profil Instagram / TikTok de vachecker.info, 1080 × 1080.
+     ?v=a|b|c : variante ; ?apercu=1 : les trois en cercle, aux tailles réelles.
+     Capture : chrome --headless=new --window-size=1080,1080 --screenshot=… "profil.html?v=a" -->
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>vachecker.info — photo de profil</title>
+<style>
+  @font-face { font-family: 'Newsreader'; font-style: italic; font-weight: 400 500; src: url('../site/fonts/newsreader-italic-latin.woff2') format('woff2'); }
+  @font-face { font-family: 'Archivo'; font-style: normal; font-weight: 400 800; src: url('../site/fonts/archivo-latin.woff2') format('woff2'); }
+  :root { --red: #ee6060; --ink: #0d0e12; }
+  html, body { margin: 0; background: var(--ink); }
+  .pic { position: relative; width: 1080px; height: 1080px; overflow: hidden; display: grid; place-items: center; }
+  /* a : « v. » blanc sur fond sombre, le point rouge comme le « .info » */
+  .a { background: radial-gradient(760px 640px at 18% 100%, rgba(163, 23, 44, 0.42), transparent 70%),
+                   radial-gradient(620px 520px at 92% 0%, rgba(238, 96, 96, 0.14), transparent 70%), var(--ink); }
+  /* b : même chose sur fond clair, comme le site */
+  .b { background: #ffffff; }
+  /* c : « va. » plus proche du nom */
+  .c { background: radial-gradient(760px 640px at 18% 100%, rgba(163, 23, 44, 0.42), transparent 70%), var(--ink); }
+  .mark { font-family: 'Newsreader', serif; font-style: italic; font-weight: 500; line-height: 1; letter-spacing: -0.02em; color: #fff;
+    transform: translate(-3%, 0); white-space: nowrap; }
+  .a .mark { font-size: 760px; }
+  .b .mark { font-size: 760px; color: #1c1c1c; }
+  .c .mark { font-size: 560px; }
+  .mark i { font-style: inherit; color: var(--red); }
+  .b .mark i { color: #a3172c; }
+
+  /* Aperçu : cercles aux tailles d'Instagram (profil ≈ 150 px, fil ≈ 32 px) */
+  .apercu { background: #fafafa; font-family: 'Archivo', sans-serif; padding: 40px; display: grid; gap: 36px; }
+  .row { display: flex; align-items: center; gap: 40px; }
+  .row .big { width: 300px; height: 300px; border-radius: 50%; overflow: hidden; box-shadow: 0 0 0 1px #dbdbdb; }
+  .row .mid { width: 150px; height: 150px; border-radius: 50%; overflow: hidden; box-shadow: 0 0 0 1px #dbdbdb; }
+  .row .sm { width: 32px; height: 32px; border-radius: 50%; overflow: hidden; }
+  .row .big .pic { transform: scale(0.2778); transform-origin: 0 0; }
+  .row .mid .pic { transform: scale(0.1389); transform-origin: 0 0; }
+  .row .sm .pic { transform: scale(0.0296); transform-origin: 0 0; }
+  .row b { font-size: 34px; width: 50px; }
+  .row span { font-size: 26px; color: #262626; font-weight: 600; }
+</style>
+</head>
+<body>
+<script>
+  const q = new URLSearchParams(location.search);
+  const pic = (v) => `<div class="pic ${v}"><div class="mark">${v === 'c' ? 'va<i>.</i>' : 'v<i>.</i>'}</div></div>`;
+  if (q.get('apercu')) {
+    document.body.className = 'apercu';
+    document.body.innerHTML = ['a', 'b', 'c'].map((v) => `<div class="row"><b>${v.toUpperCase()}</b>
+      <div class="big">${pic(v)}</div><div class="mid">${pic(v)}</div><div class="sm">${pic(v)}</div>
+      <span>vachecker.info</span></div>`).join('');
+  } else {
+    document.body.innerHTML = pic(q.get('v') || 'a');
+  }
+</script>
+</body>
+</html>

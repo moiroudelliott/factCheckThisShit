@@ -336,27 +336,21 @@ def quote(sid, clip_id, a, b, dur, track, at=0.0):
     return toks
 
 
-VERDICT_TAGS = [("Vrai", "#73c076"), ("Partiellement vrai", "#d4ac32"), ("Trompeur", "#f08a3c"), ("Faux", "#ee6060")]
-
-
 def verdicts(sid, dur):
-    """Pendant le creux avant le drop : les quatre verdicts tombent comme des tampons, un par temps."""
-    style = """§ .stack { left: 0; width: 100%; top: 0; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 44px; }
-§ .tag { display: inline-flex; align-items: center; gap: 26px; padding: 22px 46px; border-radius: 999px; opacity: 0;
-  font-size: 60px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: var(--c);
-  background: color-mix(in srgb, var(--c) 16%, transparent); border: 5px solid color-mix(in srgb, var(--c) 60%, transparent);
-  box-shadow: 0 0 70px color-mix(in srgb, var(--c) 30%, transparent); }
-§ .tag i { width: 26px; height: 26px; border-radius: 50%; background: var(--c); }"""
-    tags = "\n".join(f'  <div class="tag" id="vd-{i}" style="--c: {c};"><i></i>{t}</div>' for i, (t, c) in enumerate(VERDICT_TAGS))
-    markup = f'<div class="glow"></div>\n<div class="abs stack" id="vd-s">\n{tags}\n</div>'
+    """Pendant le creux avant le drop : les quatre verdicts, un mot à la fois, en alternance sur les noires."""
+    words = [("Vrai&nbsp;?", "#73c076", 210), ("Partiellement<br>vrai&nbsp;?", "#d4ac32", 148),
+             ("Trompeur&nbsp;?", "#f08a3c", 168), ("Faux&nbsp;?", "#ee6060", 210)]
+    style = """§ .w { left: 0; width: 100%; top: 0; height: 100%; display: flex; align-items: center; justify-content: center; text-align: center;
+  font-family: 'SRC Newsreader', serif; font-style: italic; font-weight: 500; line-height: 0.95; opacity: 0; }"""
+    markup = '<div class="glow"></div>\n' + "\n".join(
+        f'<div class="abs w" id="vd-{i}" style="color: {c}; font-size: {fs}px;">{t}</div>' for i, (t, c, fs) in enumerate(words))
     js = []
     for i in range(4):
         t0 = round(i * Q, 3)
-        rot = (-7, 6, -5, 4)[i]
-        # le tampon s'écrase, la pile tremble un instant
-        js.append(f"  tl.fromTo('#vd-{i}', {{ opacity: 0, scale: 1.8, rotation: {rot} }}, {{ opacity: 1, scale: 1, rotation: 0, duration: 0.2, ease: 'back.out(2.2)' }}, {t0});")
-        js.append(f"  tl.to('#vd-s', {{ x: {(-9, 9)[i % 2]}, duration: 0.035, yoyo: true, repeat: 3, ease: 'none' }}, {round(t0 + 0.15, 3)});")
-    js.append(f"  tl.to(['#vd-0', '#vd-1', '#vd-2', '#vd-3'], {{ opacity: 0, scale: 0.9, duration: 0.16, ease: 'power2.in', stagger: 0.02 }}, {round(dur - 0.2, 3)});")
+        js.append(f"  tl.fromTo('#vd-{i}', {{ opacity: 0, scale: 1.25 }}, {{ opacity: 1, scale: 1, duration: 0.16, ease: 'power3.out' }}, {t0});")
+        if i < 3:
+            js.append(f"  tl.set('#vd-{i}', {{ opacity: 0 }}, {round((i + 1) * Q, 3)});")
+    js.append(f"  tl.to('#vd-3', {{ opacity: 0, scale: 0.92, duration: 0.18, ease: 'power2.in' }}, {round(dur - 0.18, 3)});")
     write(sid, scene(sid, dur, style, markup, "\n".join(js)))
 
 

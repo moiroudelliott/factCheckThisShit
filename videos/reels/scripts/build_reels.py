@@ -431,8 +431,9 @@ def method(sid, dur=4.8):
     return dur
 
 
-def ending(sid, dur, line, tm=1.9, type_at=0.45, bio="Lien en bio"):
-    """« Va checker l'info ! » se replie en vachecker.info (lettres placées d'après la chasse de la police)."""
+def ending(sid, dur, line, tm=1.9, type_at=0.45, bio="Lien en bio", made=True, leave=False):
+    """« Va checker l'info ! » se replie en vachecker.info (lettres placées d'après la chasse de la police).
+    bio=None, made=False : seulement l'adresse et la ligne ; leave : tout s'efface à la fin (une scène suit)."""
     from fontTools.ttLib import TTFont
     from fontTools.varLib import instancer
     phrase, url, fs = "Va checker l’info !", "vachecker.info", 112
@@ -475,9 +476,9 @@ def ending(sid, dur, line, tm=1.9, type_at=0.45, bio="Lien en bio"):
     markup = f"""<div class="glow"></div>
 <div class="abs q" id="e-q">Un doute&nbsp;?</div>
 <div class="abs morph" id="e-m">{"".join(chars)}</div>
-<div class="abs ln" id="e-ln">{line}</div>
-<div class="abs bio" id="e-bio">{bio}</div>
-<div class="abs made" id="e-made"><span class="flag"></span>{SIGNATURE}</div>"""
+<div class="abs ln" id="e-ln">{line}</div>""" + (f"""
+<div class="abs bio" id="e-bio">{bio}</div>""" if bio else "") + (f"""
+<div class="abs made" id="e-made"><span class="flag"></span>{SIGNATURE}</div>""" if made else "")
     script = f"""  gsap.set(['#e-v', '#e-dot'], {{ opacity: 0 }});
   tl.fromTo('#e-q', {{ opacity: 0, y: 14 }}, {{ opacity: 1, y: 0, duration: 0.45, ease: 'power3.out' }}, 0.1);
   {typed}.forEach((i, k) => tl.fromTo('#e-p' + i, {{ opacity: 0 }}, {{ opacity: 1, duration: 0.05 }}, {type_at} + k * 0.035));
@@ -488,8 +489,9 @@ def ending(sid, dur, line, tm=1.9, type_at=0.45, bio="Lien en bio"):
   tl.to('{", ".join(f"#e-p{i}" for i in red)}', {{ color: '{RED}', duration: 0.5 }}, {tm + 0.4});
   tl.fromTo('#e-dot', {{ opacity: 0, y: -20 }}, {{ opacity: 1, y: 0, duration: 0.35, ease: 'back.out(2)' }}, {tm + 0.8});
   tl.to('#e-m', {{ x: {shift}, y: -90, duration: 0.7, ease: 'power3.inOut' }}, {tm + 1.0});
-  tl.fromTo(['#e-ln', '#e-bio'], {{ opacity: 0, y: 12 }}, {{ opacity: 1, y: -90, duration: 0.5, ease: 'power2.out', stagger: 0.12 }}, {tm + 1.4});
-  tl.fromTo('#e-made', {{ opacity: 0 }}, {{ opacity: 1, duration: 0.5 }}, {tm + 1.9});"""
+  tl.fromTo({['#e-ln', '#e-bio'] if bio else ['#e-ln']}, {{ opacity: 0, y: 12 }}, {{ opacity: 1, y: -90, duration: 0.5, ease: 'power2.out', stagger: 0.12 }}, {tm + 1.4});""" + (f"""
+  tl.fromTo('#e-made', {{ opacity: 0 }}, {{ opacity: 1, duration: 0.5 }}, {tm + 1.9});""" if made else "") + (f"""
+  tl.to(['#e-m', '#e-ln'], {{ opacity: 0, y: -130, duration: 0.25, ease: 'power2.in' }}, {round(dur - 0.25, 3)});""" if leave else "")
     write(sid, scene(sid, dur, style, markup, script))
     return dur
 
@@ -664,7 +666,7 @@ def build_teaser():
     reel = "presentation"
     scenes, spans, t = [], [], 0.0
     d = snap(2.55)
-    hook_text(f"{reel}-hook", d)
+    hook_mosaic(f"{reel}-hook", d)
     scenes.append((f"{reel}-hook", t, d)); t = round(t + d, 3)
     for i, (clip_id, a, b) in enumerate(TEASER):
         sid = f"{reel}-q{i + 1}"
@@ -680,16 +682,123 @@ def build_teaser():
     vraifaux(f"{reel}-vraifaux", d)
     scenes.append((f"{reel}-vraifaux", t, d)); t = round(t + d, 3)
     drop_at = t
-    d = 7.6
-    ending(f"{reel}-fin", d, "On vérifie les débats, en direct.", tm=round(2 * Q, 3), type_at=0.05, bio="Abonne-toi · lien en bio")
-    scenes.append((f"{reel}-fin", t, d)); t = round(t + d, 3)
+    # Après le drop, une phrase musicale entière : 8 mesures de 4 temps, 2 par scène
+    bars2 = round(8 * Q, 3)
+    ending(f"{reel}-fin", bars2, "On vérifie les débats, en direct.", tm=round(2 * Q, 3), type_at=0.05,
+           bio=None, made=False, leave=True)
+    scenes.append((f"{reel}-fin", t, bars2)); t = round(t + bars2, 3)
+    for name, fn in (("promesse", kinetic), ("qui", qui), ("outro", outro)):
+        fn(f"{reel}-{name}", bars2)
+        scenes.append((f"{reel}-{name}", t, bars2)); t = round(t + bars2, 3)
     total = t
     music_in = round(DROP - drop_at, 3)
-    q_end = scenes[-3][1] + scenes[-3][2]          # fin des citations
+    q_end = scenes[4][1] + scenes[4][2]           # fin des citations (après l'accroche et 4 citations)
     env = [(0, 0), (0.25, 0.85), (round(scenes[1][1] - 0.1, 3), 0.85), (round(scenes[1][1] + 0.1, 3), 0.3),
-           (round(q_end - 0.05, 3), 0.3), (round(q_end + 0.2, 3), 1.0), (round(total - 1.4, 3), 1.0), (total, 0)]
+           (round(q_end - 0.05, 3), 0.3), (round(q_end + 0.2, 3), 1.0), (round(total - 1.2, 3), 1.0), (total, 0)]
     music = (music_in, env)
     write_index(reel, scenes, spans, total, music)
+
+
+# Les quatre visages, plein cadre (2 × 2), en vidéo muette : fenêtres portrait (x, y, l, h)
+# calées sur le visage, hors logos et bandeaux. starts : début dans l'extrait (s).
+FACES = [("bardella", "Bardella", (826, 40, 427, 760)), ("attal", "Attal", (747, 40, 427, 760)),
+         ("bompard-salaire", "Bompard", (1243, 140, 354, 630)), ("zemmour", "Zemmour", (1137, 120, 427, 760))]
+TW, TH = W // 2, H // 2
+
+
+def mosaic(sid, dur, starts, track, over, over_style, names=False, pop=False, spots=()):
+    """Mosaïque des quatre orateurs. spots : [(instant, indice du visage)] où il s'éclaire ;
+    pop : les visages entrent un par un, sur les temps ; over : texte par-dessus."""
+    tiles, style = [], [f"§ .tile {{ width: {TW}px; height: {TH}px; overflow: hidden; background: #000; }}",
+                         "§ .tile video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }",
+                         "§ .tile .dim { position: absolute; inset: 0; background: #08090c; opacity: 0.55; }",
+                         # noms près du centre : bas des tuiles du haut, haut des tuiles du bas
+                         "§ .tile .nm { position: absolute; left: 0; right: 0; text-align: center; font-size: 44px; font-weight: 800; letter-spacing: 0.02em; text-shadow: 0 2px 18px rgba(0,0,0,0.8); }",
+                         "§ .tile .nm.up { bottom: 44px; }",
+                         "§ .tile .nm.down { top: 44px; }",
+                         "§ .band { left: 0; width: 100%; top: 0; height: 100%; background: radial-gradient(1000px 520px at 50% 50%, rgba(8,9,12,0.82), rgba(8,9,12,0.35) 60%, transparent 85%); }"]
+    for i, (clip_id, name, (x, y, cw, ch)) in enumerate(FACES):
+        clip = CLIPS[clip_id]
+        k = TW / cw
+        style.append(f"§ #{sid}-t{i} {{ left: {(i % 2) * TW}px; top: {(i // 2) * TH}px; }}")
+        style.append(f"§ #{sid}-i{i} {{ position: absolute; left: {-x * k:.1f}px; top: {-y * k:.1f}px; width: {1920 * k:.1f}px; height: {1080 * k:.1f}px; }}")
+        tiles.append(f"""<div class="abs tile" id="{sid}-t{i}" data-layout-allow-overflow><div id="{sid}-i{i}" data-layout-allow-overflow>
+  <video id="{sid}-v{i}" class="clip" src="assets/clips/{clip["src"]}" data-start="0" data-duration="{dur}" data-media-start="{starts[i]}"
+    data-track-index="{track + i}" muted playsinline></video></div><div class="dim" id="{sid}-d{i}"></div>{f'<div class="nm {"up" if i < 2 else "down"}" id="{sid}-n{i}">{name}</div>' if names else ''}</div>""")
+    js = []
+    if pop:
+        js.append(f"  gsap.set({[f'#{sid}-t{i}' for i in range(4)]}, {{ opacity: 0 }});")
+        for i in range(4):
+            js.append(f"  tl.fromTo('#{sid}-t{i}', {{ opacity: 0, scale: 1.15 }}, {{ opacity: 1, scale: 1, duration: 0.22, ease: 'power3.out' }}, {round(i * Q, 3)});")
+    for t, i in spots:
+        js.append(f"  tl.to('#{sid}-d{i}', {{ opacity: 0.02, duration: 0.08 }}, {t});")
+        js.append(f"  tl.to('#{sid}-d{i}', {{ opacity: 0.55, duration: 0.25 }}, {round(t + Q * 0.85, 3)});")
+    markup = "\n".join(tiles) + f'\n<div class="abs band"></div>\n{over}'
+    return "\n".join(style) + "\n" + over_style, markup, js
+
+
+def hook_mosaic(sid, dur):
+    """Accroche : les quatre visages et « Ils l'ont dit à la télé… », dès la première image (la miniature)."""
+    over = """<div class="abs l l1" id="hk-1">Ils l’ont dit</div>
+<div class="abs l l2" id="hk-2">à la télé…</div>"""
+    over_style = """§ .l { left: 0; width: 100%; text-align: center; line-height: 1.02; text-shadow: 0 4px 40px rgba(0,0,0,0.6); }
+§ .l1 { top: 770px; font-size: 104px; font-weight: 800; letter-spacing: -0.02em; }
+§ .l2 { top: 890px; font-family: 'SRC Newsreader', serif; font-style: italic; font-weight: 500; font-size: 170px; color: #fff; }"""
+    style, markup, js = mosaic(sid, dur, [4.0, 20.0, 15.5, 30.0], 20, over, over_style,
+                               spots=[(round(i * Q, 3), i) for i in range(4)])
+    js += [f"  tl.fromTo('#hk-2', {{ scale: 1 }}, {{ scale: 1.07, duration: 0.09, yoyo: true, repeat: 1, ease: 'power2.out' }}, {round(2 * Q, 3)});",
+           f"  tl.to(['#hk-1', '#hk-2'], {{ opacity: 0, y: -20, duration: 0.2, ease: 'power2.in' }}, {round(dur - 0.2, 3)});"]
+    write(sid, scene(sid, dur, style, markup, "\n".join(js)))
+
+
+def kinetic(sid, dur):
+    """Après le drop : la promesse se construit, une ligne sur les temps forts."""
+    lines = [("Chaque affirmation", "k1", 0), ("vérifiée", "k2", 2), ("en direct,", "k3", 4), ("sources à l’appui.", "k4", 6)]
+    style = """§ .k { left: 0; width: 100%; text-align: center; line-height: 1; opacity: 0; }
+§ .k1 { top: 640px; font-size: 86px; font-weight: 800; letter-spacing: -0.02em; }
+§ .k2 { top: 750px; font-family: 'SRC Newsreader', serif; font-style: italic; font-weight: 500; font-size: 190px; color: #ee6060; }
+§ .k3 { top: 980px; font-size: 86px; font-weight: 800; letter-spacing: -0.02em; }
+§ .k4 { top: 1100px; font-family: 'SRC Newsreader', serif; font-style: italic; font-weight: 500; font-size: 92px; color: rgba(255,255,255,0.86); }"""
+    markup = '<div class="glow"></div>\n' + "\n".join(f'<div class="abs k {c}" id="kn-{c}">{t}</div>' for t, c, _ in lines)
+    js = [f"  tl.fromTo('#kn-{c}', {{ opacity: 0, scale: 1.35 }}, {{ opacity: 1, scale: 1, duration: 0.18, ease: 'power3.out' }}, {round(b * Q, 3)});"
+          for _, c, b in lines]
+    js.append(f"  tl.to({[f'#kn-{c}' for _, c, _ in lines]}, {{ opacity: 0, y: -40, duration: 0.22, ease: 'power2.in', stagger: 0.03 }}, {round(dur - 0.3, 3)});")
+    write(sid, scene(sid, dur, style, markup, "\n".join(js)))
+
+
+def qui(sid, dur):
+    """Les quatre visages reviennent, un par temps, puis « Qui dit vrai ? »."""
+    over = '<div class="abs qq" id="qq">Qui dit vrai&nbsp;?</div>'
+    over_style = """§ .band { opacity: 0; }
+§ .qq { left: 0; width: 100%; top: 880px; text-align: center; font-family: 'SRC Newsreader', serif; font-style: italic; font-weight: 500; font-size: 150px; line-height: 1; opacity: 0;
+  text-shadow: 0 4px 40px rgba(0,0,0,0.7); }"""
+    spots = [(round((4 + i) * Q, 3), i) for i in range(4)]
+    style, markup, js = mosaic(sid, dur, [7.0, 15.0, 10.5, 26.0], 30, over, over_style, names=True, pop=True, spots=spots)
+    tiles = [f"#{sid}-t{i}" for i in range(4)]
+    js += [f"  tl.to({[f'#{sid}-n{i}' for i in range(4)]}, {{ opacity: 0, duration: 0.15 }}, {round(4 * Q - 0.05, 3)});",
+           f"  tl.to('#{sid}-band', {{ opacity: 1, duration: 0.2 }}, {round(4 * Q, 3)});",
+           f"  tl.fromTo('#qq', {{ opacity: 0, scale: 1.3 }}, {{ opacity: 1, scale: 1, duration: 0.2, ease: 'power3.out' }}, {round(4 * Q, 3)});",
+           f"  tl.to({['#qq'] + tiles}, {{ opacity: 0, duration: 0.25, ease: 'power2.in' }}, {round(dur - 0.25, 3)});"]
+    write(sid, scene(sid, dur, style, markup.replace('class="abs band"', f'class="abs band" id="{sid}-band"'), "\n".join(js)))
+
+
+def outro(sid, dur):
+    """Le logo revient, sur les temps ; « Abonne-toi », la signature."""
+    style = f"""§ .lg {{ left: 0; width: {W}px; top: 760px; text-align: center; font-size: 150px; }}
+§ .bio {{ left: 0; width: {W}px; top: 980px; text-align: center; font-family: 'SRC Plex Mono', monospace; font-size: 34px; letter-spacing: 0.12em; text-transform: uppercase; color: rgba(255,255,255,0.7); }}
+§ .made {{ left: 0; width: {W}px; top: 1300px; display: flex; justify-content: center; align-items: center; gap: 16px; font-size: 32px; color: rgba(255,255,255,0.7); }}
+§ .made .flag {{ width: 45px; height: 30px; }}"""
+    markup = f"""<div class="glow"></div>
+<div class="abs logo lg" id="o-lg"><span id="o-lgi" style="display: inline-block;">vachecker<b>.info</b></span></div>
+<div class="abs bio" id="o-bio">Abonne-toi · lien en bio</div>
+<div class="abs made" id="o-made"><span class="flag"></span>{SIGNATURE}</div>"""
+    js = ["  tl.fromTo('#o-lg', { opacity: 0, scale: 0.9 }, { opacity: 1, scale: 1, duration: 0.35, ease: 'back.out(1.8)' }, 0);",
+          f"  tl.fromTo('#o-bio', {{ opacity: 0, y: 14 }}, {{ opacity: 1, y: 0, duration: 0.35, ease: 'power3.out' }}, {round(Q, 3)});",
+          f"  tl.fromTo('#o-made', {{ opacity: 0 }}, {{ opacity: 1, duration: 0.4 }}, {round(2 * Q, 3)});"]
+    # Le logo bat la mesure jusqu'à la fin
+    for b in range(2, int(dur / Q)):
+        js.append(f"  tl.to('#o-lgi', {{ scale: 1.045, duration: 0.07, yoyo: true, repeat: 1, ease: 'power2.out' }}, {round(b * Q, 3)});")
+    write(sid, scene(sid, dur, style, markup, "\n".join(js)))
 
 
 def hook_text(sid, dur):

@@ -1,8 +1,13 @@
 """Réels verticaux (1080 × 1920) de vachecker.info, pour Instagram et TikTok.
 
 Usage :
-    python scripts/build_reels.py presentation   # réel épinglé (≈ 55 s)
-    python scripts/build_reels.py zemmour        # un moment (≈ 22 s)
+    python scripts/build_reels.py presentation   # réel épinglé (≈ 27 s)
+    python scripts/build_reels.py zemmour        # un moment, puis la fiche du débat (≈ 27 s)
+    python scripts/build_reels.py fiche <id>     # (re)capture la fiche verticale sombre d'un débat
+
+La fiche de fin est une capture de la page du site
+(resume.html?s=<id>&format=vertical&theme=sombre), en 1080 × 1920 :
+assets/fiches/<id>-vertical-sombre.png.
 
 Écrit compositions/<réel>-*.html et index.html (le réel choisi), puis :
     npx hyperframes render -o renders/<réel>.mp4
@@ -18,9 +23,16 @@ import html
 import json
 import math
 import os
+import shutil
+import socket
+import subprocess
 import sys
+import time
+import urllib.request
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+SITE = os.path.join(ROOT, "..", "..", "site")
+FICHES = os.path.join(ROOT, "assets", "fiches")
 COMP = os.path.join(ROOT, "compositions")
 os.makedirs(COMP, exist_ok=True)
 W, H = 1080, 1920
@@ -466,6 +478,64 @@ def ending(sid, dur, line, tm=1.9, type_at=0.45, bio="Lien en bio"):
     return dur
 
 
+# ── Fiche du débat, format vertical sombre (capture du site) ─────────────────
+CHROME = [r"C:\Program Files\Google\Chrome\Application\chrome.exe",
+          r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe",
+          "google-chrome", "chromium", "chrome"]
+
+
+def fiche_png(debat):
+    return os.path.join(FICHES, f"{debat}-vertical-sombre.png")
+
+
+def capture_fiche(debat):
+    """Capture resume.html?format=vertical&theme=sombre en 1080 × 1920, servi en local."""
+    browser = next((c for c in CHROME if os.path.exists(c) or shutil.which(c)), None)
+    if not browser:
+        raise SystemExit("✗ Chrome ou Edge introuvable pour capturer la fiche")
+    with socket.socket() as sock:
+        sock.bind(("127.0.0.1", 0))
+        port = sock.getsockname()[1]
+    server = subprocess.Popen([sys.executable, "-m", "http.server", str(port), "--bind", "127.0.0.1",
+                               "--directory", os.path.abspath(SITE)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    try:
+        base = f"http://127.0.0.1:{port}"
+        for _ in range(50):
+            try:
+                urllib.request.urlopen(base + "/sessions/index.json", timeout=1).close()
+                break
+            except OSError:
+                time.sleep(0.1)
+        os.makedirs(FICHES, exist_ok=True)
+        out = fiche_png(debat)
+        url = f"{base}/resume.html?s={debat}&format=vertical&theme=sombre&export=1"
+        subprocess.run([browser, "--headless=new", "--disable-gpu", "--hide-scrollbars", "--force-device-scale-factor=1",
+                        f"--window-size={W},{H}", "--virtual-time-budget=6000", f"--screenshot={out}", url],
+                       check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    finally:
+        server.terminate()
+    print(f"✓ fiche capturée : {os.path.relpath(out, ROOT)}")
+    return out
+
+
+def fiche(sid, debat, dur=5.0):
+    """La fiche du débat monte du bas, comme un écran de téléphone, puis se rapproche."""
+    if not os.path.exists(fiche_png(debat)):
+        capture_fiche(debat)
+    k = 0.86
+    style = f"""§ .sheet {{ left: {W * (1 - k) / 2:.0f}px; top: 120px; width: {W}px; height: {H}px; transform-origin: 0 0; }}
+§ .sheet .in {{ position: absolute; inset: 0; border-radius: 34px; overflow: hidden; background: {BG};
+  box-shadow: 0 50px 140px rgba(0,0,0,0.7), 0 0 0 2px rgba(255,255,255,0.08); }}
+§ .sheet img {{ display: block; width: {W}px; height: {H}px; }}"""
+    markup = f"""<div class="glow"></div>
+<div class="abs sheet" id="fi-s"><div class="in" id="fi-in"><img src="assets/fiches/{debat}-vertical-sombre.png" alt=""></div></div>"""
+    script = f"""  tl.fromTo('#fi-s', {{ opacity: 0, y: 420, scale: {k - 0.06} }}, {{ opacity: 1, y: 0, scale: {k}, duration: 0.8, ease: 'expo.out' }}, 0);
+  tl.to('#fi-s', {{ scale: {k + 0.025}, x: -{W * 0.0125:.1f}, duration: {round(dur - 1.1, 2)}, ease: 'sine.inOut' }}, 0.8);
+  tl.to('#fi-s', {{ opacity: 0, y: -40, duration: 0.3, ease: 'power2.in' }}, {round(dur - 0.3, 2)});"""
+    write(sid, scene(sid, dur, style, markup, script))
+    return dur
+
+
 def cta(sid, dur=3.6):
     style = f"""§ .t {{ left: 0; width: {W}px; top: 640px; text-align: center; font-size: 52px; font-weight: 600; color: rgba(255,255,255,0.8); }}
 § .lg {{ left: 0; width: {W}px; top: 740px; text-align: center; font-size: 132px; }}
@@ -497,6 +567,7 @@ def build(reel):
         return build_teaser()
     elif reel == "zemmour":
         plan = [("moment", ("zemmour", 2451.95, 2461.18, 2.0, 7.0)),
+                ("fiche", lambda s: fiche(s, "IBZZAtCeH0k")),
                 ("cta", lambda s: cta(s))]
     else:
         raise SystemExit(f"réel inconnu : {reel}")
@@ -621,4 +692,7 @@ def hook_text(sid, dur):
 if __name__ == "__main__":
     if sys.stdout.encoding and sys.stdout.encoding.lower() != "utf-8":
         sys.stdout.reconfigure(encoding="utf-8", errors="replace")
-    build(sys.argv[1] if len(sys.argv) > 1 else "zemmour")
+    if len(sys.argv) > 2 and sys.argv[1] == "fiche":
+        capture_fiche(sys.argv[2])
+    else:
+        build(sys.argv[1] if len(sys.argv) > 1 else "zemmour")

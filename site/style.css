@@ -13,10 +13,13 @@
   --bg: #ffffff;
   --surface: #f6f5f1;
   --text: #1c1c1c;
+  --text-2: #333333;
+  --text-3: #444444;
   --muted: #5e5e5e;
   --rule: #e2e0da;
   --accent: #a3172c;
   --accent-hover: #7d1021;
+  --on-accent: #ffffff;
   --serif: 'Newsreader', Georgia, 'Times New Roman', serif;
   --sans: 'Archivo', system-ui, -apple-system, 'Segoe UI', sans-serif;
   --mono: 'IBM Plex Mono', ui-monospace, Consolas, monospace;
@@ -29,6 +32,31 @@
   --v-nr: #3c6585;
   --v-nv: #5b6270;
 }
+
+/* Thème sombre (fiche et résumé) : bouton « Thème sombre » ou ?theme=sombre
+   (theme.js). Mêmes couleurs que les vidéos : fond presque noir, verdicts
+   éclaircis pour rester lisibles. */
+:root[data-theme="sombre"] {
+  color-scheme: dark;
+  --bg: #0d0e12;
+  --surface: #181a20;
+  --text: #ecebe8;
+  --text-2: #d2d1cd;
+  --text-3: #bdbcb8;
+  --muted: #9a9da5;
+  --rule: #2b2e35;
+  --accent: #ee6060;
+  --accent-hover: #ff8f85;
+  --on-accent: #0d0e12;
+  --v-vrai: #73c076;
+  --v-partiel: #d4ac32;
+  --v-trompeur: #f08a3c;
+  --v-faux: #ee6060;
+  --v-nr: #7fa8cc;
+  --v-nv: #9ca3ae;
+}
+:root[data-theme="sombre"] .th-international { --th: #4a7cc0; }
+:root[data-theme="sombre"] .th-institutions { --th: #7b8794; }
 
 *, *::before, *::after { box-sizing: border-box; }
 [hidden] { display: none !important; }
@@ -86,7 +114,7 @@ ul, ol { padding-left: 1.3rem; }
 li + li { margin-top: 0.3rem; }
 strong { font-weight: 600; }
 
-.lede { font-size: 1.2rem; line-height: 1.55; color: #333; margin-bottom: 1.6rem; }
+.lede { font-size: 1.2rem; line-height: 1.55; color: var(--text-2); margin-bottom: 1.6rem; }
 .kicker {
   font-family: var(--sans); font-size: 0.75rem; letter-spacing: 0.09em; text-transform: uppercase;
   color: var(--muted); margin: 0 0 0.6rem;
@@ -98,9 +126,9 @@ strong { font-weight: 600; }
 /* Bouton principal (un seul par page, au plus) ; .secondary à côté de lui */
 .button {
   display: inline-block; font-family: var(--sans); font-size: 0.95rem; font-weight: 600;
-  color: #fff; background: var(--accent); padding: 0.65rem 1.3rem; border-radius: 2px; text-decoration: none;
+  color: var(--on-accent); background: var(--accent); padding: 0.65rem 1.3rem; border-radius: 2px; text-decoration: none;
 }
-.button:hover { background: var(--accent-hover); color: #fff; }
+.button:hover { background: var(--accent-hover); color: var(--on-accent); }
 .button.secondary { color: var(--text); background: transparent; box-shadow: inset 0 0 0 1px var(--rule); }
 .button.secondary:hover { color: var(--accent); background: transparent; box-shadow: inset 0 0 0 1px var(--accent); }
 
@@ -319,6 +347,10 @@ td:first-child { white-space: nowrap; }
 .f-meta { font-family: var(--sans); font-size: 0.92rem; color: var(--muted); margin: -0.4rem 0 1.2rem; }
 .f-ai { font-family: var(--sans); font-size: 0.8rem; color: var(--muted); margin: -1.1rem 0 1.4rem; }
 .f-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 0.6rem 1.4rem; font-family: var(--sans); font-size: 0.95rem; }
+/* Bouton du thème : se présente comme un lien */
+.theme-toggle { font: inherit; color: var(--accent); background: none; border: 0; padding: 0; cursor: pointer;
+  text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 0.18em; }
+.theme-toggle:hover { color: var(--accent-hover); }
 .f-toc { display: flex; flex-wrap: wrap; gap: 0.3rem 1.2rem; font-family: var(--sans); font-size: 0.88rem; padding: 0.7rem 0; margin: 1.4rem 0 0; border-top: 1px solid var(--rule); border-bottom: 1px solid var(--rule); }
 /* Une section par h2 : la règle générale (pas de filet au-dessus du premier
    h2 de son parent) les retirerait tous */
@@ -351,7 +383,7 @@ td:first-child { white-space: nowrap; }
 .f-card-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 0.3rem 0.6rem; margin: 0 0 0.45rem; font-family: var(--sans); font-size: 0.85rem; }
 .f-card blockquote, .f-contra blockquote { margin: 0 0 0.5rem; font-style: italic; font-size: 1.05rem; line-height: 1.45; }
 .f-why { margin: 0 0 0.45rem; font-weight: 500; }
-.f-expl { margin: 0; font-size: 0.93rem; color: #444; }
+.f-expl { margin: 0; font-size: 0.93rem; color: var(--text-3); }
 .f-ts { font-family: var(--sans); font-size: 0.82rem; white-space: nowrap; }
 
 .f-frise { display: flex; gap: 1px; height: 2.4rem; margin: 1.2rem 0 0.3rem; }
@@ -439,9 +471,12 @@ td:first-child { white-space: nowrap; }
    en un écran paysage, sans défilement. Tailles en px : celles du canevas. */
 
 .r-body { margin: 0; background: #e7e5df; overflow: hidden; }
-.r-tools { position: fixed; top: 8px; left: 12px; z-index: 2; font-family: var(--sans); font-size: 13px; }
-.r-tools a { color: var(--muted); text-decoration: none; }
-.r-tools a:hover { color: var(--accent); }
+:root[data-theme="sombre"] .r-body { background: #050608; }
+.r-tools { position: fixed; top: 8px; left: 12px; z-index: 2; display: flex; gap: 18px; font-family: var(--sans); font-size: 13px; }
+.r-tools a, .r-tools .theme-toggle { color: var(--muted); text-decoration: none; }
+.r-tools a:hover, .r-tools .theme-toggle:hover { color: var(--accent); }
+.r-export .r-tools { display: none; }
+.r-export .r-canvas { box-shadow: none; }
 .r-stage { position: fixed; inset: 0; overflow: hidden; }
 /* Centré par position absolue : centré par la grille, un canevas plus large
    que la fenêtre était calé à gauche avant la mise à l'échelle */
@@ -460,7 +495,7 @@ td:first-child { white-space: nowrap; }
 .r-kicker { display: flex; align-items: baseline; gap: 18px; margin: 0 0 10px; font-size: 15px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); }
 .r-brand { font-family: var(--serif); font-style: italic; font-weight: 500; font-size: 27px; letter-spacing: 0; text-transform: none; color: var(--text); }
 .r-brand span { color: var(--accent); }
-.r-title { font-family: var(--serif); font-weight: 500; font-size: 40px; line-height: 1.08; letter-spacing: -0.01em; margin: 0;
+.r-title { font-family: var(--serif); font-weight: 500; font-size: 40px; line-height: 1.08; letter-spacing: -0.01em; margin: -8px 0 0; padding-top: 8px;
   display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .r-kpis { display: flex; gap: 34px; }
 .r-kpi b { display: block; font-size: 58px; font-weight: 700; line-height: 0.9; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; white-space: nowrap; }
@@ -503,6 +538,7 @@ td:first-child { white-space: nowrap; }
 .r-sw { flex: none; width: 14px; height: 14px; background: var(--th); }
 
 .r-nums { display: grid; grid-template-columns: minmax(0, 1fr) 28px minmax(0, 1fr); gap: 2px 16px; align-items: baseline; }
+.r-num-row { display: contents; }
 .r-num-who { grid-column: 1 / -1; margin: 8px 0 0; font-size: 15px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .r-num-who strong { color: var(--text); font-weight: 600; }
 .r-num-who em { font-family: var(--serif); font-size: 17px; }
@@ -518,3 +554,61 @@ td:first-child { white-space: nowrap; }
 
 .r-foot { display: flex; justify-content: space-between; align-items: end; gap: 40px; padding-top: 12px; border-top: 1px solid var(--rule); font-size: 13px; line-height: 1.4; color: var(--muted); }
 .r-url { font-family: var(--mono); white-space: nowrap; color: var(--text); }
+
+/* ── Fiche verticale (resume.html?format=vertical) ─────────────────────── */
+/* Canevas 1080 × 1920 : la fin des vidéos verticales (réels, shorts). Les
+   débatteurs dans le haut de l'écran ; le bas peut être couvert par les
+   boutons et la légende des réseaux sociaux. */
+
+.r-canvas--v { width: 1080px; height: 1920px; padding: 96px 72px 64px; grid-template-rows: auto auto auto auto 1fr auto; gap: 40px; }
+.rv-head { padding-bottom: 34px; border-bottom: 2px solid var(--text); }
+.r-canvas--v .r-kicker { gap: 22px; margin: 0 0 24px; font-size: 19px; }
+.r-canvas--v .r-brand { font-size: 40px; }
+/* padding-top : les accents des capitales (É) dépassent la ligne, que overflow couperait */
+.rv-title { font-family: var(--serif); font-weight: 500; font-size: 66px; line-height: 1.07; letter-spacing: -0.012em; margin: -12px 0 0; padding-top: 12px;
+  display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.rv-meta { margin: 20px 0 0; font-size: 24px; color: var(--muted); }
+.rv-kpis { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 28px; }
+.r-canvas--v .r-kpi b { font-size: 84px; }
+.r-canvas--v .r-kpi span { margin-top: 12px; font-size: 17px; }
+
+.rv-debs { display: grid; gap: 40px; }
+.r-canvas--v .r-deb { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "name idx" "sub idx" "lab lab" "bar bar" "cnt cnt";
+  column-gap: 32px; padding: 34px 0 0; border-left: 0; border-top: 1px solid var(--rule); }
+.r-canvas--v .r-name { grid-area: name; align-self: end; font-size: 54px; line-height: 1.1; padding-top: 10px; }
+.r-canvas--v .r-sub { grid-area: sub; align-self: start; margin: 8px 0 0; font-size: 21px; }
+.r-canvas--v .r-idx { grid-area: idx; flex-direction: column; align-items: flex-end; gap: 8px; }
+.r-canvas--v .r-idx b { font-size: 142px; }
+.r-canvas--v .r-idx b small { font-size: 60px; }
+.r-canvas--v .r-idx span { font-size: 26px; }
+.r-canvas--v .r-idx--na { height: auto; justify-content: center; }
+.r-canvas--v .r-idx--na span { font-size: 30px; }
+.r-canvas--v .r-idx-l { grid-area: lab; margin: 22px 0 14px; font-size: 16px; }
+.r-canvas--v .r-bar { grid-area: bar; height: 22px; margin-bottom: 18px; }
+.r-canvas--v .r-counts { grid-area: cnt; gap: 12px; }
+.r-canvas--v .r-counts b { font-size: 50px; }
+.r-canvas--v .r-counts span { margin-top: 6px; font-size: 16px; }
+.r-canvas--v .r-comps { margin: -8px 0 0; font-size: 22px; min-height: 0; }
+
+.rv-more { display: grid; gap: 40px; align-content: start; min-height: 0; overflow: hidden; padding-top: 34px; border-top: 1px solid var(--rule); }
+.r-canvas--v .r-h { margin-bottom: 16px; font-size: 17px; }
+.r-canvas--v .r-nums { gap: 4px 18px; }
+.r-canvas--v .r-num-who { margin-top: 12px; font-size: 20px; }
+.r-canvas--v .r-num-who em { font-size: 22px; }
+.r-canvas--v .r-num-l { font-size: 14px; }
+.r-canvas--v .r-num-big { font-size: 44px; }
+.r-canvas--v .r-num-rest { font-size: 17px; }
+.r-canvas--v .r-frise { height: 40px; }
+.r-canvas--v .r-axis { font-size: 15px; margin: 8px 0 16px; }
+.r-canvas--v .r-themes { gap: 12px 40px; font-size: 22px; }
+.r-canvas--v .r-sw { width: 16px; height: 16px; }
+
+.rv-foot { display: grid; gap: 10px; padding-top: 18px; border-top: 1px solid var(--rule); font-size: 16px; line-height: 1.4; color: var(--muted); }
+.rv-foot .r-url { font-size: 22px; }
+
+/* Trois débatteurs ou plus : blocs resserrés, sans les chiffres contestés */
+.rv-many .rv-debs { gap: 28px; }
+.rv-many .r-deb { padding-top: 26px; }
+.rv-many .r-name { font-size: 44px; }
+.rv-many .r-idx b { font-size: 112px; }
+.rv-many .r-counts b { font-size: 40px; }

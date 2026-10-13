@@ -5,12 +5,19 @@
 // sans défilement) : l'exactitude de chaque débatteur, les thèmes, les
 // chiffres contestés et les sources. Met en forme sessions/<id>.fiche.json
 // (publish_session.py) — rien n'est recalculé ici.
+//
+// ?format=vertical : la même fiche en 1080 × 1920, pour la fin des vidéos
+// verticales (réels, shorts) ; ?theme=sombre : thème sombre (theme.js) ;
+// ?export=1 : sans marge ni boutons, pour une capture à la taille exacte.
 // ══════════════════════════════════════════════════════════════════════════════
 
 (function () {
   'use strict';
 
-  const W = 1600, H = 900, MARGIN = 16;
+  const params = new URLSearchParams(location.search);
+  const VERTICAL = params.get('format') === 'vertical';
+  const EXPORT = params.get('export') === '1';
+  const W = VERTICAL ? 1080 : 1600, H = VERTICAL ? 1920 : 900, MARGIN = EXPORT ? 0 : 16;
   const ID_RE = /^[\w-]{11}$/;
   const TRANCHES = ['vrai', 'partiellement_vrai', 'trompeur', 'faux'];
   const VERDICTS = {
@@ -20,6 +27,8 @@
     faux: { one: 'fausse', many: 'fausses', color: 'var(--v-faux)' },
   };
   const canvas = document.getElementById('r-canvas');
+  canvas.classList.toggle('r-canvas--v', VERTICAL);
+  document.body.classList.toggle('r-export', EXPORT);
 
   const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const pad = (n) => String(n).padStart(2, '0');
@@ -39,7 +48,7 @@
   function fit() {
     const s = Math.min((innerWidth - 2 * MARGIN) / W, (innerHeight - 2 * MARGIN) / H);
     canvas.style.setProperty('--r-scale', String(Math.max(0.1, s)));
-    document.body.classList.toggle('r-portrait', innerHeight > innerWidth * 1.1);
+    document.body.classList.toggle('r-portrait', !VERTICAL && innerHeight > innerWidth * 1.1);
   }
   addEventListener('resize', fit);
   fit();
@@ -47,7 +56,7 @@
   init();
 
   async function init() {
-    const id = new URLSearchParams(location.search).get('s') || '';
+    const id = params.get('s') || '';
     let index = { sessions: [] };
     try {
       index = await fetch('sessions/index.json', { cache: 'no-cache' }).then((r) => r.json());
@@ -58,21 +67,33 @@
       canvas.innerHTML = '<p class="r-loading">Aucun débat publié.</p>';
       return;
     }
-    document.getElementById('r-back').href = `fiche.html?s=${encodeURIComponent(entry.id)}`;
+    // Liens de la barre : fiche complète, autre format, dans le thème choisi
+    const links = () => {
+      const q = `?s=${encodeURIComponent(entry.id)}`;
+      const theme = window.vcTheme?.isDark() ? '&theme=sombre' : '';
+      document.getElementById('r-back').href = `fiche.html${q}`;
+      const other = document.getElementById('r-format');
+      other.href = `resume.html${q}${VERTICAL ? '' : '&format=vertical'}${theme}`;
+      other.textContent = VERTICAL ? 'Format paysage' : 'Format vertical';
+    };
+    links();
+    if (window.vcTheme) window.vcTheme.bind(document.getElementById('r-theme'), links);
+    else document.getElementById('r-theme').hidden = true;
     try {
       const r = await fetch(`sessions/${entry.id}.fiche.json`, { cache: 'no-cache' });
       if (!r.ok) throw new Error(r.status);
-      render(await r.json(), entry.id);
+      (VERTICAL ? renderVertical : render)(await r.json(), entry.id);
     } catch (_) {
       canvas.innerHTML = '<p class="r-loading">Impossible de charger ce débat.</p>';
     }
   }
 
   // « +19,3 % entre 2017 et 2024, selon l'Insee » → gros : « +19,3 % »,
-  // petit : le reste. Une fourchette reste entière (« 300 000 à 400 000 »).
-  const NUM = String.raw`[+−-]?\d[\d\s  .,]*`;
+  // petit : le reste. Une fourchette reste entière (« 300 000 à 400 000 »,
+  // « 26e ou 27e ») ; un rang garde son « e » (« 15e », pas « 15 » + « e »).
+  const NUM = String.raw`[+−-]?\d(?:[\d   .,]*\d)?(?:e|er|ère|ème)?`;
   const UNIT = String.raw`(?:\s?(?:%|€|M€|Md€|milliards?|millions?|euros?|ans|an|points?|postes?|élèves?))?`;
-  const FIGURE_RE = new RegExp(String.raw`^((?:environ|près de|plus de|moins de)\s)?(${NUM}${UNIT}(?:\s?(?:à|-|–)\s?${NUM}${UNIT})?)(.*)$`, 'i');
+  const FIGURE_RE = new RegExp(String.raw`^((?:environ|près de|plus de|moins de)\s)?(${NUM}${UNIT}(?:\s?(?:à|-|–|ou)\s?${NUM}${UNIT})?)(?=$|[\s,;:.)/])(.*)$`, 'i');
   function splitFigure(text) {
     const m = String(text || '').trim().match(FIGURE_RE);
     if (!m) return { big: '', rest: text };
@@ -110,12 +131,12 @@
       ? "<em class=\"r-sig\">au-delà de la marge d'erreur</em>" : "dans la marge d'erreur"}</span>`).join('');
   }
 
-  function themes(f) {
+  function themes(f, n = 6) {
     const frise = f.frise || [];
     const total = f.duree || (frise.length ? frise[frise.length - 1].fin : 0);
     const label = Object.fromEntries((f.themes || []).map((t) => [t.id, t.label]));
-    const top = (f.themes || []).filter((t) => t.id !== 'autre' && t.duree >= 60).slice(0, 6);
-    return `<section class="r-block">
+    const top = (f.themes || []).filter((t) => t.id !== 'autre' && t.duree >= 60).slice(0, n);
+    return `<section class="r-block r-themes-block">
       <p class="r-h">Le débat, thème par thème</p>
       <div class="r-frise">${frise.map((s) => `<i class="th-${esc(s.theme)}" style="flex-grow:${Math.max(1, s.fin - s.debut)}"
         title="${esc(label[s.theme] || s.theme)}"></i>`).join('')}</div>
@@ -140,10 +161,10 @@
     return `<section class="r-block">
       <p class="r-h">Chiffres contestés</p>
       <div class="r-nums"><span class="r-num-l">Annoncé</span><span></span><span class="r-num-l">Selon la source</span>
-        ${picked.map((c) => `<p class="r-num-who"><strong>${esc(c.qui)}</strong> — <em>« ${esc(claims.get(c.id) || c.annonce)} »</em></p>
+        ${picked.map((c) => `<div class="r-num-row"><p class="r-num-who"><strong>${esc(c.qui)}</strong> — <em>« ${esc(claims.get(c.id) || c.annonce)} »</em></p>
           <div><b class="r-num-big r-num-said" title="${esc(c.annonce)}">${esc(c.said.big)}</b><span class="r-num-rest">${esc(c.said.rest)}</span></div>
           <span class="r-num-arrow" aria-hidden="true">→</span>
-          <div><b class="r-num-big" title="${esc(c.selon_source)}">${esc(c.found.big)}</b><span class="r-num-rest">${esc(c.found.rest)}</span></div>`).join('')}</div>
+          <div><b class="r-num-big" title="${esc(c.selon_source)}">${esc(c.found.big)}</b><span class="r-num-rest">${esc(c.found.rest)}</span></div></div>`).join('')}</div>
     </section>`;
   }
 
@@ -181,7 +202,53 @@
       <footer class="r-foot">
         <span>Indice d'exactitude : vrai 1, partiel ½, trompeur et faux 0, sur les verdicts tranchés ; ± : marge d'erreur à 95 %.
           Calculé par le programme à partir de verdicts automatiques, qui peuvent se tromper.${topSources ? ` Sources les plus citées : ${esc(topSources)}.` : ''}</span>
-        <span class="r-url">vachecker.info/fiche.html?s=${esc(id)}</span>
+        <span class="r-url">vachecker.info/fiche?s=${esc(id)}</span>
       </footer>`;
+  }
+
+  // Format vertical : en-tête, chiffres clés, un débatteur par ligne, puis
+  // les chiffres contestés et les thèmes — l'essentiel dans le haut de
+  // l'écran, que les boutons des réseaux sociaux ne couvrent pas
+  function renderVertical(f, id) {
+    document.title = `${f.titre || 'Débat'} — fiche verticale vachecker.info`;
+    const t = f.totaux || {};
+    const v = t.verdicts || {};
+    const debs = f.debatteurs || [];
+    const many = debs.length > 2;
+    const meta = [fmtDate(f.date), f.duree ? `${fmtDur(f.duree)} de débat` : ''].filter(Boolean).join(' · ');
+    canvas.classList.toggle('rv-many', many);
+    canvas.innerHTML = `
+      <header class="rv-head">
+        <p class="r-kicker"><span class="r-brand">vachecker<span>.info</span></span><span>Fiche du débat</span></p>
+        <h1 class="rv-title">${esc(f.titre || 'Débat').replace(/(\w)-(\w)/g, '$1‑$2')}</h1>
+        ${meta ? `<p class="rv-meta">${esc(meta)}</p>` : ''}
+      </header>
+      <div class="rv-kpis">
+        <div class="r-kpi"><b>${Number(t.affirmations || 0)}</b><span>affirmations<br>vérifiées</span></div>
+        <div class="r-kpi"><b style="color:var(--v-faux)">${Number(v.faux || 0) + Number(v.trompeur || 0)}</b><span>fausses ou<br>trompeuses</span></div>
+        <div class="r-kpi"><b style="color:var(--v-vrai)">${Number(v.vrai || 0)}</b><span>vraies</span></div>
+      </div>
+      <div class="rv-debs">${debs.map((d) => debater(d, f.min_verdicts || 15)).join('')}</div>
+      <p class="r-comps">${comparisons(f)}</p>
+      <div class="rv-more">${many ? '' : figures(f)}${themes(f, 4)}</div>
+      <footer class="rv-foot">
+        <span class="r-url">vachecker.info/fiche?s=${esc(id)}</span>
+        <span>Indice d'exactitude : vrai 1, partiel ½, trompeur et faux 0 ; ± : marge d'erreur à 95 %.
+          Verdicts automatiques, qui peuvent se tromper : chacun est consultable avec sa source sur la fiche complète.</span>
+      </footer>`;
+    fitMore();
+  }
+
+  // Le bas de la fiche verticale prend ce qui tient : sans les thèmes, puis
+  // avec un seul chiffre contesté — jamais une ligne coupée
+  async function fitMore() {
+    try { await document.fonts.ready; } catch (_) { /* polices système */ }
+    const more = canvas.querySelector('.rv-more');
+    if (!more) return;
+    const over = () => more.scrollHeight > more.clientHeight + 1;
+    if (over()) more.querySelector('.r-themes-block')?.remove();
+    const rows = [...more.querySelectorAll('.r-num-row')];
+    while (over() && rows.length > 1) rows.pop().remove();
+    if (over()) more.innerHTML = '';
   }
 })();

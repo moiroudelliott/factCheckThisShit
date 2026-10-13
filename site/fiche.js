@@ -131,7 +131,16 @@
     $('f-meta').textContent = [fmtDate(fiche.date), fiche.duree ? fmtDur(fiche.duree) : '',
       t.affirmations ? plural(t.affirmations, 'affirmation vérifiée', 'affirmations vérifiées') : ''].filter(Boolean).join(' · ');
     $('f-replay').href = replayUrl(null);
-    $('f-resume-link').href = `resume.html?s=${encodeURIComponent(sid)}`;
+    // Résumé en un écran, paysage ou vertical (fin des vidéos), dans le thème choisi ici
+    const resumeLinks = () => {
+      const q = `resume.html?s=${encodeURIComponent(sid)}`;
+      const theme = window.vcTheme?.isDark() ? '&theme=sombre' : '';
+      $('f-resume-link').href = q + theme;
+      $('f-vertical').href = `${q}&format=vertical${theme}`;
+    };
+    resumeLinks();
+    if (window.vcTheme) window.vcTheme.bind($('f-theme'), resumeLinks);
+    else $('f-theme').hidden = true;
     $('f-generated').textContent = fmtDate(fiche.genere) || fiche.genere || '';
     $('f-min').textContent = fiche.min_verdicts || 15;
     const resume = fiche.redaction?.resume;

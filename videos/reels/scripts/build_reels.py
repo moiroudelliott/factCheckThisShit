@@ -36,9 +36,12 @@ FICHES = os.path.join(ROOT, "assets", "fiches")
 COMP = os.path.join(ROOT, "compositions")
 os.makedirs(COMP, exist_ok=True)
 W, H = 1080, 1920
-FRAME_Y, FRAME_H = 330, 1000          # fenêtre de l'extrait
-CAP_Y = FRAME_Y + FRAME_H + 22        # sous-titres
-CARD_Y = 850                          # la carte couvre le bas de l'extrait et les sous-titres
+# Interface d'Instagram par-dessus le réel : barre « Reels » en haut (≈ 230 px), boutons à droite
+# sous y ≈ 1080 (x > 930), nom du compte et légende en bas (y > 1500). Le texte reste hors de ces zones.
+SAFE_TOP, SAFE_BOTTOM, SAFE_RIGHT = 250, 1480, 915
+FRAME_Y, FRAME_H = 400, 880           # fenêtre de l'extrait (l'image peut passer sous les boutons, pas le texte)
+CAP_Y = FRAME_Y + FRAME_H + 20        # sous-titres, à gauche des boutons
+CARD_Y = 720                          # la carte couvre le bas de l'extrait et les sous-titres
 
 ACCENT = {"attente": "#9aa6b4", "vrai": "#73c076", "partiel": "#d4ac32", "trompeur": "#eba941", "faux": "#ee6060"}
 FOOT_COLOR = {"vrai": "#73c076", "partiel": "#d4ac32", "trompeur": "#eba941", "faux": "#f9786a"}
@@ -193,9 +196,11 @@ def write(name, text):
 
 
 def inner_box(crop):
+    """Position de la vidéo source dans le cadre : la fenêtre (x, y, l, h) remplit la largeur,
+    centrée en hauteur (le cadre est un peu moins haut que la fenêtre)."""
     x, y, cw, ch = crop
     k = W / cw
-    return dict(left=round(-x * k, 1), top=round(-y * k, 1), width=round(1920 * k, 1), height=round(1080 * k, 1))
+    return dict(left=round(-x * k, 1), top=round(FRAME_H / 2 - (y + ch / 2) * k, 1), width=round(1920 * k, 1), height=round(1080 * k, 1))
 
 
 def recrops(clip, a, dur, target, at):
@@ -223,19 +228,18 @@ def moment(sid, clip_id, a, b, guess, hold, track=3, card_id=None, at=0.0, hook=
     g0 = round(speech + 0.15, 2)            # « Vrai ou faux ? »
     c0 = round(g0 + guess, 2)               # la carte tombe
     dur = round(c0 + hold + 0.35, 2)
-    x, y, cw, ch = clip["crop"]
-    k = W / cw
+    ib = inner_box(clip["crop"])
     lane = {"version": 1, "lanes": [{"target": "volume", "points": [
         {"t": 0, "v": 0}, {"t": 0.12, "v": 1}, {"t": round(speech + 0.1, 2), "v": 1}, {"t": round(speech + 0.55, 2), "v": 0.16},
         {"t": round(c0 + 0.6, 2), "v": 0.07}, {"t": round(dur - 0.3, 2), "v": 0.07}, {"t": dur, "v": 0}]}]}
     media_start = round(a - 0.12 - clip["t0"], 2)
-    style = f"""§ .head {{ left: 72px; top: 196px; right: 72px; display: flex; align-items: baseline; justify-content: space-between; }}
+    style = f"""§ .head {{ left: 72px; top: 262px; right: {W - SAFE_RIGHT}px; display: flex; align-items: baseline; justify-content: space-between; }}
 § .head .logo {{ font-size: 44px; }}
 § .head .q {{ font-size: 26px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: rgba(255,255,255,0.55); }}
-§ .who {{ left: 72px; top: 262px; font-size: 30px; color: rgba(255,255,255,0.62); }}
+§ .who {{ left: 72px; top: 330px; font-size: 30px; color: rgba(255,255,255,0.62); }}
 § .who b {{ color: #fff; font-weight: 700; }}
 § .frame {{ left: 0; top: {FRAME_Y}px; width: {W}px; height: {FRAME_H}px; overflow: hidden; background: #000; }}
-§ .inner {{ position: absolute; left: {-x * k:.1f}px; top: {-y * k:.1f}px; width: {1920 * k:.1f}px; height: {1080 * k:.1f}px; }}
+§ .inner {{ position: absolute; left: {ib["left"]}px; top: {ib["top"]}px; width: {ib["width"]}px; height: {ib["height"]}px; }}
 § video {{ position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }}
 § .shade {{ position: absolute; inset: 0; background: rgba(8,9,12,0.62); opacity: 0; }}
 § .hshade {{ position: absolute; inset: 0; background: rgba(8,9,12,0.74); }}
@@ -243,11 +247,11 @@ def moment(sid, clip_id, a, b, guess, hold, track=3, card_id=None, at=0.0, hook=
 § .hook .hw {{ font-size: 58px; font-weight: 800; letter-spacing: -0.01em; color: rgba(255,255,255,0.85); }}
 § .hook .hq {{ font-family: 'SRC Newsreader', serif; font-style: italic; font-weight: 500; font-size: 100px; line-height: 1.06; }}
 § .hook .hv {{ font-size: 76px; font-weight: 800; letter-spacing: -0.01em; color: #f5c84c; }}
-§ .guess {{ left: 0; width: {W}px; top: {FRAME_Y + 330}px; text-align: center; }}
+§ .guess {{ left: 0; width: {W}px; top: {FRAME_Y + 290}px; text-align: center; }}
 § .guess .t {{ font-family: 'SRC Newsreader', serif; font-style: italic; font-weight: 500; font-size: 128px; line-height: 1; }}
 § .guess .bar {{ margin: 44px auto 0; width: 420px; height: 10px; border-radius: 5px; background: rgba(255,255,255,0.18); overflow: hidden; }}
 § .guess .bar i {{ display: block; height: 100%; background: #fff; transform-origin: 0 50%; }}
-§ .card {{ left: 60px; top: {CARD_Y}px; width: 960px; border-radius: 30px; overflow: hidden; --accent: {ACCENT[v]};
+§ .card {{ left: 48px; top: {CARD_Y}px; width: {SAFE_RIGHT - 48}px; border-radius: 30px; overflow: hidden; --accent: {ACCENT[v]};
   background: linear-gradient(180deg, rgba(22,24,29,0.97), rgba(15,16,20,0.97)); border: 2px solid rgba(255,255,255,0.10);
   box-shadow: 0 40px 110px rgba(0,0,0,0.6), 0 14px 70px color-mix(in srgb, var(--accent) 22%, transparent); }}
 § .card .bar {{ height: 7px; background: var(--accent); }}
@@ -318,17 +322,16 @@ def quote(sid, clip_id, a, b, dur, track, at=0.0, hold=0.08, tail=0.22):
     hold, tail : le son reste plein jusqu'à speech + hold, puis s'éteint à speech + tail
     (plus serré quand quelqu'un d'autre enchaîne aussitôt)."""
     clip = CLIPS[clip_id]
-    x, y, cw, ch = clip["crop"]
-    k = W / cw
+    ib = inner_box(clip["crop"])
     speech = round(b - a, 2)
     lane = {"version": 1, "lanes": [{"target": "volume", "points": [
         {"t": 0, "v": 0}, {"t": 0.06, "v": 1}, {"t": round(speech + hold, 2), "v": 1}, {"t": round(speech + tail, 2), "v": 0},
         {"t": dur, "v": 0}]}]}
     media_start = round(a - 0.12 - clip["t0"], 2)
-    style = f"""§ .nm {{ left: 72px; top: 178px; font-size: 64px; font-weight: 800; letter-spacing: -0.015em; line-height: 1; }}
-§ .wh {{ left: 74px; top: 258px; font-size: 30px; color: rgba(255,255,255,0.6); }}
+    style = f"""§ .nm {{ left: 72px; top: 262px; font-size: 64px; font-weight: 800; letter-spacing: -0.015em; line-height: 1; }}
+§ .wh {{ left: 74px; top: 342px; font-size: 30px; color: rgba(255,255,255,0.6); }}
 § .frame {{ left: 0; top: {FRAME_Y}px; width: {W}px; height: {FRAME_H}px; overflow: hidden; background: #000; }}
-§ .inner {{ position: absolute; left: {-x * k:.1f}px; top: {-y * k:.1f}px; width: {1920 * k:.1f}px; height: {1080 * k:.1f}px; }}
+§ .inner {{ position: absolute; left: {ib["left"]}px; top: {ib["top"]}px; width: {ib["width"]}px; height: {ib["height"]}px; }}
 § video {{ position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }}"""
     markup = f"""<div class="glow"></div>
 <div class="abs nm" id="{sid}-nm">{esc(clip["who"])}</div>
@@ -469,7 +472,7 @@ def captions(sid, total, spans):
                           f" tl.set('#{sid}-w{n}-{i}', {{ color: '#ffffff' }}, {round(start + t['e'] + 0.05, 2)});")
             n += 1
     style = f"""§ {{ background: transparent; }}
-§ .grp {{ position: absolute; left: 90px; width: 900px; top: {CAP_Y}px; text-align: center; opacity: 0;
+§ .grp {{ position: absolute; left: 60px; width: {SAFE_RIGHT - 60}px; top: {CAP_Y}px; text-align: center; opacity: 0;
   font-weight: 800; font-size: 50px; line-height: 1.18; letter-spacing: -0.005em; color: #fff; text-shadow: 0 3px 14px rgba(0,0,0,0.6); }}"""
     write(sid, scene(sid, total, style, "\n".join(items), "\n".join(js), bg="transparent"))
 
@@ -646,8 +649,9 @@ def intro_fiche(sid, debat, dur=2.6):
     style = """§ .ln { left: 72px; right: 72px; text-align: center; opacity: 0; }
 § .k { top: 620px; font-size: 54px; font-weight: 700; color: rgba(255,255,255,0.75); }
 § .num { top: 700px; font-family: 'SRC Newsreader', serif; font-style: italic; font-weight: 500; font-size: 250px; line-height: 1; color: #ee6060; font-variant-numeric: tabular-nums; }
-§ .lbl { top: 960px; font-family: 'SRC Newsreader', serif; font-style: italic; font-weight: 500; font-size: 92px; line-height: 1; }
-§ .sub { top: 1110px; font-size: 34px; line-height: 1.4; color: rgba(255,255,255,0.62); }"""
+§ .lbl { top: 960px; font-family: 'SRC Newsreader', serif; font-style: italic; font-weight: 500; font-size: 82px; line-height: 1; }
+§ .sub { top: 1110px; font-size: 30px; line-height: 1.4; color: rgba(255,255,255,0.62); }""" + (
+        f"\n§ .sub {{ left: {W - SAFE_RIGHT}px; right: {W - SAFE_RIGHT}px; }}")   # à gauche des boutons
     markup = f"""<div class="glow"></div>
 <div class="abs ln k" id="if-k">Et sur tout le débat&nbsp;?</div>
 <div class="abs ln num" id="if-n">{n}</div>
@@ -669,15 +673,15 @@ def fiche(sid, debat, dur=5.0):
     """La fiche du débat monte du bas, comme un écran de téléphone, puis se rapproche."""
     if not os.path.exists(fiche_png(debat)):
         capture_fiche(debat)
-    k = 0.86
-    style = f"""§ .sheet {{ left: {W * (1 - k) / 2:.0f}px; top: 120px; width: {W}px; height: {H}px; transform-origin: 0 0; }}
+    k = 0.72
+    style = f"""§ .sheet {{ left: {W * (1 - k) / 2:.0f}px; top: {SAFE_TOP}px; width: {W}px; height: {H}px; transform-origin: 0 0; }}
 § .sheet .in {{ position: absolute; inset: 0; border-radius: 34px; overflow: hidden; background: {BG};
   box-shadow: 0 50px 140px rgba(0,0,0,0.7), 0 0 0 2px rgba(255,255,255,0.08); }}
 § .sheet img {{ display: block; width: {W}px; height: {H}px; }}"""
     markup = f"""<div class="glow"></div>
 <div class="abs sheet" id="fi-s"><div class="in" id="fi-in"><img src="assets/fiches/{debat}-vertical-sombre.png" alt=""></div></div>"""
     script = f"""  tl.fromTo('#fi-s', {{ opacity: 0, y: 420, scale: {k - 0.06} }}, {{ opacity: 1, y: 0, scale: {k}, duration: 0.8, ease: 'expo.out' }}, 0);
-  tl.to('#fi-s', {{ scale: {k + 0.025}, x: -{W * 0.0125:.1f}, duration: {round(dur - 1.1, 2)}, ease: 'sine.inOut' }}, 0.8);
+  tl.to('#fi-s', {{ scale: {k + 0.012}, x: -{W * 0.006:.1f}, duration: {round(dur - 1.1, 2)}, ease: 'sine.inOut' }}, 0.8);
   tl.to('#fi-s', {{ opacity: 0, y: -40, duration: 0.3, ease: 'power2.in' }}, {round(dur - 0.3, 2)});"""
     write(sid, scene(sid, dur, style, markup, script))
     return dur

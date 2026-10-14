@@ -251,11 +251,11 @@ def moment(sid, clip_id, a, b, guess, hold, track=3, card_id=None, at=0.0, hook=
 § .guess .t {{ font-family: 'SRC Newsreader', serif; font-style: italic; font-weight: 500; font-size: 128px; line-height: 1; }}
 § .guess .bar {{ margin: 44px auto 0; width: 420px; height: 10px; border-radius: 5px; background: rgba(255,255,255,0.18); overflow: hidden; }}
 § .guess .bar i {{ display: block; height: 100%; background: #fff; transform-origin: 0 50%; }}
-§ .card {{ left: 48px; top: {CARD_Y}px; width: {SAFE_RIGHT - 48}px; border-radius: 30px; overflow: hidden; --accent: {ACCENT[v]};
+§ .card {{ left: {W - SAFE_RIGHT}px; top: {CARD_Y}px; width: {2 * SAFE_RIGHT - W}px; border-radius: 30px; overflow: hidden; --accent: {ACCENT[v]};
   background: linear-gradient(180deg, rgba(22,24,29,0.97), rgba(15,16,20,0.97)); border: 2px solid rgba(255,255,255,0.10);
   box-shadow: 0 40px 110px rgba(0,0,0,0.6), 0 14px 70px color-mix(in srgb, var(--accent) 22%, transparent); }}
 § .card .bar {{ height: 7px; background: var(--accent); }}
-§ .card .in {{ padding: 30px 38px 34px; }}
+§ .card .in {{ padding: 28px 34px 30px; }}
 § .card .top {{ display: flex; justify-content: space-between; align-items: center; margin-bottom: 22px; }}
 § .card .cb {{ font-family: 'SRC Newsreader', serif; font-style: italic; font-weight: 500; font-size: 30px; color: rgba(255,255,255,0.85); }}
 § .card .cb .d {{ font-style: normal; font-size: 18px; margin-right: 10px; color: var(--accent); }}
@@ -266,8 +266,8 @@ def moment(sid, clip_id, a, b, guess, hold, track=3, card_id=None, at=0.0, hook=
 § .card .meta {{ display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }}
 § .card .nm {{ font-size: 24px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); }}
 § .card .ts {{ font-family: 'SRC Plex Mono', monospace; font-size: 22px; color: rgba(255,255,255,0.7); border: 2px solid rgba(255,255,255,0.12); border-radius: 8px; padding: 2px 12px; }}
-§ .card .claim {{ margin: 0 0 22px; font-family: 'SRC Newsreader', serif; font-style: italic; font-size: 46px; line-height: 1.25; color: #fff; }}
-§ .card .body {{ margin: 0; font-size: 31px; line-height: 1.45; color: rgba(255,255,255,0.84); }}
+§ .card .claim {{ margin: 0 0 20px; font-family: 'SRC Newsreader', serif; font-style: italic; font-size: 42px; line-height: 1.25; color: #fff; }}
+§ .card .body {{ margin: 0; font-size: 29px; line-height: 1.42; color: rgba(255,255,255,0.84); }}
 § .card .foot {{ display: flex; justify-content: space-between; gap: 20px; margin-top: 24px; padding-top: 22px; border-top: 2px solid rgba(255,255,255,0.09); font-size: 24px; }}
 § .card .src {{ font-family: 'SRC Plex Mono', monospace; color: rgba(255,255,255,0.7); }}
 § .card .vd {{ font-weight: 600; color: {FOOT_COLOR[v]}; }}"""
@@ -472,7 +472,7 @@ def captions(sid, total, spans):
                           f" tl.set('#{sid}-w{n}-{i}', {{ color: '#ffffff' }}, {round(start + t['e'] + 0.05, 2)});")
             n += 1
     style = f"""§ {{ background: transparent; }}
-§ .grp {{ position: absolute; left: 60px; width: {SAFE_RIGHT - 60}px; top: {CAP_Y}px; text-align: center; opacity: 0;
+§ .grp {{ position: absolute; left: {W - SAFE_RIGHT}px; width: {2 * SAFE_RIGHT - W}px; top: {CAP_Y}px; text-align: center; opacity: 0;
   font-weight: 800; font-size: 50px; line-height: 1.18; letter-spacing: -0.005em; color: #fff; text-shadow: 0 3px 14px rgba(0,0,0,0.6); }}"""
     write(sid, scene(sid, total, style, "\n".join(items), "\n".join(js), bg="transparent"))
 

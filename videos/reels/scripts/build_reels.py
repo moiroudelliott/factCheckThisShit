@@ -23,6 +23,7 @@ import html
 import json
 import math
 import os
+import re
 import shutil
 import socket
 import subprocess
@@ -85,25 +86,51 @@ E = Q / 2
 DROP = 85.713
 
 # Moments : bornes de la phrase (repère des mots, mesurées au mot près), carte telle que publiée
-CARDS = {
-    "zemmour": dict(verdict="faux", tag="FAUX", ts="40:56", claim="Tous les terroristes sont musulmans",
-                    body="La France a connu des attentats terroristes non islamistes (ex : attentats d'extrême droite, séparatistes corses, etc.).",
-                    source="Wikipédia", foot="✗ démenti · 90%"),
-    "bardella": dict(verdict="trompeur", tag="TROMPEUR", ts="23:04",
-                     claim="Dès l'été, baisser la TVA de 20 % à 5,5 % sur l'électricité, le gaz, le fioul et le carburant",
-                     body="La directive européenne sur la TVA autorise un taux réduit sur l'électricité et le gaz. Pour le fioul et les carburants, en revanche, une TVA à 5,5 % serait contraire au droit européen.",
-                     source="Les Surligneurs", foot="⚠ trompeur · 90%"),
-    "bompard": dict(verdict="vrai", tag="VRAI", ts="17:34",
-                    claim="L'ONU a pointé un problème structurel de racisme dans la police française",
-                    body="Le Haut-Commissariat des Nations unies aux droits de l’homme a effectivement pointé en juin 2023 des « profonds problèmes de racisme et de discrimination raciale parmi les forces de l’ordre » en France.",
-                    source="Le Monde", foot="✓ confirmé · 95%"),
+# Réels « moment » : l'extrait, le débat et l'affirmation de la fiche publiée, les bornes de la
+# phrase (repère des mots). Carte, transition et fiche de fin sont lues dans la fiche du site.
+MOMENTS = {
+    "zemmour": dict(clip="zemmour", debat="IBZZAtCeH0k", aff="0d2cb45d", a=2451.95, b=2461.18,
+                    quote="Tous les terroristes sont musulmans"),
+    "bardella-tva": dict(clip="bardella", debat="2V70R8-Om7c", aff="a8088858", a=3.56, b=11.70,
+                         quote="Dès l'été, j'entends baisser la TVA de 20 % à 5,5 % sur […] le fioul, l'énergie et le carburant"),
+    "attal-farage": dict(clip="attal", debat="IWsfqdiX8vI", aff="ad888ac6", a=187.43, b=197.09,
+                         quote="[Jordan Bardella] a accepté […] que la France […] reçoive l'intégralité des personnes migrantes au Royaume-Uni"),
+    "bompard-salaire": dict(clip="bompard-salaire", debat="zZvdogH_fUM", aff="493f5a7a", a=16.16, b=17.92,
+                            quote="Vous n'avez pas augmenté le salaire des enseignants"),
+    "bompard-onu": dict(clip="bompard", debat="zZvdogH_fUM", aff="9dbb4249", a=1055.10, b=1064.08,
+                        quote="Quand l'organisation des Nations unies pointe […] un problème structurel de racisme dans la police, vous devez l'écouter"),
 }
+# quote : les mots exacts de l'orateur pour l'accroche (« … » ne doit jamais citer un résumé) ;
+# la carte garde l'affirmation telle que résumée dans la fiche du site.
+VERDICTS = {  # verdict de la fiche → (couleur, étiquette, pied de carte)
+    "vrai": ("vrai", "VRAI", "✓ confirmé"), "faux": ("faux", "FAUX", "✗ démenti"),
+    "trompeur": ("trompeur", "TROMPEUR", "⚠ trompeur"), "partiellement_vrai": ("partiel", "PARTIELLEMENT VRAI", "◐ partiel"),
+}
+
+
+def card_from_fiche(debat, aff):
+    """La carte d'une affirmation, telle que publiée dans la fiche du débat."""
+    with open(os.path.join(SITE, "sessions", f"{debat}.fiche.json"), encoding="utf-8") as f:
+        a = next(x for x in json.load(f)["affirmations"] if x["id"] == aff)
+    v, tag, foot = VERDICTS[a["verdict"]]
+    t = int(a["t"])
+    ts = f"{t // 3600}:{t % 3600 // 60:02d}:{t % 60:02d}" if t >= 3600 else f"{t // 60}:{t % 60:02d}"
+    return dict(verdict=v, tag=tag, ts=ts, claim=a["texte"], body=a["explication"], source=a["source"],
+                foot=f"{foot} · {a['confiance']}%")
 
 FIXES = {"fuel,": "fioul,", "Sommige,": "insoumise,", "Unies": "unies"}
 
 
 def esc(s):
     return html.escape(s, quote=False)
+
+
+def typo(s):
+    """Texte échappé, avec espaces insécables : « 20 % », « faux ? », « … » ne se coupent pas en fin de ligne."""
+    s = esc(s)
+    s = re.sub(r"(\d) %", r"\1&nbsp;%", s)
+    s = re.sub(r" ([?!:;»])", r"&nbsp;\1", s)
+    return s.replace("« ", "«&nbsp;")
 
 
 # Débuts de mots mal placés par la transcription, recalés sur le son (énergie par 20 ms)
@@ -218,11 +245,12 @@ def recrops(clip, a, dur, target, at):
 
 
 # ── Scène « moment » ─────────────────────────────────────────────────────────
-def moment(sid, clip_id, a, b, guess, hold, track=3, card_id=None, at=0.0, hook=0.0):
+def moment(sid, clip_id, a, b, guess, hold, card, track=3, at=0.0, hook=0.0):
     """a, b : début et fin de la phrase (repère des mots). Renvoie (durée, mots minutés).
     hook : durée de l'accroche (« Zemmour : « … » Vrai ou faux ? ») posée sur l'extrait
     dès la première image — c'est aussi la miniature du réel."""
-    clip, c = CLIPS[clip_id], CARDS[card_id or clip_id]
+    clip, c = CLIPS[clip_id], card
+    long = len(c["claim"]) > 80 or len(c["body"]) > 200
     v = c["verdict"]
     speech = round(b - a, 2)
     g0 = round(speech + 0.15, 2)            # « Vrai ou faux ? »
@@ -245,13 +273,13 @@ def moment(sid, clip_id, a, b, guess, hold, track=3, card_id=None, at=0.0, hook=
 § .hshade {{ position: absolute; inset: 0; background: rgba(8,9,12,0.74); }}
 § .hook {{ left: 60px; width: {W - 120}px; top: {FRAME_Y}px; height: {FRAME_H}px; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 30px; text-align: center; }}
 § .hook .hw {{ font-size: 58px; font-weight: 800; letter-spacing: -0.01em; color: rgba(255,255,255,0.85); }}
-§ .hook .hq {{ font-family: 'SRC Newsreader', serif; font-style: italic; font-weight: 500; font-size: 100px; line-height: 1.06; }}
+§ .hook .hq {{ font-family: 'SRC Newsreader', serif; font-style: italic; font-weight: 500; font-size: {100 if len(c["quote"]) <= 45 else 84 if len(c["quote"]) <= 80 else 68}px; line-height: 1.06; }}
 § .hook .hv {{ font-size: 76px; font-weight: 800; letter-spacing: -0.01em; color: #f5c84c; }}
 § .guess {{ left: 0; width: {W}px; top: {FRAME_Y + 290}px; text-align: center; }}
 § .guess .t {{ font-family: 'SRC Newsreader', serif; font-style: italic; font-weight: 500; font-size: 128px; line-height: 1; }}
 § .guess .bar {{ margin: 44px auto 0; width: 420px; height: 10px; border-radius: 5px; background: rgba(255,255,255,0.18); overflow: hidden; }}
 § .guess .bar i {{ display: block; height: 100%; background: #fff; transform-origin: 0 50%; }}
-§ .card {{ left: {W - SAFE_RIGHT}px; top: {CARD_Y}px; width: {2 * SAFE_RIGHT - W}px; border-radius: 30px; overflow: hidden; --accent: {ACCENT[v]};
+§ .card {{ left: {W - SAFE_RIGHT}px; top: {CARD_Y - (110 if long else 0)}px; width: {2 * SAFE_RIGHT - W}px; border-radius: 30px; overflow: hidden; --accent: {ACCENT[v]};
   background: linear-gradient(180deg, rgba(22,24,29,0.97), rgba(15,16,20,0.97)); border: 2px solid rgba(255,255,255,0.10);
   box-shadow: 0 40px 110px rgba(0,0,0,0.6), 0 14px 70px color-mix(in srgb, var(--accent) 22%, transparent); }}
 § .card .bar {{ height: 7px; background: var(--accent); }}
@@ -260,20 +288,20 @@ def moment(sid, clip_id, a, b, guess, hold, track=3, card_id=None, at=0.0, hook=
 § .card .cb {{ font-family: 'SRC Newsreader', serif; font-style: italic; font-weight: 500; font-size: 30px; color: rgba(255,255,255,0.85); }}
 § .card .cb .d {{ font-style: normal; font-size: 18px; margin-right: 10px; color: var(--accent); }}
 § .card .cb b {{ font-weight: 500; color: var(--accent); }}
-§ .card .tag {{ display: inline-flex; align-items: center; gap: 12px; padding: 9px 22px; border-radius: 999px; font-weight: 800; font-size: 30px; letter-spacing: 0.08em;
+§ .card .tag {{ display: inline-flex; align-items: center; gap: 12px; padding: 9px 22px; border-radius: 999px; font-weight: 800; font-size: {30 if len(c["tag"]) <= 10 else 24}px; letter-spacing: 0.08em;
   color: var(--accent); background: color-mix(in srgb, var(--accent) 16%, transparent); border: 3px solid color-mix(in srgb, var(--accent) 55%, transparent); }}
 § .card .tag i {{ width: 14px; height: 14px; border-radius: 50%; background: var(--accent); }}
 § .card .meta {{ display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }}
 § .card .nm {{ font-size: 24px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); }}
 § .card .ts {{ font-family: 'SRC Plex Mono', monospace; font-size: 22px; color: rgba(255,255,255,0.7); border: 2px solid rgba(255,255,255,0.12); border-radius: 8px; padding: 2px 12px; }}
-§ .card .claim {{ margin: 0 0 20px; font-family: 'SRC Newsreader', serif; font-style: italic; font-size: 42px; line-height: 1.25; color: #fff; }}
-§ .card .body {{ margin: 0; font-size: 29px; line-height: 1.42; color: rgba(255,255,255,0.84); }}
+§ .card .claim {{ margin: 0 0 20px; font-family: 'SRC Newsreader', serif; font-style: italic; font-size: {36 if long else 42}px; line-height: 1.25; color: #fff; }}
+§ .card .body {{ margin: 0; font-size: {26 if long else 29}px; line-height: 1.42; color: rgba(255,255,255,0.84); }}
 § .card .foot {{ display: flex; justify-content: space-between; gap: 20px; margin-top: 24px; padding-top: 22px; border-top: 2px solid rgba(255,255,255,0.09); font-size: 24px; }}
 § .card .src {{ font-family: 'SRC Plex Mono', monospace; color: rgba(255,255,255,0.7); }}
 § .card .vd {{ font-weight: 600; color: {FOOT_COLOR[v]}; }}"""
     hook_markup = (f"""
 <div class="abs hook" id="{sid}-hook"><div class="hw">{esc(clip["who"].split()[-1])}&nbsp;:</div>
-  <div class="hq">«&nbsp;{esc(c["claim"])}&nbsp;»</div><div class="hv">Vrai ou faux&nbsp;?</div></div>""" if hook else "")
+  <div class="hq">«&nbsp;{typo(c["quote"])}&nbsp;»</div><div class="hv">Vrai ou faux&nbsp;?</div></div>""" if hook else "")
     markup = f"""<div class="glow"></div>
 <div class="abs head" id="{sid}-head"><span class="logo">vachecker<b>.info</b></span><span class="q">Vrai ou faux&nbsp;?</span></div>
 <div class="abs who" id="{sid}-who"><b>{esc(clip["who"])}</b> · {esc(clip["where"])}</div>
@@ -287,8 +315,8 @@ def moment(sid, clip_id, a, b, guess, hold, track=3, card_id=None, at=0.0, hook=
   <div class="in">
     <div class="top"><span class="cb"><span class="d">◆</span>vachecker<b>.info</b></span><span class="tag" id="{sid}-tag"><i></i>{c["tag"]}</span></div>
     <div class="meta"><span class="nm">{esc(clip["who"])}</span><span class="ts">▶ {c["ts"]}</span></div>
-    <p class="claim">« {esc(c["claim"])} »</p>
-    <p class="body" id="{sid}-body">{esc(c["body"])}</p>
+    <p class="claim">«&nbsp;{typo(c["claim"])}&nbsp;»</p>
+    <p class="body" id="{sid}-body">{typo(c["body"])}</p>
     <div class="foot" id="{sid}-foot"><span class="src">{esc(c["source"])} ↗</span><span class="vd">{c["foot"]}</span></div>
   </div>
 </div>"""
@@ -718,10 +746,11 @@ def build(reel):
         return build_teaser()
     elif reel == "outro":
         plan = [("logo", lambda s: logo_outro(s))]
-    elif reel == "zemmour":
-        plan = [("moment", ("zemmour", 2451.95, 2461.18, 2.0, 7.0, 2.4)),
-                ("transition", lambda s: intro_fiche(s, "IBZZAtCeH0k")),
-                ("fiche", lambda s: fiche(s, "IBZZAtCeH0k")),
+    elif reel in MOMENTS:
+        m = MOMENTS[reel]
+        plan = [("moment", (m["clip"], m["a"], m["b"], 2.0, 7.0, 2.4, dict(card_from_fiche(m["debat"], m["aff"]), quote=m["quote"]))),
+                ("transition", lambda s: intro_fiche(s, m["debat"])),
+                ("fiche", lambda s: fiche(s, m["debat"])),
                 ("cta", lambda s: cta(s)),
                 ("logo", lambda s: logo_outro(s))]
     else:
@@ -731,8 +760,8 @@ def build(reel):
         if callable(spec):
             dur = spec(sid)
         else:
-            clip_id, a, b, guess, hold, *hook = spec
-            dur, toks, g0 = moment(sid, clip_id, a, b, guess, hold, track=3 + len(spans), at=t, hook=hook[0] if hook else 0.0)
+            clip_id, a, b, guess, hold, hook, card = spec
+            dur, toks, g0 = moment(sid, clip_id, a, b, guess, hold, card, track=3 + len(spans), at=t, hook=hook)
             spans.append((t, toks, g0))
         scenes.append((sid, t, dur))
         t = round(t + dur, 2)

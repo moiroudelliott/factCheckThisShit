@@ -673,15 +673,15 @@ def fiche(sid, debat, dur=5.0):
     """La fiche du débat monte du bas, comme un écran de téléphone, puis se rapproche."""
     if not os.path.exists(fiche_png(debat)):
         capture_fiche(debat)
-    k = 0.72
-    style = f"""§ .sheet {{ left: {W * (1 - k) / 2:.0f}px; top: {SAFE_TOP}px; width: {W}px; height: {H}px; transform-origin: 0 0; }}
+    k = 0.86                              # assez grande pour être lue ; tant pis si les boutons d'Instagram la touchent
+    style = f"""§ .sheet {{ left: {W * (1 - k) / 2:.0f}px; top: 120px; width: {W}px; height: {H}px; transform-origin: 0 0; }}
 § .sheet .in {{ position: absolute; inset: 0; border-radius: 34px; overflow: hidden; background: {BG};
   box-shadow: 0 50px 140px rgba(0,0,0,0.7), 0 0 0 2px rgba(255,255,255,0.08); }}
 § .sheet img {{ display: block; width: {W}px; height: {H}px; }}"""
     markup = f"""<div class="glow"></div>
 <div class="abs sheet" id="fi-s"><div class="in" id="fi-in"><img src="assets/fiches/{debat}-vertical-sombre.png" alt=""></div></div>"""
     script = f"""  tl.fromTo('#fi-s', {{ opacity: 0, y: 420, scale: {k - 0.06} }}, {{ opacity: 1, y: 0, scale: {k}, duration: 0.8, ease: 'expo.out' }}, 0);
-  tl.to('#fi-s', {{ scale: {k + 0.012}, x: -{W * 0.006:.1f}, duration: {round(dur - 1.1, 2)}, ease: 'sine.inOut' }}, 0.8);
+  tl.to('#fi-s', {{ scale: {k + 0.025}, x: -{W * 0.0125:.1f}, duration: {round(dur - 1.1, 2)}, ease: 'sine.inOut' }}, 0.8);
   tl.to('#fi-s', {{ opacity: 0, y: -40, duration: 0.3, ease: 'power2.in' }}, {round(dur - 0.3, 2)});"""
     write(sid, scene(sid, dur, style, markup, script))
     return dur

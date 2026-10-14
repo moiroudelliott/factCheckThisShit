@@ -39,9 +39,9 @@ W, H = 1080, 1920
 # Interface d'Instagram par-dessus le réel : barre « Reels » en haut (≈ 230 px), boutons à droite
 # sous y ≈ 1080 (x > 930), nom du compte et légende en bas (y > 1500). Le texte reste hors de ces zones.
 SAFE_TOP, SAFE_BOTTOM, SAFE_RIGHT = 250, 1480, 915
-FRAME_Y, FRAME_H = 400, 880           # fenêtre de l'extrait (l'image peut passer sous les boutons, pas le texte)
-CAP_Y = FRAME_Y + FRAME_H + 20        # sous-titres, à gauche des boutons
-CARD_Y = 720                          # la carte couvre le bas de l'extrait et les sous-titres
+FRAME_Y, FRAME_H = 400, 1000          # fenêtre de l'extrait (l'image peut passer sous les boutons, pas le texte)
+CAP_Y = FRAME_Y + FRAME_H + 16        # sous-titres : une seule ligne, juste au-dessus du nom du compte
+CARD_Y = 800                          # la carte couvre le bas de l'extrait et les sous-titres
 
 ACCENT = {"attente": "#9aa6b4", "vrai": "#73c076", "partiel": "#d4ac32", "trompeur": "#eba941", "faux": "#ee6060"}
 FOOT_COLOR = {"vrai": "#73c076", "partiel": "#d4ac32", "trompeur": "#eba941", "faux": "#f9786a"}
@@ -460,7 +460,7 @@ def captions(sid, total, spans):
     items, js = [], []
     n = 0
     for start, toks, stop in spans:
-        gs = groups(toks)
+        gs = groups(toks, max_chars=24)        # une ligne : rien ne descend dans la légende d'Instagram
         for gi, g in enumerate(gs):
             g_in = round(start + g[0]["s"], 2)
             g_out = round(start + (gs[gi + 1][0]["s"] if gi + 1 < len(gs) else min(stop, g[-1]["e"] + 0.4)), 2)
@@ -473,7 +473,7 @@ def captions(sid, total, spans):
             n += 1
     style = f"""§ {{ background: transparent; }}
 § .grp {{ position: absolute; left: {W - SAFE_RIGHT}px; width: {2 * SAFE_RIGHT - W}px; top: {CAP_Y}px; text-align: center; opacity: 0;
-  font-weight: 800; font-size: 50px; line-height: 1.18; letter-spacing: -0.005em; color: #fff; text-shadow: 0 3px 14px rgba(0,0,0,0.6); }}"""
+  font-weight: 800; font-size: 46px; line-height: 1.18; white-space: nowrap; letter-spacing: -0.005em; color: #fff; text-shadow: 0 3px 14px rgba(0,0,0,0.6); }}"""
     write(sid, scene(sid, total, style, "\n".join(items), "\n".join(js), bg="transparent"))
 
 

@@ -7,6 +7,8 @@ Usage :
     python scripts/build_reels.py extrait <id YouTube> <début> <durée> <nom>   # télécharge et transcrit un passage
     python scripts/build_reels.py legende <réel> # écrit la légende Instagram au format convenu
     python scripts/build_reels.py verifier <réel>  # citation, coupes, plans, légende + planche du cadrage
+    python scripts/build_reels.py rendre <réel>    # construit, lint, rend dans renders/a-publier
+    python scripts/build_reels.py etat             # vidéos à publier / déjà en ligne
 Mode d'emploi complet (et règles) : le skill reels-vachecker (.claude/skills/reels-vachecker/SKILL.md).
 
 La fiche de fin est une capture de la page du site
@@ -1016,7 +1018,7 @@ if __name__ == "__main__":
     cmd = sys.argv[1] if len(sys.argv) > 1 else "zemmour"
     if cmd == "fiche" and len(sys.argv) > 2:
         capture_fiche(sys.argv[2])
-    elif cmd in ("extrait", "legende", "verifier"):
+    elif cmd in ("extrait", "legende", "verifier", "rendre", "etat"):
         import outils_reels
         ok = getattr(outils_reels, cmd)(*sys.argv[2:])
         sys.exit(0 if ok is not False else 1)

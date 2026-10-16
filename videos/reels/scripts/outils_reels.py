@@ -3,6 +3,8 @@
     python scripts/build_reels.py extrait <id YouTube> <début s> <durée s> <nom>
     python scripts/build_reels.py legende <réel>
     python scripts/build_reels.py verifier <réel>
+    python scripts/build_reels.py rendre <réel>      # construit, lint, rend dans renders/a-publier
+    python scripts/build_reels.py etat               # à publier / déjà en ligne
 
 extrait  : télécharge le passage (yt-dlp), le réencode avec une image clé par seconde
            (HyperFrames cale l'image exacte) et le transcrit mot à mot (Whisper, en local).
@@ -27,6 +29,8 @@ import build_reels as b
 
 ROOT = b.ROOT
 LEGENDES = os.path.normpath(os.path.join(ROOT, "..", "..", "social", "legendes"))
+REGISTRE = os.path.normpath(os.path.join(ROOT, "..", "..", "social", "publications.json"))
+A_PUBLIER, PUBLIEES = os.path.join(ROOT, "renders", "a-publier"), os.path.join(ROOT, "renders", "publiees")
 VERDICT_LEGENDE = {"vrai": "✅ Vrai", "faux": "❌ Faux", "trompeur": "⚠️ Trompeur", "partiellement_vrai": "◐ Partiellement vrai"}
 
 
@@ -178,7 +182,7 @@ def verifier(reel):
     # 5. La planche : ce que montre le cadre, aux moments clés et dans chaque plan
     times = sorted({round(a + 0.3, 2), round((a + bb) / 2, 2), round(bb - 0.2, 2)}
                    | {round((x + y) / 2, 2) for x, y in zip([m0] + cuts, cuts + [m0 + dur])})
-    sheet = os.path.join(ROOT, "renders", f"verif-{reel}.jpg")
+    sheet = os.path.join(ROOT, "renders", "verif", f"{reel}.jpg")
     os.makedirs(os.path.dirname(sheet), exist_ok=True)
     with tempfile.TemporaryDirectory() as tmp:
         frames = []
@@ -217,3 +221,43 @@ def verifier(reel):
 
     print("✓ vérifications passées — reste à regarder la planche et le rendu" if ok else "✗ à corriger avant de rendre")
     return ok
+
+
+# ── Rendu et état des publications ───────────────────────────────────────────
+def _publies():
+    with open(REGISTRE, encoding="utf-8") as f:
+        return {p["reel"]: p for p in json.load(f)["publications"] if p["plateforme"] == "instagram"}
+
+
+def rendre(reel):
+    """Construit le réel, le vérifie (lint) et le rend dans renders/a-publier."""
+    deja = _publies().get(reel)
+    if deja:
+        print(f"⚠ « {reel} » est déjà en ligne ({deja['lien']}) : ce rendu ne se publiera qu'avec --republier")
+    b.build(reel)
+    npx = "npx.cmd" if os.name == "nt" else "npx"
+    lint = subprocess.run([npx, "--yes", "hyperframes@0.8.152", "lint"], cwd=ROOT, capture_output=True, text=True)
+    if " 0 errors" not in lint.stdout + lint.stderr:
+        print(lint.stdout[-2000:] + lint.stderr[-2000:])
+        raise SystemExit("✗ lint : erreurs à corriger avant de rendre")
+    os.makedirs(A_PUBLIER, exist_ok=True)
+    out = os.path.join(A_PUBLIER, f"vachecker-{reel}.mp4")
+    subprocess.run([npx, "--yes", "hyperframes@0.8.152", "render", "-o", out], cwd=ROOT, check=True,
+                   stdout=subprocess.DEVNULL)
+    print(f"✓ {os.path.relpath(out, ROOT)} — à regarder avant toute publication")
+
+
+def etat():
+    pub = _publies()
+    todo = sorted(f for f in os.listdir(A_PUBLIER) if f.endswith(".mp4")) if os.path.isdir(A_PUBLIER) else []
+    print("À publier (renders/a-publier) :")
+    for f in todo:
+        reel = f[len("vachecker-"):-4]
+        note = f"  ⚠ déjà en ligne : {pub[reel]['lien']}" if reel in pub else ""
+        leg = "" if os.path.exists(os.path.join(LEGENDES, f"{reel}.txt")) else "  (légende à écrire : legende)"
+        print(f"  · {reel}{leg}{note}")
+    if not todo:
+        print("  (rien)")
+    print("Déjà en ligne (social/publications.json) :")
+    for reel, p in sorted(pub.items(), key=lambda x: x[1]["date"]):
+        print(f"  ✓ {reel} — {p['date'][:10]} — {p['lien']}" + (f" ({p['note']})" if p.get("note") else ""))

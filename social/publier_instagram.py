@@ -2,10 +2,13 @@
 
     python social/publier_instagram.py verifier                 # la clé marche ? quel compte ?
     python social/publier_instagram.py rafraichir               # renouvelle la clé (valable 60 jours)
-    python social/publier_instagram.py publier REEL.mp4 --legende LEGENDE.txt [--miniature 0] [--confirme]
+    python social/publier_instagram.py publier REEL.mp4 --legende LEGENDE.txt [--miniature 0] [--confirme] [--republier]
 
 Sans --confirme, rien n'est envoyé : le script affiche ce qui serait publié. Chaque
 publication se fait après l'accord explicite de l'utilisateur, réel par réel.
+Les vidéos à publier sont dans videos/reels/renders/a-publier ; une fois en ligne, la vidéo
+passe dans renders/publiees et la publication s'inscrit dans social/publications.json
+(un réel déjà inscrit est refusé, sauf --republier).
 
 La clé est lue dans .env (INSTAGRAM_TOKEN) et n'est jamais affichée (4 derniers caractères
 au plus). Avec la connexion Instagram, Meta va chercher la vidéo à une adresse publique :
@@ -25,6 +28,8 @@ import urllib.request
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 ENV = os.path.join(ROOT, ".env")
+REGISTRE = os.path.join(ROOT, "social", "publications.json")
+RENDERS = os.path.join(ROOT, "videos", "reels", "renders")      # a-publier/ → publiees/ une fois en ligne
 API = "https://graph.instagram.com/v23.0"
 SSH_HOST = os.environ.get("SOURCE_SSH_HOST", "source-site")
 REMOTE_TMP = "domains/source.codeminds.fr/public_html/tmp-reels"
@@ -56,6 +61,36 @@ def write_token(new):
     lines = [l for l in lines if not l.startswith("INSTAGRAM_TOKEN=")] + [f"INSTAGRAM_TOKEN={new}"]
     with open(ENV, "w", encoding="utf-8", newline="\n") as f:
         f.write("\n".join(lines) + "\n")
+
+
+# ── Registre des publications ────────────────────────────────────────────────
+def registre():
+    with open(REGISTRE, encoding="utf-8") as f:
+        return json.load(f)
+
+
+def deja_publie(reel):
+    return next((p for p in registre()["publications"] if p["reel"] == reel and p["plateforme"] == "instagram"), None)
+
+
+def noter(reel, lien, video):
+    """Inscrit la publication au registre et range la vidéo dans renders/publiees."""
+    reg = registre()
+    reg["publications"].append({"reel": reel, "plateforme": "instagram",
+                                "date": time.strftime("%Y-%m-%dT%H:%M:%S+00:00", time.gmtime()), "lien": lien})
+    with open(REGISTRE, "w", encoding="utf-8", newline="\n") as f:
+        f.write(json.dumps(reg, ensure_ascii=False, indent=2) + "\n")
+    if os.path.basename(os.path.dirname(video)) == "a-publier":
+        dest = os.path.join(RENDERS, "publiees", os.path.basename(video))
+        os.makedirs(os.path.dirname(dest), exist_ok=True)
+        os.replace(video, dest)
+        print(f"✓ vidéo rangée dans {os.path.relpath(dest, ROOT)}")
+    print(f"✓ inscrit dans social/publications.json")
+
+
+def reel_de(video):
+    name = os.path.splitext(os.path.basename(video))[0]
+    return name[len("vachecker-"):] if name.startswith("vachecker-") else name
 
 
 # ── Appels ───────────────────────────────────────────────────────────────────
@@ -119,6 +154,11 @@ def publier(a):
     print(f"Réel      : {os.path.relpath(video, ROOT)} — {w}×{h}, {dur:.1f} s, {os.path.getsize(video) / 1e6:.1f} Mo")
     print(f"Miniature : image à {a.miniature} ms")
     print(f"Légende   : {len(caption)} caractères, {tags} hashtags\n" + "\n".join("  │ " + l for l in caption.splitlines()))
+    reel = reel_de(video)
+    deja = deja_publie(reel)
+    if deja and not a.republier:
+        problems.append(f"« {reel} » est déjà en ligne depuis le {deja['date'][:10]} ({deja['lien']}) — pour une nouvelle "
+                        "version, supprimer l'ancienne dans l'appli puis relancer avec --republier")
     if problems:
         raise SystemExit("✗ " + " ; ".join(problems))
     if not a.confirme:
@@ -148,6 +188,7 @@ def publier(a):
     finally:
         subprocess.run(ssh + [f"rm -f {REMOTE_TMP}/{name}"], check=False)
         print("✓ copie temporaire effacée du serveur")
+    noter(reel, link, video)
 
 
 def main():
@@ -162,6 +203,7 @@ def main():
     p.add_argument("--legende", required=True, help="fichier texte de la légende")
     p.add_argument("--miniature", type=int, default=0, help="image de couverture : position en millisecondes")
     p.add_argument("--confirme", action="store_true", help="publier pour de vrai (sinon : essai)")
+    p.add_argument("--republier", action="store_true", help="réel déjà en ligne : nouvelle version (l'ancienne supprimée dans l'appli)")
     p.set_defaults(fn=publier)
     a = ap.parse_args()
     a.fn(a)

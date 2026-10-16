@@ -1,0 +1,9 @@
+{
+  "info": "Réels publiés, un par ligne. Écrit par social/publier_instagram.py après chaque publication ; il refuse de republier un réel déjà là (sauf --republier).",
+  "publications": [
+    {"reel": "presentation", "plateforme": "instagram", "date": "2026-10-14T13:23:17+00:00", "lien": "https://www.instagram.com/reel/DeeeysejLpG/", "note": "teaser, épinglé"},
+    {"reel": "zemmour", "plateforme": "instagram", "date": "2026-10-14T13:37:36+00:00", "lien": "https://www.instagram.com/reel/DeegbokjyuT/"},
+    {"reel": "bardella-tva", "plateforme": "instagram", "date": "2026-10-15T06:56:52+00:00", "lien": "https://www.instagram.com/reel/DegXXi7EkI0/", "note": "version en ligne : sous-titres finissant sur « le carburant parce » (corrigé depuis dans le script)"},
+    {"reel": "attal-farage", "plateforme": "instagram", "date": "2026-10-15T06:57:38+00:00", "lien": "https://www.instagram.com/reel/DegXc6FCZ8A/"}
+  ]
+}

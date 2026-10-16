@@ -40,6 +40,16 @@ haut, les boutons à droite et la légende d'Instagram : n'y touchez pas.
    s'affichent jamais.
 6. **Publication** : jamais sans un « publie » explicite de l'utilisateur, réel par réel ; essai à
    blanc d'abord. L'API ne supprime ni n'épingle : c'est l'utilisateur qui le fait dans l'appli.
+   **Ce qui est en ligne ne se republie pas** (même corrigé) sans qu'il le demande : il supprime
+   l'ancienne version, puis `--republier`.
+
+## Où sont les vidéos
+
+- `videos/reels/renders/a-publier/` : réels rendus, pas encore en ligne.
+- `videos/reels/renders/publiees/` : réels en ligne (le script de publication les y range).
+- `social/publications.json` (versionné) : date et lien de chaque publication — c'est la référence.
+- `python scripts/build_reels.py etat` : ce qui reste à publier, ce qui est en ligne.
+- `videos/reels/renders/verif/` : planches de `verifier`.
 
 ## Étapes
 
@@ -67,20 +77,21 @@ Depuis `videos/reels` :
 6. **Légende et vérification** :
    `python scripts/build_reels.py legende <réel>` puis
    `python scripts/build_reels.py verifier <réel>` — tout doit être ✓ (un ⚠ se justifie).
-   **Regarder** `renders/verif-<réel>.jpg` : l'orateur visible et centré pendant la phrase.
+   **Regarder** `renders/verif/<réel>.jpg` : l'orateur visible et centré pendant la phrase.
 7. **Construire et contrôler** : `python scripts/build_reels.py <réel>`,
    `npx --yes hyperframes@0.8.152 lint` (0 erreur), snapshots aux moments clés
    (`npx --yes hyperframes@0.8.152 snapshot --at 0.4,<carte>,<fiche> --no-end --describe false`)
    et les regarder.
-8. **Rendre** : `npx --yes hyperframes@0.8.152 render -o renders/vachecker-<réel>.mp4`, puis
-   une planche à une image par seconde
-   (`ffmpeg -i renders/vachecker-<réel>.mp4 -vf "fps=1,scale=150:-1,tile=14x2" -frames:v 1 p.jpg`)
+8. **Rendre** : `python scripts/build_reels.py rendre <réel>` (construit, lint, rend dans
+   `renders/a-publier/vachecker-<réel>.mp4`), puis une planche à une image par seconde
+   (`ffmpeg -i renders/a-publier/vachecker-<réel>.mp4 -vf "fps=1,scale=150:-1,tile=14x2" -frames:v 1 p.jpg`)
    à regarder en entier, et le niveau sonore (≈ −16 LUFS : `-af ebur128`).
 9. **Livrer** : envoyer le rendu à l'utilisateur ; commit (script, légende, fiche capturée dans
    `assets/fiches`) puis `git push origin ameliorations` et `git push origin ameliorations:main`.
 10. **Publier** (après « publie ») depuis la racine du dépôt :
-    `python social/publier_instagram.py publier videos/reels/renders/vachecker-<réel>.mp4 --legende social/legendes/<réel>.txt`
-    (essai), puis la même commande avec `--confirme`. Renvoyer le lien.
+    `python social/publier_instagram.py publier videos/reels/renders/a-publier/vachecker-<réel>.mp4 --legende social/legendes/<réel>.txt`
+    (essai), puis la même commande avec `--confirme`. Le script range la vidéo dans `publiees/`
+    et inscrit le lien dans `social/publications.json` : committer ce fichier. Renvoyer le lien.
 
 ## Pièges déjà rencontrés
 

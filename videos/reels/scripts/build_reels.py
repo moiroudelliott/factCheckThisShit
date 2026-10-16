@@ -4,6 +4,10 @@ Usage :
     python scripts/build_reels.py presentation   # réel épinglé (≈ 27 s)
     python scripts/build_reels.py zemmour        # un moment, puis la fiche du débat (≈ 27 s)
     python scripts/build_reels.py fiche <id>     # (re)capture la fiche verticale sombre d'un débat
+    python scripts/build_reels.py extrait <id YouTube> <début> <durée> <nom>   # télécharge et transcrit un passage
+    python scripts/build_reels.py legende <réel> # écrit la légende Instagram au format convenu
+    python scripts/build_reels.py verifier <réel>  # citation, coupes, plans, légende + planche du cadrage
+Mode d'emploi complet (et règles) : le skill reels-vachecker (.claude/skills/reels-vachecker/SKILL.md).
 
 La fiche de fin est une capture de la page du site
 (resume.html?s=<id>&format=vertical&theme=sombre), en 1080 × 1920 :
@@ -75,6 +79,11 @@ CLIPS = {
                             crop=(1105, 142, 672, 622), who="Manuel Bompard", where="LCI · 2 octobre 2026"),
     "attal": dict(src="fj-attal-farage-171.mp4", words="fj-attal-farage-171.words.json", t0=171.0,
                   crop=(460, 20, 960, 889), who="Gabriel Attal", where="Franc-jeu · 20 septembre 2026"),
+    # Pendant sa phrase, la réalisation est sur le plan large : cadre serré sur lui (à droite, de
+    # trois quarts) ; au plan rapproché (1476,54), cadre d'origine
+    "geffray": dict(src="fj-geffray-mandela-1435.mp4", words="fj-geffray-mandela-1435.words.json", t0=1435.5,
+                    crop=(1300, 180, 520, 481), recrop=[(1476.54, (1100, 175, 820, 760))],
+                    who="Édouard Geffray", where="Franc-jeu · 4 octobre 2026"),
 }
 
 # ── Musique du teaser : « No Title » (102 BPM) ────────────────────────────────
@@ -90,15 +99,30 @@ DROP = 85.713
 # phrase (repère des mots). Carte, transition et fiche de fin sont lues dans la fiche du site.
 MOMENTS = {
     "zemmour": dict(clip="zemmour", debat="IBZZAtCeH0k", aff="0d2cb45d", a=2451.95, b=2461.18,
-                    quote="Tous les terroristes sont musulmans"),
+                    quote="Tous les terroristes sont musulmans",
+                    contexte="Éric Zemmour, face à Jean-Luc Mélenchon (BFMTV, 23 septembre 2021)",
+                    tags=["#zemmour", "#melenchon", "#debat", "#politique"]),
     "bardella-tva": dict(clip="bardella", debat="2V70R8-Om7c", aff="a8088858", a=3.56, b=11.70,
-                         quote="Dès l'été, j'entends baisser la TVA de 20 % à 5,5 % sur […] le fioul, l'énergie et le carburant"),
+                         quote="Dès l'été, j'entends baisser la TVA de 20 % à 5,5 % sur […] le fioul, l'énergie et le carburant",
+                         contexte="Jordan Bardella (France 2, débat des législatives, 27 juin 2024)",
+                         tags=["#bardella", "#legislatives", "#tva", "#debat", "#politique"]),
     "attal-farage": dict(clip="attal", debat="IWsfqdiX8vI", aff="ad888ac6", a=187.43, b=197.09,
-                         quote="[Jordan Bardella] a accepté […] que la France […] reçoive l'intégralité des personnes migrantes au Royaume-Uni"),
+                         quote="[Jordan Bardella] a accepté […] que la France […] reçoive l'intégralité des personnes migrantes au Royaume-Uni",
+                         contexte="Gabriel Attal face à Marion Maréchal (Franc-jeu, 20 septembre 2026)",
+                         tags=["#attal", "#bardella", "#farage", "#immigration", "#politique"]),
     "bompard-salaire": dict(clip="bompard-salaire", debat="zZvdogH_fUM", aff="493f5a7a", a=16.16, b=17.92,
-                            quote="Vous n'avez pas augmenté le salaire des enseignants"),
+                            quote="Vous n'avez pas augmenté le salaire des enseignants",
+                            contexte="Manuel Bompard (LCI, 2 octobre 2026)",
+                            tags=["#bompard", "#enseignants", "#education", "#debat", "#politique"]),
     "bompard-onu": dict(clip="bompard", debat="zZvdogH_fUM", aff="9dbb4249", a=1055.10, b=1064.08,
-                        quote="Quand l'organisation des Nations unies pointe […] un problème structurel de racisme dans la police, vous devez l'écouter"),
+                        quote="Quand l'organisation des Nations unies pointe […] un problème structurel de racisme dans la police, vous devez l'écouter",
+                        contexte="Manuel Bompard (LCI, 2 octobre 2026)",
+                        tags=["#bompard", "#police", "#onu", "#debat", "#politique"]),
+    # « …par exemple, le lycée Mandela » : phrase enchaînée, l'extrait part de la petite coupure avant « le »
+    "geffray-mandela": dict(clip="geffray", debat="Np12sKLLYro", aff="0ac94c98", a=1470.76, b=1473.30,
+                            quote="Le lycée Mandela, c'est 2 millions d'euros",
+                            contexte="Édouard Geffray, face à Manuel Bompard (Franc-jeu, 4 octobre 2026)",
+                            tags=["#geffray", "#lycee", "#education", "#debat", "#politique"]),
 }
 # quote : les mots exacts de l'orateur pour l'accroche (« … » ne doit jamais citer un résumé) ;
 # la carte garde l'affirmation telle que résumée dans la fiche du site.
@@ -150,7 +174,7 @@ def tokens(clip, a, b):
     """Mots prononcés entre a et b (repère des mots), apostrophes et virgules recollées."""
     out = []
     for w in words_of(clip):
-        if not (a - 0.05 <= w["s"] <= b + 0.05):
+        if not (a - 0.05 <= w["s"] <= b - 0.05):        # un mot qui commence à la fin de la phrase n'en est pas
             continue
         t = w["w"].strip()
         if not t or t in ("–", "-", "—"):
@@ -989,7 +1013,12 @@ def hook_text(sid, dur):
 if __name__ == "__main__":
     if sys.stdout.encoding and sys.stdout.encoding.lower() != "utf-8":
         sys.stdout.reconfigure(encoding="utf-8", errors="replace")
-    if len(sys.argv) > 2 and sys.argv[1] == "fiche":
+    cmd = sys.argv[1] if len(sys.argv) > 1 else "zemmour"
+    if cmd == "fiche" and len(sys.argv) > 2:
         capture_fiche(sys.argv[2])
+    elif cmd in ("extrait", "legende", "verifier"):
+        import outils_reels
+        ok = getattr(outils_reels, cmd)(*sys.argv[2:])
+        sys.exit(0 if ok is not False else 1)
     else:
-        build(sys.argv[1] if len(sys.argv) > 1 else "zemmour")
+        build(cmd)

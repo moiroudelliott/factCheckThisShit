@@ -7,6 +7,7 @@ build/
 pretrained_models/
 *.db
 voices/
-.claude/
+.claude/*
+!.claude/skills/
 brag-output/
 data/

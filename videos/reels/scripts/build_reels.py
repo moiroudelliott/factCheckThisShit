@@ -118,7 +118,7 @@ MOMENTS = {
                          quote="[Jordan Bardella] a accepté […] que la France […] reçoive l'intégralité des personnes migrantes au Royaume-Uni",
                          contexte="Gabriel Attal face à Marion Maréchal (Franc-jeu, 20 septembre 2026)",
                          tags=["#attal", "#bardella", "#farage", "#immigration", "#politique"]),
-    "bompard-salaire": dict(clip="bompard-salaire", debat="zZvdogH_fUM", aff="493f5a7a", a=16.16, b=17.92,
+    "bompard-salaire": dict(clip="bompard-salaire", debat="zZvdogH_fUM", aff="493f5a7a", a=16.20, b=17.92,
                             quote="Vous n'avez pas augmenté le salaire des enseignants",
                             contexte="Manuel Bompard (LCI, 2 octobre 2026)",
                             tags=["#bompard", "#enseignants", "#education", "#debat", "#politique"]),
@@ -142,6 +142,31 @@ VERDICTS = {  # verdict de la fiche → (couleur, étiquette, pied de carte)
     "vrai": ("vrai", "VRAI", "✓ confirmé"), "faux": ("faux", "FAUX", "✗ démenti"),
     "trompeur": ("trompeur", "TROMPEUR", "⚠ trompeur"), "partiellement_vrai": ("partiel", "PARTIELLEMENT VRAI", "◐ partiel"),
 }
+
+
+def clip_end(clip_id):
+    """Fin de l'extrait téléchargé, dans le repère des mots."""
+    clip = CLIPS[clip_id]
+    out = subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0",
+                          os.path.join(ROOT, "assets", "clips", clip["src"])], capture_output=True, text=True).stdout
+    return clip["t0"] + float(out.strip())
+
+
+def guess_start(speech, hook):
+    """« Vrai ou faux ? » : après la phrase, et pas avant que l'accroche s'efface
+    (phrase courte, accroche longue : le grand « Vrai ou faux ? » prend le relais)."""
+    return round(max(speech + 0.15, hook - 0.2), 2)
+
+
+def moment_timing(m, card):
+    """(deviner, tenue de la carte, accroche) : le temps de lire, ni plus ni moins.
+    Accroche : 2,4 à 5 s selon la citation ; carte : 7 à 13 s selon affirmation + explication,
+    sans dépasser la fin de l'extrait (le débat continue sous la carte)."""
+    guess = 2.0
+    hook = round(min(5.0, max(2.4, 1.6 + len(m["quote"]) / 30)), 2)
+    hold = min(13.0, max(7.0, 4.0 + (len(card["claim"]) + len(card["body"])) / 35))
+    room = clip_end(m["clip"]) - 0.2 - (m["a"] - 0.12) - guess_start(m["b"] - m["a"], hook) - guess - 0.35
+    return guess, round(min(hold, room), 2), hook
 
 
 def card_from_fiche(debat, aff):
@@ -289,7 +314,7 @@ def moment(sid, clip_id, a, b, guess, hold, card, track=3, at=0.0, hook=0.0):
     long = len(c["claim"]) > 80 or len(c["body"]) > 200
     v = c["verdict"]
     speech = round(b - a, 2)
-    g0 = round(speech + 0.15, 2)            # « Vrai ou faux ? »
+    g0 = guess_start(speech, hook)          # « Vrai ou faux ? »
     c0 = round(g0 + guess, 2)               # la carte tombe
     dur = round(c0 + hold + 0.35, 2)
     ib = inner_box(clip["crop"])
@@ -703,7 +728,7 @@ def capture_fiche(debat):
 MOIS = ["janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août", "septembre", "octobre", "novembre", "décembre"]
 
 
-def intro_fiche(sid, debat, dur=2.6):
+def intro_fiche(sid, debat, dur=3.2):
     """Avant la fiche : on passe de la phrase au débat entier (chiffres lus dans la fiche publiée)."""
     with open(os.path.join(SITE, "sessions", f"{debat}.fiche.json"), encoding="utf-8") as f:
         fi = json.load(f)
@@ -733,7 +758,7 @@ def intro_fiche(sid, debat, dur=2.6):
     return dur
 
 
-def fiche(sid, debat, dur=5.0):
+def fiche(sid, debat, dur=6.5):
     """La fiche du débat monte du bas, comme un écran de téléphone, puis se rapproche."""
     if not os.path.exists(fiche_png(debat)):
         capture_fiche(debat)
@@ -784,7 +809,9 @@ def build(reel):
         plan = [("logo", lambda s: logo_outro(s))]
     elif reel in MOMENTS:
         m = MOMENTS[reel]
-        plan = [("moment", (m["clip"], m["a"], m["b"], 2.0, 7.0, 2.4, dict(card_from_fiche(m["debat"], m["aff"]), quote=m["quote"]))),
+        card = dict(card_from_fiche(m["debat"], m["aff"]), quote=m["quote"])
+        guess, hold, hook = moment_timing(m, card)
+        plan = [("moment", (m["clip"], m["a"], m["b"], guess, hold, hook, card)),
                 ("transition", lambda s: intro_fiche(s, m["debat"])),
                 ("fiche", lambda s: fiche(s, m["debat"])),
                 ("cta", lambda s: cta(s)),

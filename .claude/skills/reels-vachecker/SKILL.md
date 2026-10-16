@@ -19,6 +19,13 @@ sur l'orateur, sous-titres mot à mot → « Vrai ou faux ? » et décompte → 
 débat → « La fiche complète du débat » → outro « va✓ ». La mise en page évite déjà la barre du
 haut, les boutons à droite et la légende d'Instagram : n'y touchez pas.
 
+**La cadence se calcule** (`moment_timing`, `guess_start`) : accroche de 2,4 à 5 s selon la
+longueur de la citation, carte de 7 à 13 s selon affirmation + explication (plafonnée par la
+fin de l'extrait), « Vrai ou faux ? » jamais avant que l'accroche s'efface, intro de la fiche
+3,2 s, fiche 6,5 s. Retour de l'utilisateur : « ça va un peu trop vite, on a du mal à lire » —
+ne pas raccourcir ces durées. Une carte plafonnée (extrait trop court) : retélécharger un
+extrait plus long plutôt que d'accepter une carte trop brève.
+
 ## Règles (non négociables)
 
 1. **Les textes de l'IA tels quels.** Verdict, affirmation, explication et source viennent de
@@ -59,7 +66,8 @@ Depuis `videos/reels` :
    `qui`, `verdict`, `confiance`, `texte`. L'id du débat est celui de la vidéo YouTube du site.
 2. **L'extrait** (s'il n'existe pas déjà dans `assets/clips`) :
    `python scripts/build_reels.py extrait <id YouTube> <t − 35> 60 <chaine>-<orateur>-<sujet>-<début>`
-   (télécharge le passage, une image clé par seconde, son ramené à −16 LUFS comme les autres
+   (prévoir au moins 20 s après la phrase : le débat continue sous la carte ;
+   télécharge le passage, une image clé par seconde, son ramené à −16 LUFS comme les autres
    extraits, transcription Whisper en local). Un extrait trop faible ou trop fort :
    `python scripts/build_reels.py normaliser <extrait>`.
    Exception : `2V70R8-Om7c` (législatives 2024) porte un bandeau de campagne ; les extraits

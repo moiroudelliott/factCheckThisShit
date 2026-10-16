@@ -139,7 +139,8 @@ def verifier(reel):
     clip = b.CLIPS[m["clip"]]
     a, bb = m["a"], m["b"]
     speech = bb - a
-    dur = speech + 0.15 + 2.0 + 7.0 + 0.35                 # durée de la scène « moment » (moment(), réglages par défaut)
+    guess, hold, hook = b.moment_timing(m, dict(b.card_from_fiche(m["debat"], m["aff"]), quote=m["quote"]))
+    dur = b.guess_start(speech, hook) + guess + hold + 0.35  # durée de la scène « moment »
     m0 = a - 0.12                                          # début de l'extrait dans la vidéo
     ok = True
 

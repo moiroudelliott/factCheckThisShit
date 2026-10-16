@@ -8,6 +8,7 @@ Usage :
     python scripts/build_reels.py legende <réel> # écrit la légende Instagram au format convenu
     python scripts/build_reels.py verifier <réel>  # citation, coupes, plans, légende + planche du cadrage
     python scripts/build_reels.py rendre <réel>    # construit, lint, rend dans renders/a-publier
+    python scripts/build_reels.py normaliser <extrait>  # son de l'extrait à −16 LUFS (fait par « extrait »)
     python scripts/build_reels.py etat             # vidéos à publier / déjà en ligne
 Mode d'emploi complet (et règles) : le skill reels-vachecker (.claude/skills/reels-vachecker/SKILL.md).
 
@@ -86,6 +87,11 @@ CLIPS = {
     "geffray": dict(src="fj-geffray-mandela-1435.mp4", words="fj-geffray-mandela-1435.words.json", t0=1435.5,
                     crop=(1300, 180, 520, 481), recrop=[(1476.54, (1100, 175, 820, 760))],
                     who="Édouard Geffray", where="Franc-jeu · 4 octobre 2026"),
+    # Écran partagé (Mélenchon à gauche) jusqu'à 6591,37, puis plan seul ; Zemmour seul sous la carte
+    "melenchon": dict(src="bfm-melenchon-optout-6546.mp4", words="bfm-melenchon-optout-6546.words.json", t0=6546.0,
+                      crop=(180, 140, 760, 704),
+                      recrop=[(6591.37, (625, 100, 860, 796)), (6599.87, (530, 100, 860, 796)), (6602.6, (625, 100, 860, 796))],
+                      who="Jean-Luc Mélenchon", where="BFMTV · 23 septembre 2021"),
 }
 
 # ── Musique du teaser : « No Title » (102 BPM) ────────────────────────────────
@@ -125,6 +131,10 @@ MOMENTS = {
                             quote="Le lycée Mandela, c'est 2 millions d'euros",
                             contexte="Édouard Geffray, face à Manuel Bompard (Franc-jeu, 4 octobre 2026)",
                             tags=["#geffray", "#lycee", "#education", "#debat", "#politique"]),
+    "melenchon-optout": dict(clip="melenchon", debat="IBZZAtCeH0k", aff="f7763b4a", a=6585.52, b=6593.40,
+                             quote="Quand ça ne correspond pas aux traités européens, je ferai opt-out […] la règle ne s'appliquera pas à la France",
+                             contexte="Jean-Luc Mélenchon, face à Éric Zemmour (BFMTV, 23 septembre 2021)",
+                             tags=["#melenchon", "#europe", "#traites", "#debat", "#politique"]),
 }
 # quote : les mots exacts de l'orateur pour l'accroche (« … » ne doit jamais citer un résumé) ;
 # la carte garde l'affirmation telle que résumée dans la fiche du site.
@@ -1018,7 +1028,7 @@ if __name__ == "__main__":
     cmd = sys.argv[1] if len(sys.argv) > 1 else "zemmour"
     if cmd == "fiche" and len(sys.argv) > 2:
         capture_fiche(sys.argv[2])
-    elif cmd in ("extrait", "legende", "verifier", "rendre", "etat"):
+    elif cmd in ("extrait", "normaliser", "legende", "verifier", "rendre", "etat"):
         import outils_reels
         ok = getattr(outils_reels, cmd)(*sys.argv[2:])
         sys.exit(0 if ok is not False else 1)

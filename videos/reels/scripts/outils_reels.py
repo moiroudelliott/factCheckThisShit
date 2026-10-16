@@ -35,6 +35,28 @@ VERDICT_LEGENDE = {"vrai": "✅ Vrai", "faux": "❌ Faux", "trompeur": "⚠️ T
 
 
 # ── Extrait ──────────────────────────────────────────────────────────────────
+LOUD = "I=-16:TP=-1.5:LRA=11"                              # même niveau que les extraits existants (−16 LUFS)
+
+
+def _loudnorm_args(src):
+    """Filtre de normalisation en deux passes (mesure, puis gain linéaire) vers −16 LUFS."""
+    out = subprocess.run(["ffmpeg", "-hide_banner", "-nostats", "-i", src, "-af", f"loudnorm={LOUD}:print_format=json",
+                          "-f", "null", "-"], capture_output=True, text=True).stderr
+    m = json.loads(out[out.rindex("{"):out.rindex("}") + 1])
+    return (f"loudnorm={LOUD}:measured_I={m['input_i']}:measured_TP={m['input_tp']}:measured_LRA={m['input_lra']}"
+            f":measured_thresh={m['input_thresh']}:offset={m['target_offset']}:linear=true")
+
+
+def normaliser(nom):
+    """Remet le son d'un extrait déjà téléchargé à −16 LUFS (vidéo inchangée)."""
+    path = os.path.join(ROOT, "assets", "clips", f"{nom}.mp4")
+    tmp = path + ".tmp.mp4"
+    subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", path, "-c:v", "copy", "-af", _loudnorm_args(path),
+                    "-ar", "48000", "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart", tmp], check=True)
+    os.replace(tmp, path)
+    print(f"✓ assets/clips/{nom}.mp4 : son normalisé à −16 LUFS")
+
+
 def extrait(vid, debut, duree, nom):
     debut, duree = float(debut), float(duree)
     clips, words = os.path.join(ROOT, "assets", "clips"), os.path.join(ROOT, "assets", "words")
@@ -49,8 +71,8 @@ def extrait(vid, debut, duree, nom):
                         f"https://www.youtube.com/watch?v={vid}"], check=True)
         src = next(os.path.join(tmp, f) for f in os.listdir(tmp) if f.startswith("brut."))
         subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", src, "-c:v", "libx264", "-preset", "medium", "-crf", "18",
-                        "-r", "30", "-g", "30", "-keyint_min", "30", "-pix_fmt", "yuv420p",
-                        "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart", out], check=True)
+                        "-r", "30", "-g", "30", "-keyint_min", "30", "-pix_fmt", "yuv420p", "-af", _loudnorm_args(src),
+                        "-ar", "48000", "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart", out], check=True)
     from faster_whisper import WhisperModel
     model = WhisperModel("mobiuslabsgmbh/faster-whisper-large-v3-turbo", device="cpu", compute_type="int8")
     segs, _ = model.transcribe(out, language="fr", word_timestamps=True, vad_filter=False)
@@ -244,7 +266,11 @@ def rendre(reel):
     out = os.path.join(A_PUBLIER, f"vachecker-{reel}.mp4")
     subprocess.run([npx, "--yes", "hyperframes@0.8.152", "render", "-o", out], cwd=ROOT, check=True,
                    stdout=subprocess.DEVNULL)
-    print(f"✓ {os.path.relpath(out, ROOT)} — à regarder avant toute publication")
+    meas = subprocess.run(["ffmpeg", "-hide_banner", "-nostats", "-i", out, "-af", "ebur128", "-f", "null", "-"],
+                          capture_output=True, text=True).stderr
+    lufs = float(re.findall(r"I:\s+(-?[\d.]+) LUFS", meas)[-1])
+    flag = "" if -19 <= lufs <= -13 else "  ⚠ hors de −19…−13 : normaliser l'extrait (normaliser <extrait>) et rendre de nouveau"
+    print(f"✓ {os.path.relpath(out, ROOT)} — son {lufs:.1f} LUFS{flag} — à regarder avant toute publication")
 
 
 def etat():

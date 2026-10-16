@@ -59,7 +59,9 @@ Depuis `videos/reels` :
    `qui`, `verdict`, `confiance`, `texte`. L'id du débat est celui de la vidéo YouTube du site.
 2. **L'extrait** (s'il n'existe pas déjà dans `assets/clips`) :
    `python scripts/build_reels.py extrait <id YouTube> <t − 35> 60 <chaine>-<orateur>-<sujet>-<début>`
-   (télécharge le passage, une image clé par seconde, transcription Whisper en local).
+   (télécharge le passage, une image clé par seconde, son ramené à −16 LUFS comme les autres
+   extraits, transcription Whisper en local). Un extrait trop faible ou trop fort :
+   `python scripts/build_reels.py normaliser <extrait>`.
    Exception : `2V70R8-Om7c` (législatives 2024) porte un bandeau de campagne ; les extraits
    viennent de la version France 2 `dFbfWKwEAEA`, décalée de −660 s.
 3. **Les bornes** `a` (début du premier mot) et `b` (fin du dernier) : lire
@@ -83,7 +85,8 @@ Depuis `videos/reels` :
    (`npx --yes hyperframes@0.8.152 snapshot --at 0.4,<carte>,<fiche> --no-end --describe false`)
    et les regarder.
 8. **Rendre** : `python scripts/build_reels.py rendre <réel>` (construit, lint, rend dans
-   `renders/a-publier/vachecker-<réel>.mp4`), puis une planche à une image par seconde
+   `renders/a-publier/vachecker-<réel>.mp4` et affiche le niveau sonore : ⚠ hors de −19…−13 LUFS),
+   puis une planche à une image par seconde
    (`ffmpeg -i renders/a-publier/vachecker-<réel>.mp4 -vf "fps=1,scale=150:-1,tile=14x2" -frames:v 1 p.jpg`)
    à regarder en entier, et le niveau sonore (≈ −16 LUFS : `-af ebur128`).
 9. **Livrer** : envoyer le rendu à l'utilisateur ; commit (script, légende, fiche capturée dans

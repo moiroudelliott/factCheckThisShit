@@ -13,7 +13,7 @@ legende  : écrit social/legendes/<réel>.txt au format convenu, depuis la fiche
            (explication et source de l'IA telles quelles, mention de l'IA).
 verifier : contrôle ce qu'un script ne garantit pas — la citation au mot près, le début
            de l'extrait (pas de bout de mot), les changements de plan pendant la phrase,
-           la légende — et fait une planche du cadrage à regarder : renders/verif-<réel>.jpg.
+           la légende — et fait une planche du cadrage à regarder : renders/verif/<réel>.jpg.
 """
 import json
 import math
